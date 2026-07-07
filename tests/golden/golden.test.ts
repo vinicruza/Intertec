@@ -4,11 +4,14 @@ import {
   ErroCalculoBloqueante,
   calcularAlocacao,
   calcularCMV,
+  calcularCMVsEmCascata,
   calcularPedido,
   precoSemImposto,
   toMoney,
   toPercent,
   type ComponenteFicha,
+  type InsumoCascata,
+  type ProdutoCascata,
 } from "@calc";
 
 // ============================================================
@@ -148,6 +151,56 @@ describe("Camada 4 — pedido completo", () => {
         aliquotaComissao: "0.025",
       })
     ).toThrow(ErroCalculoBloqueante);
+  });
+});
+
+describe("Camada 2b — recálculo de kit em cascata", () => {
+  // T8: um kit contém o produto Avental; o Avental consome a Bobina SMS.
+  // Mudar o preço da Bobina deve refletir no CMV do Avental E do kit.
+  const bobina = (precoComImposto: string): InsumoCascata => ({
+    id: "bobina-sms",
+    precoComImposto,
+    icms: "0.12",
+    pisCofins: "0.0925",
+  });
+  const produtos: ProdutoCascata[] = [
+    // Avental consome Bobina SMS por área (1 × 1,2 ÷ 0,99).
+    {
+      id: "avental",
+      componentes: [
+        { tipo: "insumo", insumoId: "bobina-sms", quantidade: { tipo: "area", largura: "1", comprimento: "1.2", rendimento: "0.99" } },
+      ],
+    },
+    // Kit leva 2 aventais.
+    {
+      id: "kit-avental",
+      componentes: [
+        { tipo: "produto", produtoId: "avental", quantidade: { tipo: "direta", quantidade: "2" } },
+      ],
+    },
+  ];
+
+  it("T8 — alterar o preço da Bobina SMS recalcula o CMV do kit", () => {
+    // Preço original 0,872 -> sem imposto 0,6867.
+    const antes = calcularCMVsEmCascata([bobina("0.872")], produtos);
+    // Dobrando o preço (1,744) -> sem imposto 1,3734 (o dobro).
+    const depois = calcularCMVsEmCascata([bobina("1.744")], produtos);
+
+    // O CMV do kit muda e, como o preço dobrou, o CMV do kit dobra.
+    const kitAntes = antes.get("kit-avental")!;
+    const kitDepois = depois.get("kit-avental")!;
+    expect(kitDepois.gt(kitAntes)).toBe(true);
+    esperarProximo(kitDepois, kitAntes.times(2).toString());
+    // Valor absoluto: 0,6867 × (1,2/0,99) × 2 = 1,664727…
+    esperarProximo(kitAntes, "1.664727");
+  });
+
+  it("detecta referência circular em cascata (A contém B contém A)", () => {
+    const circular: ProdutoCascata[] = [
+      { id: "A", componentes: [{ tipo: "produto", produtoId: "B", quantidade: { tipo: "direta", quantidade: "1" } }] },
+      { id: "B", componentes: [{ tipo: "produto", produtoId: "A", quantidade: { tipo: "direta", quantidade: "1" } }] },
+    ];
+    expect(() => calcularCMVsEmCascata([], circular)).toThrow(ErroCalculoBloqueante);
   });
 });
 
