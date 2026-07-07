@@ -9,3 +9,4 @@ export * from "./cmv";
 export * from "./allocation";
 export * from "./order";
 export * from "./cascade";
+export * from "./ficha";
