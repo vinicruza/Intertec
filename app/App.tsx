@@ -6,6 +6,8 @@ import LoginPage from "./pages/LoginPage";
 import ShellLayout from "./pages/ShellLayout";
 import InicioPage from "./pages/InicioPage";
 import PerfilPage from "./pages/PerfilPage";
+import InsumosPage from "./pages/InsumosPage";
+import InsumoFormPage from "./pages/InsumoFormPage";
 import EmBrevePage from "./pages/EmBrevePage";
 
 const queryClient = new QueryClient();
@@ -17,7 +19,6 @@ const rotasEmBreve: Array<{ caminho: string; titulo: string; sprint: string }> =
   { caminho: "/pedidos", titulo: "Histórico de pedidos", sprint: "Sprint 11" },
   { caminho: "/kits", titulo: "Kits", sprint: "Sprint 9" },
   { caminho: "/produtos", titulo: "Produtos e fichas", sprint: "Sprint 7" },
-  { caminho: "/insumos", titulo: "Insumos", sprint: "Sprint 6" },
   { caminho: "/alocacao", titulo: "Alocação de despesas", sprint: "Sprint 8" },
   { caminho: "/dre", titulo: "DRE mensal", sprint: "Sprint 12" },
   { caminho: "/configuracoes", titulo: "Configurações", sprint: "Sprint 6+" },
@@ -39,6 +40,18 @@ export default function App() {
             >
               <Route path="/" element={<InicioPage />} />
               <Route path="/perfil" element={<PerfilPage />} />
+              <Route
+                path="/insumos"
+                element={<ExigirAcesso caminho="/insumos"><InsumosPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/insumos/novo"
+                element={<ExigirAcesso caminho="/insumos"><InsumoFormPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/insumos/:id"
+                element={<ExigirAcesso caminho="/insumos"><InsumoFormPage /></ExigirAcesso>}
+              />
               {rotasEmBreve.map((r) => (
                 <Route
                   key={r.caminho}
