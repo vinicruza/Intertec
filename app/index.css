@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Tema base do Intertec. Cores neutras + um azul institucional.
+   Claro e escuro tratados via prefers-color-scheme no futuro; por ora, claro. */
+:root {
+  --cor-fundo: #f6f7f9;
+  --cor-cartao: #ffffff;
+  --cor-borda: #e3e6ea;
+  --cor-primaria: #1f5fa8;
+  --cor-texto: #1a2230;
+  --cor-texto-suave: #5a6472;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

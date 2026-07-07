@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
 // Estrutura de pastas do projeto (ver docs/02-Arquitetura.md):
@@ -9,7 +10,7 @@ import path from "node:path";
 //   lib/calculations/  motor de cálculo puro — sem dependência de UI ou banco
 //   tests/             testes automatizados (golden tests incluídos)
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@app": path.resolve(import.meta.dirname, "app"),
