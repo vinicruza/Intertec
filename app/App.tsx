@@ -1,8 +1,60 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "./auth/AuthProvider";
+import { ExigirAcesso, ExigirLogin } from "./auth/guards";
+import LoginPage from "./pages/LoginPage";
+import ShellLayout from "./pages/ShellLayout";
+import InicioPage from "./pages/InicioPage";
+import PerfilPage from "./pages/PerfilPage";
+import EmBrevePage from "./pages/EmBrevePage";
+
+const queryClient = new QueryClient();
+
+// Rotas que ainda são "em breve" (telas nas próximas sprints), cada uma
+// protegida por perfil conforme o menu (docs/04-UX.md §2 / lib/roles.ts).
+const rotasEmBreve: Array<{ caminho: string; titulo: string; sprint: string }> = [
+  { caminho: "/simulador", titulo: "Simulador de pedido", sprint: "Sprint 10" },
+  { caminho: "/pedidos", titulo: "Histórico de pedidos", sprint: "Sprint 11" },
+  { caminho: "/kits", titulo: "Kits", sprint: "Sprint 9" },
+  { caminho: "/produtos", titulo: "Produtos e fichas", sprint: "Sprint 7" },
+  { caminho: "/insumos", titulo: "Insumos", sprint: "Sprint 6" },
+  { caminho: "/alocacao", titulo: "Alocação de despesas", sprint: "Sprint 8" },
+  { caminho: "/dre", titulo: "DRE mensal", sprint: "Sprint 12" },
+  { caminho: "/configuracoes", titulo: "Configurações", sprint: "Sprint 6+" },
+];
+
 export default function App() {
   return (
-    <main>
-      <h1>Intertec — CMV e Rentabilidade</h1>
-      <p>Sistema em construção. Nenhuma tela antes da Sprint 5 (ver docs/01-PRD.md, Seção 10).</p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              element={
+                <ExigirLogin>
+                  <ShellLayout />
+                </ExigirLogin>
+              }
+            >
+              <Route path="/" element={<InicioPage />} />
+              <Route path="/perfil" element={<PerfilPage />} />
+              {rotasEmBreve.map((r) => (
+                <Route
+                  key={r.caminho}
+                  path={r.caminho}
+                  element={
+                    <ExigirAcesso caminho={r.caminho}>
+                      <EmBrevePage titulo={r.titulo} sprint={r.sprint} />
+                    </ExigirAcesso>
+                  }
+                />
+              ))}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
