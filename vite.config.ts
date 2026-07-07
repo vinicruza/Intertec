@@ -14,7 +14,7 @@ export default defineConfig({
     alias: {
       "@app": path.resolve(import.meta.dirname, "app"),
       "@components": path.resolve(import.meta.dirname, "components"),
-      "@calc": path.resolve(import.meta.dirname, "lib/calculations"),
+      "@calc": path.resolve(import.meta.dirname, "lib/calculations/index.ts"),
     },
   },
   test: {

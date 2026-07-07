@@ -17,6 +17,7 @@
     "paths": {
       "@app/*": ["./app/*"],
       "@components/*": ["./components/*"],
+      "@calc": ["./lib/calculations/index.ts"],
       "@calc/*": ["./lib/calculations/*"]
     }
   },
