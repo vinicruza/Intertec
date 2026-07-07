@@ -1,6 +1,6 @@
 # CI — verificação automática a cada push e pull request.
-# Roda: instalação, checagem de tipos, lint e testes.
-# Os golden tests do Calculations.md §11 rodarão aqui a partir da Sprint 3.
+# Roda: instalação, checagem de tipos, lint e testes (inclui os golden
+# tests obrigatórios do Calculations.md §11 — se um quebrar, o CI falha).
 name: CI
 
 on:
