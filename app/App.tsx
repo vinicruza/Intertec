@@ -14,6 +14,7 @@ import AlocacaoPage from "./pages/AlocacaoPage";
 import AlocacaoPeriodoPage from "./pages/AlocacaoPeriodoPage";
 import KitsPage from "./pages/KitsPage";
 import KitFormPage from "./pages/KitFormPage";
+import SimuladorPage from "./pages/SimuladorPage";
 import EmBrevePage from "./pages/EmBrevePage";
 
 const queryClient = new QueryClient();
@@ -21,7 +22,6 @@ const queryClient = new QueryClient();
 // Rotas que ainda são "em breve" (telas nas próximas sprints), cada uma
 // protegida por perfil conforme o menu (docs/04-UX.md §2 / lib/roles.ts).
 const rotasEmBreve: Array<{ caminho: string; titulo: string; sprint: string }> = [
-  { caminho: "/simulador", titulo: "Simulador de pedido", sprint: "Sprint 10" },
   { caminho: "/pedidos", titulo: "Histórico de pedidos", sprint: "Sprint 11" },
   { caminho: "/dre", titulo: "DRE mensal", sprint: "Sprint 12" },
   { caminho: "/configuracoes", titulo: "Configurações", sprint: "Sprint 6+" },
@@ -86,6 +86,10 @@ export default function App() {
               <Route
                 path="/kits/:id"
                 element={<ExigirAcesso caminho="/kits"><KitFormPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/simulador"
+                element={<ExigirAcesso caminho="/simulador"><SimuladorPage /></ExigirAcesso>}
               />
               {rotasEmBreve.map((r) => (
                 <Route
