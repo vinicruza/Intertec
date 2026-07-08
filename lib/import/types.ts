@@ -29,6 +29,9 @@ export type InsumoImportado = {
 export type ConsumoInsumo = {
   linhaInsumo: number;
   quantidade: Decimal;
+  // Custo do componente na própria planilha (2ª coluna do bloco). Nas fichas
+  // com fórmula especial, é a ÚNICA verdade do custo — a carga usa este valor.
+  custoPlanilha: Decimal | null;
 };
 
 export type ProdutoImportado = {

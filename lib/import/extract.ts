@@ -81,8 +81,15 @@ export function extrairProdutos(p: Planilha, insumos: InsumoImportado[]): Produt
     const nome = texto(p.valor(ABA_INPUT, PRODUTO_LINHA_NOME, coluna));
     if (!nome) continue;
     const consumos = insumos
-      .map((ins) => ({ linhaInsumo: ins.linha, quantidade: paraDecimal(p.valor(ABA_INPUT, ins.linha, coluna)) }))
-      .filter((c): c is { linhaInsumo: number; quantidade: Decimal } => c.quantidade !== null && !c.quantidade.isZero());
+      .map((ins) => ({
+        linhaInsumo: ins.linha,
+        quantidade: paraDecimal(p.valor(ABA_INPUT, ins.linha, coluna)),
+        custoPlanilha: paraDecimal(p.valor(ABA_INPUT, ins.linha, coluna + PRODUTO_OFFSET_CUSTO)),
+      }))
+      .filter(
+        (c): c is { linhaInsumo: number; quantidade: Decimal; custoPlanilha: Decimal | null } =>
+          c.quantidade !== null && !c.quantidade.isZero()
+      );
     // CMV que a planilha realmente calcula: soma da coluna "Custo" do bloco.
     let cmvPlanilhaCusto = new Decimal(0);
     for (const ins of insumos) {
