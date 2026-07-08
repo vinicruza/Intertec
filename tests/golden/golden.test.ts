@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Decimal,
   ErroCalculoBloqueante,
+  assinaturaKit,
   calcularAlocacao,
   calcularCMV,
   calcularCMVsEmCascata,
@@ -201,6 +202,47 @@ describe("Camada 2b — recálculo de kit em cascata", () => {
       { id: "B", componentes: [{ tipo: "produto", produtoId: "A", quantidade: { tipo: "direta", quantidade: "1" } }] },
     ];
     expect(() => calcularCMVsEmCascata([], circular)).toThrow(ErroCalculoBloqueante);
+  });
+});
+
+describe("Kits — assinatura única (PRD §6.5)", () => {
+  it("T10 — mesma composição em ordem diferente gera a mesma assinatura", () => {
+    const ordemA = assinaturaKit([
+      { produtoId: "produto_7", quantidade: "1" },
+      { produtoId: "produto_3", quantidade: "2" },
+      { produtoId: "produto_12", quantidade: "5" },
+    ]);
+    const ordemB = assinaturaKit([
+      { produtoId: "produto_12", quantidade: "5" },
+      { produtoId: "produto_3", quantidade: "2" },
+      { produtoId: "produto_7", quantidade: "1" },
+    ]);
+    expect(ordemA).toBe(ordemB);
+    expect(ordemA).toBe("produto_12:5|produto_3:2|produto_7:1");
+
+    // Composição diferente (quantidade mudou) → assinatura diferente.
+    const outra = assinaturaKit([
+      { produtoId: "produto_3", quantidade: "3" },
+      { produtoId: "produto_7", quantidade: "1" },
+      { produtoId: "produto_12", quantidade: "5" },
+    ]);
+    expect(outra).not.toBe(ordemA);
+  });
+
+  it("consolida itens repetidos e normaliza quantidades equivalentes", () => {
+    // 2 + 3 do mesmo produto = 5; "5.0" e "5" são a mesma quantidade.
+    const somada = assinaturaKit([
+      { produtoId: "p1", quantidade: "2" },
+      { produtoId: "p1", quantidade: "3" },
+    ]);
+    const direta = assinaturaKit([{ produtoId: "p1", quantidade: "5.0" }]);
+    expect(somada).toBe(direta);
+    expect(direta).toBe("p1:5");
+  });
+
+  it("kit sem itens ou com quantidade inválida é erro bloqueante", () => {
+    expect(() => assinaturaKit([])).toThrow(ErroCalculoBloqueante);
+    expect(() => assinaturaKit([{ produtoId: "p1", quantidade: "0" }])).toThrow(ErroCalculoBloqueante);
   });
 });
 
