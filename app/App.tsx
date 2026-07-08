@@ -10,6 +10,8 @@ import InsumosPage from "./pages/InsumosPage";
 import InsumoFormPage from "./pages/InsumoFormPage";
 import ProdutosPage from "./pages/ProdutosPage";
 import ProdutoFormPage from "./pages/ProdutoFormPage";
+import AlocacaoPage from "./pages/AlocacaoPage";
+import AlocacaoPeriodoPage from "./pages/AlocacaoPeriodoPage";
 import EmBrevePage from "./pages/EmBrevePage";
 
 const queryClient = new QueryClient();
@@ -20,7 +22,6 @@ const rotasEmBreve: Array<{ caminho: string; titulo: string; sprint: string }> =
   { caminho: "/simulador", titulo: "Simulador de pedido", sprint: "Sprint 10" },
   { caminho: "/pedidos", titulo: "Histórico de pedidos", sprint: "Sprint 11" },
   { caminho: "/kits", titulo: "Kits", sprint: "Sprint 9" },
-  { caminho: "/alocacao", titulo: "Alocação de despesas", sprint: "Sprint 8" },
   { caminho: "/dre", titulo: "DRE mensal", sprint: "Sprint 12" },
   { caminho: "/configuracoes", titulo: "Configurações", sprint: "Sprint 6+" },
 ];
@@ -64,6 +65,14 @@ export default function App() {
               <Route
                 path="/produtos/:id"
                 element={<ExigirAcesso caminho="/produtos"><ProdutoFormPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/alocacao"
+                element={<ExigirAcesso caminho="/alocacao"><AlocacaoPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/alocacao/:id"
+                element={<ExigirAcesso caminho="/alocacao"><AlocacaoPeriodoPage /></ExigirAcesso>}
               />
               {rotasEmBreve.map((r) => (
                 <Route
