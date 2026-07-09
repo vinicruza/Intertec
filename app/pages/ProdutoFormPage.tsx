@@ -39,7 +39,7 @@ export default function ProdutoFormPage() {
 
   const { register, control, handleSubmit, reset, watch } = useForm<ProdutoForm>({
     defaultValues: {
-      code: "", name: "", category: "", type: "", sterile: false, size: "", grammage: "",
+      name: "", category: "", type: "", sterile: false, size: "", grammage: "",
       componentes: [COMPONENTE_VAZIO],
     },
   });
@@ -54,7 +54,7 @@ export default function ProdutoFormPage() {
     const p = produtoQuery.data;
     if (!p) return;
     reset({
-      code: p.produto.code, name: p.produto.name, category: p.produto.category ?? "",
+      name: p.produto.name, category: p.produto.category ?? "",
       type: p.produto.type ?? "", sterile: p.produto.sterile ?? false,
       size: p.produto.size ?? "", grammage: p.produto.grammage ?? "",
       componentes: p.componentes.length
@@ -110,16 +110,27 @@ export default function ProdutoFormPage() {
 
   return (
     <div className="max-w-4xl space-y-4">
-      <h1 className="text-2xl font-semibold">{editando ? "Editar produto" : "Novo produto"}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold">{editando ? "Editar produto" : "Novo produto"}</h1>
+        {editando && produtoQuery.data && (
+          <span className="rounded-full bg-[var(--cor-fundo)] px-3 py-1 text-sm text-[var(--cor-texto-suave)]">
+            {produtoQuery.data.produto.code}
+          </span>
+        )}
+      </div>
+      {!editando && (
+        <p className="text-sm text-[var(--cor-texto-suave)]">
+          O código do produto é gerado automaticamente ao salvar.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit((f) => salvar.mutate(f))} className="space-y-4" noValidate>
         <Card className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Código</Label><Input {...register("code", { required: true })} /></div>
             <div><Label>Nome</Label><Input {...register("name", { required: true })} /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
             <div><Label>Categoria</Label><Input {...register("category")} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div><Label>Tamanho</Label><Input {...register("size")} /></div>
             <div><Label>Gramatura</Label><Input {...register("grammage")} /></div>
           </div>

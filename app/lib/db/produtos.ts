@@ -30,8 +30,9 @@ export type ComponenteForm = {
   lot_size: string; // lote
 };
 
+// O código (P001, P002...) é gerado pelo banco (sequência atômica) — o
+// usuário nunca digita um.
 export type ProdutoForm = {
-  code: string;
   name: string;
   category: string;
   type: string;
@@ -162,7 +163,6 @@ function componentesParaBanco(produtoId: string, form: ProdutoForm) {
 export async function salvarProduto(id: string | null, form: ProdutoForm): Promise<string> {
   const campos = {
     tenant_id: TENANT_FIXO,
-    code: form.code.trim(),
     name: form.name.trim(),
     category: form.category.trim() || null,
     type: form.type.trim() || null,

@@ -5,7 +5,7 @@ const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
 
 export type KitLinha = {
   id: string;
-  code: string | null;
+  code: string; // gerado pelo banco (K001, K002...)
   name: string;
   description: string | null;
   signature: string;
@@ -36,8 +36,9 @@ export async function obterKit(id: string): Promise<KitLinha | null> {
   return (data as unknown as KitLinha) ?? null;
 }
 
+// O código (K001, K002...) é gerado pelo banco (sequência atômica) — o
+// usuário nunca digita um.
 export type KitForm = {
-  code: string;
   name: string;
   description: string;
   itens: ItemKit[];
@@ -65,7 +66,6 @@ export async function salvarKit(id: string | null, form: KitForm): Promise<Resul
 
   const campos = {
     tenant_id: TENANT_FIXO,
-    code: form.code.trim() || null,
     name: form.name.trim(),
     description: form.description.trim() || null,
     signature,

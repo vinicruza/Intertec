@@ -16,7 +16,6 @@ export default function KitFormPage() {
   const queryClient = useQueryClient();
 
   const [nome, setNome] = useState("");
-  const [codigo, setCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [itens, setItens] = useState<ItemEdicao[]>([{ produtoId: "", quantidade: "1" }]);
   const [erro, setErro] = useState<string | null>(null);
@@ -29,7 +28,6 @@ export default function KitFormPage() {
     const k = kitQuery.data;
     if (!k) return;
     setNome(k.name);
-    setCodigo(k.code ?? "");
     setDescricao(k.description ?? "");
     setItens(k.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity })));
   }, [kitQuery.data]);
@@ -69,7 +67,7 @@ export default function KitFormPage() {
 
   const salvar = useMutation({
     mutationFn: () =>
-      salvarKit(id ?? null, { code: codigo, name: nome, description: descricao, itens: itensValidos }),
+      salvarKit(id ?? null, { name: nome, description: descricao, itens: itensValidos }),
     onSuccess: (r: ResultadoSalvarKit) => {
       if (r.tipo === "duplicado") {
         setDuplicado(r.kitExistente);
@@ -94,7 +92,17 @@ export default function KitFormPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <h1 className="text-2xl font-semibold">{editando ? "Editar kit" : "Novo kit"}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold">{editando ? "Editar kit" : "Novo kit"}</h1>
+        {editando && kitQuery.data && (
+          <span className="rounded-full bg-[var(--cor-fundo)] px-3 py-1 text-sm text-[var(--cor-texto-suave)]">
+            {kitQuery.data.code}
+          </span>
+        )}
+      </div>
+      {!editando && (
+        <p className="text-sm text-[var(--cor-texto-suave)]">O código do kit é gerado automaticamente ao salvar.</p>
+      )}
 
       <form
         className="space-y-4"
@@ -108,10 +116,7 @@ export default function KitFormPage() {
         }}
       >
         <Card className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-            <div><Label>Código</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
-          </div>
+          <div><Label>Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
           <div><Label>Descrição</Label><Input value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
         </Card>
 
