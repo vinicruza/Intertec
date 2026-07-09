@@ -18,15 +18,9 @@ import SimuladorPage from "./pages/SimuladorPage";
 import PedidosPage from "./pages/PedidosPage";
 import PedidoDetalhePage from "./pages/PedidoDetalhePage";
 import DREPage from "./pages/DREPage";
-import EmBrevePage from "./pages/EmBrevePage";
+import ConfiguracoesPage from "./pages/ConfiguracoesPage";
 
 const queryClient = new QueryClient();
-
-// Rotas que ainda são "em breve" (telas nas próximas sprints), cada uma
-// protegida por perfil conforme o menu (docs/04-UX.md §2 / lib/roles.ts).
-const rotasEmBreve: Array<{ caminho: string; titulo: string; sprint: string }> = [
-  { caminho: "/configuracoes", titulo: "Configurações", sprint: "Sprint 13/14" },
-];
 
 export default function App() {
   return (
@@ -104,17 +98,10 @@ export default function App() {
                 path="/dre"
                 element={<ExigirAcesso caminho="/dre"><DREPage /></ExigirAcesso>}
               />
-              {rotasEmBreve.map((r) => (
-                <Route
-                  key={r.caminho}
-                  path={r.caminho}
-                  element={
-                    <ExigirAcesso caminho={r.caminho}>
-                      <EmBrevePage titulo={r.titulo} sprint={r.sprint} />
-                    </ExigirAcesso>
-                  }
-                />
-              ))}
+              <Route
+                path="/configuracoes"
+                element={<ExigirAcesso caminho="/configuracoes"><ConfiguracoesPage /></ExigirAcesso>}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
