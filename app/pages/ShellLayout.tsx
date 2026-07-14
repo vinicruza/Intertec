@@ -8,7 +8,19 @@ import { cn } from "@components/ui/cn";
 // (docs/04-UX.md §2) e cabeçalho com o usuário logado.
 export default function ShellLayout() {
   const { perfil, sair } = useAuth();
-  if (!perfil) return null;
+  if (!perfil) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--cor-fundo)] p-6">
+        <div className="max-w-md rounded-md border border-[var(--cor-borda)] bg-white p-5 text-sm shadow-sm">
+          <h1 className="text-lg font-semibold">Perfil nao carregado</h1>
+          <p className="mt-2 text-[var(--cor-texto-suave)]">
+            Sua sessao existe, mas o perfil de acesso nao foi encontrado. Entre novamente para recarregar as permissoes.
+          </p>
+          <Button className="mt-4" onClick={() => void sair()}>Sair e entrar novamente</Button>
+        </div>
+      </div>
+    );
+  }
   const itens = menuDoPerfil(perfil.perfil);
 
   return (

@@ -31,7 +31,10 @@ export default function KitFormPage() {
     setNome(k.name);
     setCodigo(k.code ?? "");
     setDescricao(k.description ?? "");
-    setItens(k.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity })));
+    setItens(k.kit_items.length > 0
+      ? k.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity }))
+      : [{ produtoId: "", quantidade: "1" }]
+    );
   }, [kitQuery.data]);
 
   const custoPorProduto = useMemo(
@@ -85,6 +88,31 @@ export default function KitFormPage() {
   });
 
   const produtos = produtosQuery.data ?? [];
+
+  if (editando && kitQuery.isLoading) {
+    return <p className="text-[var(--cor-texto-suave)]">Carregando kit...</p>;
+  }
+
+  if (editando && kitQuery.isError) {
+    const msg = kitQuery.error instanceof Error ? kitQuery.error.message : "Nao foi possivel carregar o kit.";
+    return (
+      <Card className="max-w-3xl space-y-3">
+        <h1 className="text-xl font-semibold">Erro ao abrir kit</h1>
+        <p className="text-sm text-red-700">{msg}</p>
+        <Button type="button" onClick={() => navigate("/kits")}>Voltar para kits</Button>
+      </Card>
+    );
+  }
+
+  if (editando && !kitQuery.data) {
+    return (
+      <Card className="max-w-3xl space-y-3">
+        <h1 className="text-xl font-semibold">Kit nao encontrado</h1>
+        <p className="text-sm text-[var(--cor-texto-suave)]">Esse kit nao existe ou seu usuario nao tem permissao para acessa-lo.</p>
+        <Button type="button" onClick={() => navigate("/kits")}>Voltar para kits</Button>
+      </Card>
+    );
+  }
 
   function atualizarItem(i: number, campo: keyof ItemEdicao, valor: string) {
     setItens((atual) => atual.map((item, idx) => (idx === i ? { ...item, [campo]: valor } : item)));

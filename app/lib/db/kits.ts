@@ -17,13 +17,35 @@ export type KitLinha = {
   }>;
 };
 
+type KitLinhaBruta = Omit<KitLinha, "kit_items"> & {
+  kit_items?: Array<{
+    product_id: string;
+    quantity: string;
+    products?: { name: string } | { name: string }[] | null;
+  }> | null;
+};
+
+function normalizarKit(kit: KitLinhaBruta): KitLinha {
+  return {
+    ...kit,
+    kit_items: (kit.kit_items ?? []).map((item) => {
+      const produto = Array.isArray(item.products) ? item.products[0] ?? null : item.products ?? null;
+      return {
+        product_id: item.product_id,
+        quantity: String(item.quantity),
+        products: produto,
+      };
+    }),
+  };
+}
+
 export async function listarKits(): Promise<KitLinha[]> {
   const { data, error } = await supabase
     .from("kits")
     .select("id, code, name, description, signature, status, kit_items(product_id, quantity, products(name))")
     .order("name");
   if (error) throw error;
-  return (data ?? []) as unknown as KitLinha[];
+  return ((data ?? []) as unknown as KitLinhaBruta[]).map(normalizarKit);
 }
 
 export async function obterKit(id: string): Promise<KitLinha | null> {
@@ -33,7 +55,7 @@ export async function obterKit(id: string): Promise<KitLinha | null> {
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return (data as unknown as KitLinha) ?? null;
+  return data ? normalizarKit(data as unknown as KitLinhaBruta) : null;
 }
 
 export type KitForm = {
