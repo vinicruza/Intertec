@@ -31,7 +31,7 @@ export type ComponenteForm = {
 };
 
 export type ProdutoForm = {
-  code: string;
+  code?: string;
   name: string;
   category: string;
   type: string;
@@ -162,7 +162,7 @@ function componentesParaBanco(produtoId: string, form: ProdutoForm) {
 export async function salvarProduto(id: string | null, form: ProdutoForm): Promise<string> {
   const campos = {
     tenant_id: TENANT_FIXO,
-    code: form.code.trim(),
+    code: form.code?.trim() ?? "",
     name: form.name.trim(),
     category: form.category.trim() || null,
     type: form.type.trim() || null,

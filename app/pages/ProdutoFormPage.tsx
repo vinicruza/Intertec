@@ -115,7 +115,14 @@ export default function ProdutoFormPage() {
       <form onSubmit={handleSubmit((f) => salvar.mutate(f))} className="space-y-4" noValidate>
         <Card className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Código</Label><Input {...register("code", { required: true })} /></div>
+            <div>
+              <Label>Código</Label>
+              <Input
+                {...register("code")}
+                readOnly
+                placeholder={editando ? "" : "Gerado automaticamente"}
+              />
+            </div>
             <div><Label>Nome</Label><Input {...register("name", { required: true })} /></div>
           </div>
           <div className="grid grid-cols-3 gap-4">

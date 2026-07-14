@@ -110,7 +110,15 @@ export default function KitFormPage() {
         <Card className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Nome</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-            <div><Label>Código</Label><Input value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
+            <div>
+              <Label>Código</Label>
+              <Input
+                value={codigo}
+                readOnly
+                placeholder={editando ? "" : "Gerado automaticamente"}
+                onChange={(e) => setCodigo(e.target.value)}
+              />
+            </div>
           </div>
           <div><Label>Descrição</Label><Input value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
         </Card>

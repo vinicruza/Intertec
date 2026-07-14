@@ -37,7 +37,7 @@ export async function obterKit(id: string): Promise<KitLinha | null> {
 }
 
 export type KitForm = {
-  code: string;
+  code?: string;
   name: string;
   description: string;
   itens: ItemKit[];
@@ -65,7 +65,7 @@ export async function salvarKit(id: string | null, form: KitForm): Promise<Resul
 
   const campos = {
     tenant_id: TENANT_FIXO,
-    code: form.code.trim() || null,
+    code: form.code?.trim() || null,
     name: form.name.trim(),
     description: form.description.trim() || null,
     signature,
