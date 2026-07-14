@@ -185,7 +185,7 @@ export default function SimuladorPage() {
       </Card>
 
       <Card className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Itens</h2>
           <Button type="button" onClick={() => setLinhas((a) => [...a, { itemId: "", quantidade: "1", preco: "" }])}>
             Adicionar item
