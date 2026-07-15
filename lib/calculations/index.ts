@@ -1,4 +1,4 @@
-// Motor de cálculo puro do Intertec (docs/02-Arquitetura.md §4).
+// Motor de cálculo puro da Intertech Surgical (docs/02-Arquitetura.md §4).
 // Ponto único de importação: `import { ... } from "@calc"`.
 // Sem dependência de UI ou banco — só matemática financeira testável.
 

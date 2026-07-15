@@ -3,7 +3,7 @@ import type { PedidoResumo } from "../db/fechamento";
 export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise<void> {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
-  workbook.creator = "Intertec";
+  workbook.creator = "Intertech Surgical";
   const sheet = workbook.addWorksheet("Pedidos");
   sheet.columns = [
     { header: "Criado em", key: "criado", width: 14 },
@@ -43,7 +43,7 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "historico-pedidos-intertec.xlsx";
+  link.download = "historico-pedidos-intertech.xlsx";
   link.click();
   URL.revokeObjectURL(url);
 }

@@ -5,7 +5,7 @@ const numero = (linha: LinhaDRE | null) => linha ? Number(linha.valor.toFixed(2)
 export async function exportarDREExcel(dre: DRE, mes: string): Promise<void> {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
-  workbook.creator = "Intertec";
+  workbook.creator = "Intertech Surgical";
   workbook.created = new Date();
 
   const resumo = workbook.addWorksheet("DRE");
@@ -58,7 +58,7 @@ export async function exportarDREExcel(dre: DRE, mes: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `dre-intertec-${mes}.xlsx`;
+  link.download = `dre-intertech-${mes}.xlsx`;
   link.click();
   URL.revokeObjectURL(url);
 }

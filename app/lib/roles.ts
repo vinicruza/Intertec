@@ -13,23 +13,24 @@ export const NOME_PERFIL: Record<Perfil, string> = {
 export type ItemMenu = {
   caminho: string;
   rotulo: string;
+  icone: string;
   perfis: Perfil[]; // quem enxerga este item
 };
 
 // Áreas do sistema. As telas de conteúdo chegam nas próximas sprints; aqui
 // entram os itens de menu já filtrados por perfil, conforme a matriz do UX.
 export const MENU: ItemMenu[] = [
-  { caminho: "/", rotulo: "Início", perfis: ["admin", "financeiro", "comercial"] },
-  { caminho: "/simulador", rotulo: "Simulador de pedido", perfis: ["admin", "financeiro", "comercial"] },
-  { caminho: "/pedidos", rotulo: "Histórico de pedidos", perfis: ["admin", "financeiro", "comercial"] },
-  { caminho: "/kits", rotulo: "Kits", perfis: ["admin", "financeiro", "comercial", "producao"] },
-  { caminho: "/produtos", rotulo: "Produtos e fichas", perfis: ["admin", "financeiro", "comercial", "producao"] },
-  { caminho: "/insumos", rotulo: "Insumos", perfis: ["admin", "financeiro", "producao"] },
-  { caminho: "/alocacao", rotulo: "Alocação de despesas", perfis: ["admin", "financeiro"] },
-  { caminho: "/dre", rotulo: "DRE mensal", perfis: ["admin", "financeiro"] },
-  { caminho: "/configuracoes", rotulo: "Configurações", perfis: ["admin", "financeiro"] },
-  { caminho: "/integridade", rotulo: "Integridade dos dados", perfis: ["admin", "financeiro"] },
-  { caminho: "/perfil", rotulo: "Meu perfil", perfis: ["admin", "financeiro", "comercial", "producao"] },
+  { caminho: "/", rotulo: "Início", icone: "⌂", perfis: ["admin", "financeiro", "comercial"] },
+  { caminho: "/simulador", rotulo: "Simulador de pedido", icone: "＋", perfis: ["admin", "financeiro", "comercial"] },
+  { caminho: "/pedidos", rotulo: "Histórico de pedidos", icone: "≡", perfis: ["admin", "financeiro", "comercial"] },
+  { caminho: "/kits", rotulo: "Kits", icone: "◇", perfis: ["admin", "financeiro", "comercial", "producao"] },
+  { caminho: "/produtos", rotulo: "Produtos e fichas", icone: "□", perfis: ["admin", "financeiro", "comercial", "producao"] },
+  { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },
+  { caminho: "/alocacao", rotulo: "Alocação de despesas", icone: "%", perfis: ["admin", "financeiro"] },
+  { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"] },
+  { caminho: "/configuracoes", rotulo: "Configurações", icone: "⚙", perfis: ["admin", "financeiro"] },
+  { caminho: "/integridade", rotulo: "Integridade dos dados", icone: "✓", perfis: ["admin", "financeiro"] },
+  { caminho: "/perfil", rotulo: "Meu perfil", icone: "●", perfis: ["admin", "financeiro", "comercial", "producao"] },
 ];
 
 export function menuDoPerfil(perfil: Perfil): ItemMenu[] {
