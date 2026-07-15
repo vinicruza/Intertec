@@ -32,3 +32,9 @@ jobs:
 
       - name: Testes
         run: npm run test
+
+      - name: Instalar Chromium para E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke tests E2E públicos
+        run: npm run test:e2e

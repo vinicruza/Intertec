@@ -1,25 +1,26 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ExigirAcesso, ExigirLogin } from "./auth/guards";
-import LoginPage from "./pages/LoginPage";
-import ShellLayout from "./pages/ShellLayout";
-import InicioPage from "./pages/InicioPage";
-import PerfilPage from "./pages/PerfilPage";
-import InsumosPage from "./pages/InsumosPage";
-import InsumoFormPage from "./pages/InsumoFormPage";
-import ProdutosPage from "./pages/ProdutosPage";
-import ProdutoFormPage from "./pages/ProdutoFormPage";
-import AlocacaoPage from "./pages/AlocacaoPage";
-import AlocacaoPeriodoPage from "./pages/AlocacaoPeriodoPage";
-import KitsPage from "./pages/KitsPage";
-import KitFormPage from "./pages/KitFormPage";
-import SimuladorPage from "./pages/SimuladorPage";
-import PedidosPage from "./pages/PedidosPage";
-import PedidoDetalhePage from "./pages/PedidoDetalhePage";
-import DREPage from "./pages/DREPage";
-import ConfiguracoesPage from "./pages/ConfiguracoesPage";
-import IntegridadePage from "./pages/IntegridadePage";
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ShellLayout = lazy(() => import("./pages/ShellLayout"));
+const InicioPage = lazy(() => import("./pages/InicioPage"));
+const PerfilPage = lazy(() => import("./pages/PerfilPage"));
+const InsumosPage = lazy(() => import("./pages/InsumosPage"));
+const InsumoFormPage = lazy(() => import("./pages/InsumoFormPage"));
+const ProdutosPage = lazy(() => import("./pages/ProdutosPage"));
+const ProdutoFormPage = lazy(() => import("./pages/ProdutoFormPage"));
+const AlocacaoPage = lazy(() => import("./pages/AlocacaoPage"));
+const AlocacaoPeriodoPage = lazy(() => import("./pages/AlocacaoPeriodoPage"));
+const KitsPage = lazy(() => import("./pages/KitsPage"));
+const KitFormPage = lazy(() => import("./pages/KitFormPage"));
+const SimuladorPage = lazy(() => import("./pages/SimuladorPage"));
+const PedidosPage = lazy(() => import("./pages/PedidosPage"));
+const PedidoDetalhePage = lazy(() => import("./pages/PedidoDetalhePage"));
+const DREPage = lazy(() => import("./pages/DREPage"));
+const ConfiguracoesPage = lazy(() => import("./pages/ConfiguracoesPage"));
+const IntegridadePage = lazy(() => import("./pages/IntegridadePage"));
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+          <Suspense fallback={<div className="p-6 text-sm text-[var(--cor-texto-suave)]">Carregando tela…</div>}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
@@ -110,6 +112,7 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
