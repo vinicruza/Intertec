@@ -1,8 +1,6 @@
 import { assinaturaKit, type ItemKit } from "@calc";
 import { supabase } from "../supabase";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 export type KitLinha = {
   id: string;
   code: string | null;
@@ -73,47 +71,14 @@ export type ResultadoSalvarKit =
 
 export async function salvarKit(id: string | null, form: KitForm): Promise<ResultadoSalvarKit> {
   const signature = assinaturaKit(form.itens);
-
-  // Verifica dedupe antes de gravar (a UNIQUE do banco é a garantia final).
-  const { data: existente, error: eBusca } = await supabase
-    .from("kits")
-    .select("id, name")
-    .eq("signature", signature)
-    .maybeSingle();
-  if (eBusca) throw eBusca;
-  if (existente && existente.id !== id) {
-    return { tipo: "duplicado", kitExistente: existente as { id: string; name: string } };
-  }
-
-  const campos = {
-    tenant_id: TENANT_FIXO,
-    code: form.code?.trim() || null,
-    name: form.name.trim(),
-    description: form.description.trim() || null,
-    signature,
-  };
-
-  let kitId = id;
-  if (kitId) {
-    const { error } = await supabase.from("kits").update(campos).eq("id", kitId);
-    if (error) throw error;
-    const { error: eDel } = await supabase.from("kit_items").delete().eq("kit_id", kitId);
-    if (eDel) throw eDel;
-  } else {
-    const { data, error } = await supabase.from("kits").insert(campos).select("id").single();
-    if (error) throw error;
-    kitId = data.id as string;
-  }
-
-  const { error: eItens } = await supabase.from("kit_items").insert(
-    form.itens.map((i) => ({
-      tenant_id: TENANT_FIXO,
-      kit_id: kitId,
-      product_id: i.produtoId,
-      quantity: String(i.quantidade),
-    }))
-  );
-  if (eItens) throw eItens;
-
-  return id ? { tipo: "atualizado", id: kitId } : { tipo: "criado", id: kitId };
+  const { data, error } = await supabase.rpc("save_kit_with_items", {
+    p_kit_id: id,
+    p_code: form.code?.trim() || null,
+    p_name: form.name.trim(),
+    p_description: form.description.trim() || null,
+    p_signature: signature,
+    p_items: form.itens.map((i) => ({ product_id: i.produtoId, quantity: String(i.quantidade) })),
+  });
+  if (error) throw error;
+  return data as ResultadoSalvarKit;
 }
