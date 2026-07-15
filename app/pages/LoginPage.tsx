@@ -35,7 +35,7 @@ export default function LoginPage() {
       <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full border-[5rem] border-white/5" />
         <div className="absolute -bottom-64 -left-32 h-[38rem] w-[38rem] rounded-full border-[7rem] border-[#6d5bd0]/25" />
-        <IntertechLogo inverse />
+        <IntertechLogo inverse size="lg" />
         <div className="relative max-w-xl">
           <div className="mb-5 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">
             Gestão orientada por dados
