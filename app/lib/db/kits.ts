@@ -4,6 +4,7 @@ import { supabase } from "../supabase";
 export type KitLinha = {
   id: string;
   code: string | null;
+  legacy_code: string | null;
   name: string;
   description: string | null;
   signature: string;
@@ -40,7 +41,7 @@ function normalizarKit(kit: KitLinhaBruta): KitLinha {
 export async function listarKits(): Promise<KitLinha[]> {
   const { data, error } = await supabase
     .from("kits")
-    .select("id, code, name, description, signature, status, kit_items(product_id, quantity, products(name))")
+    .select("id, code, legacy_code, name, description, signature, status, kit_items(product_id, quantity, products(name))")
     .order("name");
   if (error) throw error;
   return ((data ?? []) as unknown as KitLinhaBruta[]).map(normalizarKit);
@@ -49,7 +50,7 @@ export async function listarKits(): Promise<KitLinha[]> {
 export async function obterKit(id: string): Promise<KitLinha | null> {
   const { data, error } = await supabase
     .from("kits")
-    .select("id, code, name, description, signature, status, kit_items(product_id, quantity, products(name))")
+    .select("id, code, legacy_code, name, description, signature, status, kit_items(product_id, quantity, products(name))")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;

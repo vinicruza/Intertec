@@ -16,6 +16,7 @@ export type ItemVendavel = {
   tipo: "produto" | "kit";
   id: string;
   nome: string;
+  codigo: string;
   cmvUnitario: string | null; // null = sem custo vigente (erro bloqueante ao usar)
   despesaUnitaria: string | null;
 };
@@ -37,9 +38,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("difal_rates").select("uf, final_rate"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
-    supabase.from("products").select("id, name").eq("status", "active").order("name"),
+    supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
     supabase.from("product_costs").select("product_id, cmv"),
-    supabase.from("kits").select("id, name, kit_items(product_id, quantity)").eq("status", "active").order("name"),
+    supabase.from("kits").select("id, code, name, kit_items(product_id, quantity)").eq("status", "active").order("name"),
     supabase.from("expense_allocation_periods").select("id, total_expense").eq("status", "open").order("period", { ascending: false }).limit(1),
   ]);
   for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, periodo]) {
@@ -78,6 +79,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     tipo: "produto",
     id: p.id as string,
     nome: p.name as string,
+    codigo: p.code as string,
     cmvUnitario: cmvPorProduto.get(p.id as string) ?? null,
     despesaUnitaria: despesaPorProduto.get(p.id as string) ?? null,
   }));
@@ -100,7 +102,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     } catch {
       despesa = null;
     }
-    return { tipo: "kit", id: k.id as string, nome: `[Kit] ${k.name as string}`, cmvUnitario: cmv, despesaUnitaria: despesa };
+    return { tipo: "kit", id: k.id as string, codigo: k.code as string, nome: `[Kit] ${k.name as string}`, cmvUnitario: cmv, despesaUnitaria: despesa };
   });
 
   const tabelaPorUF = new Map<string, TabelasUF>();

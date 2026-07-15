@@ -4,8 +4,10 @@ import { supabase } from "../supabase";
 export type ProdutoLinha = {
   id: string;
   code: string;
+  legacy_code: string | null;
   name: string;
   category: string | null;
+  category_id: string;
   type: string | null;
   sterile: boolean | null;
   size: string | null;
@@ -31,13 +33,22 @@ export type ComponenteForm = {
 export type ProdutoForm = {
   code?: string;
   name: string;
-  category: string;
+  categoryId: string;
   type: string;
   sterile: boolean;
   size: string;
   grammage: string;
   componentes: ComponenteForm[];
 };
+
+export type CategoriaProduto = { id: string; name: string; prefix: string; description: string | null; sort_order: number };
+
+export async function listarCategoriasProduto(): Promise<CategoriaProduto[]> {
+  const { data, error } = await supabase.from("product_categories")
+    .select("id, name, prefix, description, sort_order").eq("active", true).order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as CategoriaProduto[];
+}
 
 function num(texto: string): string {
   const limpo = (texto ?? "").trim().replace(",", ".");
@@ -94,7 +105,7 @@ export async function carregarBaseCascata(
 export async function listarProdutos(): Promise<ProdutoLinha[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, code, name, category, type, sterile, size, grammage, status, product_costs(cmv)")
+    .select("id, code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
@@ -123,7 +134,7 @@ export type ProdutoCompleto = {
 export async function obterProduto(id: string): Promise<ProdutoCompleto | null> {
   const { data: produto, error } = await supabase
     .from("products")
-    .select("id, code, name, category, type, sterile, size, grammage, status")
+    .select("id, code, legacy_code, name, category, category_id, type, sterile, size, grammage, status")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -159,7 +170,7 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
   const campos = {
     code: form.code?.trim() ?? "",
     name: form.name.trim(),
-    category: form.category.trim() || null,
+    category_id: form.categoryId,
     type: form.type.trim() || null,
     sterile: form.sterile,
     size: form.size.trim() || null,

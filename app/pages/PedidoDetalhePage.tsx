@@ -95,6 +95,7 @@ export default function PedidoDetalhePage() {
             {pedido.itens.map((i) => (
               <tr key={i.id} className="border-b border-[var(--cor-borda)] last:border-0">
                 <td className="px-4 py-3 font-medium">
+                  <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">{i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? ""}</div>
                   {i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "—")}
                   {fechado && i.kit_composition_snapshot != null && (
                     <div className="mt-1 text-xs text-[var(--cor-texto-suave)]">
