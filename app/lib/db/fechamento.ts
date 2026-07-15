@@ -78,7 +78,17 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     )
     .eq("order_id", id);
   if (e2) throw e2;
-  return { ...(pedido as unknown as Omit<PedidoCompleto, "itens">), itens: (itens ?? []) as unknown as PedidoCompleto["itens"] };
+  const itensNormalizados = (itens ?? []).map((item) => ({
+    ...item,
+    quantity: String(item.quantity),
+    unit_price: String(item.unit_price),
+    cmv_unit_snapshot: item.cmv_unit_snapshot == null ? null : String(item.cmv_unit_snapshot),
+    expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
+  }));
+  return {
+    ...(pedido as unknown as Omit<PedidoCompleto, "itens">),
+    itens: itensNormalizados as unknown as PedidoCompleto["itens"],
+  };
 }
 
 // ---------- Fechamento (D7) ----------

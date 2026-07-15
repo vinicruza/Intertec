@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { listarPedidos } from "../lib/db/fechamento";
-import { dataCurta } from "../lib/format";
+import { dataCurta, reais } from "../lib/format";
 import { Badge, Card } from "@components/ui/primitives";
 
 export default function PedidosPage() {
@@ -67,10 +67,10 @@ export default function PedidosPage() {
                     <Badge>{p.status === "closed" ? `Fechado ${dataCurta(p.closed_at)}` : "Simulação"}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {p.totals_display?.receita_liquida ? `R$ ${p.totals_display.receita_liquida.replace(".", ",")}` : "—"}
+                    {reais(p.totals_display?.receita_liquida)}
                   </td>
                   <td className="px-4 py-3">
-                    {p.totals_display?.margem_contribuicao ? `R$ ${p.totals_display.margem_contribuicao.replace(".", ",")}` : "—"}
+                    {reais(p.totals_display?.margem_contribuicao)}
                   </td>
                 </tr>
               ))}

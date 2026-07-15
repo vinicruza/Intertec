@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Decimal, toPercent } from "@calc";
 import { montarDRE, type LinhaDRE } from "../lib/sim/dre";
 import { obterDespesaReal, pedidosFechadosDoMes, salvarDespesaReal } from "../lib/db/dre";
@@ -12,6 +13,7 @@ function mesAtual(): string {
 
 export default function DREPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [mes, setMes] = useState(mesAtual());
   const [despesaEdicao, setDespesaEdicao] = useState<string | null>(null);
 
@@ -34,12 +36,12 @@ export default function DREPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">DRE gerencial mensal</h1>
+        <h1 className="text-2xl font-semibold">DRE realizada mensal</h1>
         <Input type="month" className="w-44" value={mes} onChange={(e) => setMes(e.target.value)} />
       </div>
 
       <p className="text-sm text-[var(--cor-texto-suave)]">
-        Somatório dos <strong>snapshots</strong> dos pedidos fechados no mês — os custos do momento
+        Esta visão considera exclusivamente pedidos <strong>fechados</strong>. Somatório dos <strong>snapshots</strong> do mês — os custos do momento
         de cada venda, nunca recalculados (D7). A despesa da última linha é a despesa fixa{" "}
         <strong>real</strong> do mês, não a soma dos rateios (D3).
       </p>
@@ -49,9 +51,9 @@ export default function DREPage() {
       {dre && dre.pedidos === 0 && (
         <Card>
           <p className="text-sm text-[var(--cor-texto-suave)]">
-            Nenhum pedido fechado neste mês. O DRE nasce dos fechamentos — simule e feche pedidos
-            para vê-lo ganhar corpo.
+            Nenhum pedido fechado neste mês. Simulações são projeções e não entram na DRE realizada.
           </p>
+          <Button className="mt-3" onClick={() => navigate("/pedidos")}>Ver simulações e fechar pedido</Button>
         </Card>
       )}
 
