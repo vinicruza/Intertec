@@ -9,6 +9,7 @@ import { Decimal, dec } from "@calc";
 // entre as duas aparece como "variação de absorção".
 
 export type PedidoParaDRE = {
+  id?: string;
   gross_revenue_snapshot: string;
   tax_snapshot: string;
   freight_tax_snapshot: string;
@@ -21,6 +22,26 @@ export type PedidoParaDRE = {
   vendedor: string;
   canalId?: string;
   canal: string;
+  clienteId?: string;
+  cliente?: string;
+};
+
+export type ItemParaDRE = {
+  id: string;
+  orderId: string;
+  tipo: "produto" | "kit";
+  nome: string;
+  categoria: string;
+  quantidade: string;
+  precoUnitario: string;
+  cmvUnitario: string;
+};
+
+export type AberturaDRE = {
+  id: string;
+  nome: string;
+  receitaBruta: Decimal;
+  margemContribuicao: Decimal;
 };
 
 export type LinhaDRE = {
@@ -42,14 +63,17 @@ export type DRE = {
   variacaoAbsorcao: Decimal | null; // Σ rateios − despesa real (informativo)
   somaRateios: Decimal;
   aberturas: {
-    porVendedor: Array<{ nome: string; receitaBruta: Decimal; margemContribuicao: Decimal }>;
-    porCanal: Array<{ nome: string; receitaBruta: Decimal; margemContribuicao: Decimal }>;
+    porVendedor: AberturaDRE[];
+    porCanal: AberturaDRE[];
+    porCliente: AberturaDRE[];
+    porCategoria: AberturaDRE[];
+    porItem: AberturaDRE[];
   };
 };
 
 const ZERO = new Decimal(0);
 
-export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | null): DRE {
+export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | null, itens: ItemParaDRE[] = []): DRE {
   const soma = (f: (p: PedidoParaDRE) => string) =>
     pedidos.reduce((s, p) => s.plus(dec(f(p))), ZERO);
 
@@ -71,11 +95,12 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
   const resultadoOperacional = real === null ? null : margemContribuicao.minus(real);
 
   const agrupar = (identidade: (p: PedidoParaDRE) => { id: string; nome: string }) => {
-    const grupos = new Map<string, { nome: string; receitaBruta: Decimal; margemContribuicao: Decimal }>();
+    const grupos = new Map<string, AberturaDRE>();
     for (const p of pedidos) {
       const k = identidade(p);
-      const g = grupos.get(k.id) ?? { nome: k.nome, receitaBruta: ZERO, margemContribuicao: ZERO };
+      const g = grupos.get(k.id) ?? { id: k.id, nome: k.nome, receitaBruta: ZERO, margemContribuicao: ZERO };
       grupos.set(k.id, {
+        id: g.id,
         nome: g.nome,
         receitaBruta: g.receitaBruta.plus(dec(p.gross_revenue_snapshot)),
         margemContribuicao: g.margemContribuicao.plus(dec(p.contribution_margin_snapshot)),
@@ -84,6 +109,35 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
     return [...grupos.entries()]
       .map(([, v]) => v)
       .sort((a, b) => b.receitaBruta.comparedTo(a.receitaBruta));
+  };
+
+  const pedidoPorId = new Map(pedidos.filter((p) => p.id).map((p) => [p.id!, p]));
+  const agruparItens = (identidade: (i: ItemParaDRE) => { id: string; nome: string }) => {
+    const grupos = new Map<string, AberturaDRE>();
+    for (const item of itens) {
+      const pedido = pedidoPorId.get(item.orderId);
+      if (!pedido) continue;
+      const brutoItem = dec(item.precoUnitario).times(dec(item.quantidade));
+      const cmvItem = dec(item.cmvUnitario).times(dec(item.quantidade));
+      const brutoPedido = dec(pedido.gross_revenue_snapshot);
+      // Impostos, frete e comissão são do pedido. Para a abertura por item,
+      // rateamos esse bloco pela participação na receita e preservamos o CMV exato.
+      const deducoesSemCmv = brutoPedido
+        .minus(dec(pedido.contribution_margin_snapshot))
+        .minus(dec(pedido.cmv_total_snapshot));
+      const margemItem = brutoItem.minus(cmvItem).minus(
+        brutoPedido.isZero() ? ZERO : deducoesSemCmv.times(brutoItem.div(brutoPedido))
+      );
+      const k = identidade(item);
+      const g = grupos.get(k.id) ?? { id: k.id, nome: k.nome, receitaBruta: ZERO, margemContribuicao: ZERO };
+      grupos.set(k.id, {
+        id: g.id,
+        nome: g.nome,
+        receitaBruta: g.receitaBruta.plus(brutoItem),
+        margemContribuicao: g.margemContribuicao.plus(margemItem),
+      });
+    }
+    return [...grupos.values()].sort((a, b) => b.receitaBruta.comparedTo(a.receitaBruta));
   };
 
   return {
@@ -103,6 +157,9 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
     aberturas: {
       porVendedor: agrupar((p) => ({ id: p.vendedorId ?? p.vendedor, nome: p.vendedor })),
       porCanal: agrupar((p) => ({ id: p.canalId ?? p.canal, nome: p.canal })),
+      porCliente: agrupar((p) => ({ id: p.clienteId ?? p.cliente ?? "sem-cliente", nome: p.cliente ?? "—" })),
+      porCategoria: agruparItens((i) => ({ id: i.categoria, nome: i.categoria })),
+      porItem: agruparItens((i) => ({ id: `${i.tipo}:${i.id}`, nome: i.nome })),
     },
   };
 }

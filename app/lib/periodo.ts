@@ -14,3 +14,10 @@ export function limitesMesSaoPaulo(mes: string): { inicio: string; fim: string }
     fim: new Date(`${proximo}-01T00:00:00${OFFSET_SAO_PAULO}`).toISOString(),
   };
 }
+
+export function mesAnterior(mes: string): string {
+  if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error("Mês inválido; use YYYY-MM.");
+  const [ano, numeroMes] = mes.split("-").map(Number);
+  if (numeroMes < 1 || numeroMes > 12) throw new Error("Mês inválido; use YYYY-MM.");
+  return numeroMes === 1 ? `${ano - 1}-12` : `${ano}-${String(numeroMes - 1).padStart(2, "0")}`;
+}

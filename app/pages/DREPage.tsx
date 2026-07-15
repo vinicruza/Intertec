@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Decimal, toPercent } from "@calc";
-import { montarDRE, type LinhaDRE } from "../lib/sim/dre";
-import { obterDespesaReal, pedidosFechadosDoMes, salvarDespesaReal } from "../lib/db/dre";
+import { toPercent } from "@calc";
+import { montarDRE, type AberturaDRE, type DRE, type LinhaDRE } from "../lib/sim/dre";
+import { dadosDREDoMes, obterDespesaReal, salvarDespesaReal } from "../lib/db/dre";
+import { exportarDREExcel } from "../lib/export/dre";
+import { mesAnterior } from "../lib/periodo";
 import { reais } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
 function mesAtual(): string {
-  return new Date().toISOString().slice(0, 7);
+  const partes = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" })
+    .formatToParts(new Date());
+  return `${partes.find((p) => p.type === "year")!.value}-${partes.find((p) => p.type === "month")!.value}`;
 }
 
 export default function DREPage() {
@@ -16,14 +20,23 @@ export default function DREPage() {
   const navigate = useNavigate();
   const [mes, setMes] = useState(mesAtual());
   const [despesaEdicao, setDespesaEdicao] = useState<string | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const [erroExportacao, setErroExportacao] = useState<string | null>(null);
+  const anterior = mesAnterior(mes);
 
-  const pedidosQuery = useQuery({ queryKey: ["drePedidos", mes], queryFn: () => pedidosFechadosDoMes(mes) });
+  const dadosQuery = useQuery({ queryKey: ["dreDados", mes], queryFn: () => dadosDREDoMes(mes) });
   const despesaQuery = useQuery({ queryKey: ["dreDespesa", mes], queryFn: () => obterDespesaReal(mes) });
+  const dadosAnterioresQuery = useQuery({ queryKey: ["dreDados", anterior], queryFn: () => dadosDREDoMes(anterior) });
+  const despesaAnteriorQuery = useQuery({ queryKey: ["dreDespesa", anterior], queryFn: () => obterDespesaReal(anterior) });
 
   const dre = useMemo(() => {
-    if (!pedidosQuery.data) return null;
-    return montarDRE(pedidosQuery.data, despesaQuery.data ?? null);
-  }, [pedidosQuery.data, despesaQuery.data]);
+    if (!dadosQuery.data) return null;
+    return montarDRE(dadosQuery.data.pedidos, despesaQuery.data ?? null, dadosQuery.data.itens);
+  }, [dadosQuery.data, despesaQuery.data]);
+  const dreAnterior = useMemo(() => {
+    if (!dadosAnterioresQuery.data) return null;
+    return montarDRE(dadosAnterioresQuery.data.pedidos, despesaAnteriorQuery.data ?? null, dadosAnterioresQuery.data.itens);
+  }, [dadosAnterioresQuery.data, despesaAnteriorQuery.data]);
 
   const salvar = useMutation({
     mutationFn: (valor: string) => salvarDespesaReal(mes, valor),
@@ -34,11 +47,20 @@ export default function DREPage() {
   });
 
   return (
-    <div className="max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="max-w-6xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">DRE realizada mensal</h1>
-        <Input type="month" className="w-44" value={mes} onChange={(e) => setMes(e.target.value)} />
+        <div className="no-print flex flex-wrap gap-2">
+          {dre && <Button type="button" disabled={exportando} onClick={async () => {
+            setExportando(true); setErroExportacao(null);
+            try { await exportarDREExcel(dre, mes); } catch { setErroExportacao("Não foi possível gerar o Excel."); }
+            finally { setExportando(false); }
+          }}>{exportando ? "Gerando…" : "Exportar Excel"}</Button>}
+          <Button type="button" className="bg-slate-600" onClick={() => window.print()}>Imprimir / salvar PDF</Button>
+          <Input type="month" className="w-44" value={mes} onChange={(e) => setMes(e.target.value)} />
+        </div>
       </div>
+      {erroExportacao && <p className="no-print text-sm text-red-700">{erroExportacao}</p>}
 
       <p className="text-sm text-[var(--cor-texto-suave)]">
         Esta visão considera exclusivamente pedidos <strong>fechados</strong>. Somatório dos <strong>snapshots</strong> do mês — os custos do momento
@@ -46,7 +68,7 @@ export default function DREPage() {
         <strong>real</strong> do mês, não a soma dos rateios (D3).
       </p>
 
-      {pedidosQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
+      {dadosQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
 
       {dre && dre.pedidos === 0 && (
         <Card>
@@ -86,6 +108,8 @@ export default function DREPage() {
             )}
           </Card>
 
+          {dreAnterior && <Comparativo atual={dre} anterior={dreAnterior} mesAnterior={anterior} />}
+
           <Card>
             <h2 className="mb-2 text-lg font-semibold">Despesa fixa real do mês</h2>
             {despesaEdicao === null ? (
@@ -115,9 +139,12 @@ export default function DREPage() {
             )}
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Abertura titulo="Por vendedor" linhas={dre.aberturas.porVendedor} />
             <Abertura titulo="Por canal" linhas={dre.aberturas.porCanal} />
+            <Abertura titulo="Por cliente" linhas={dre.aberturas.porCliente} />
+            <Abertura titulo="Por categoria" linhas={dre.aberturas.porCategoria} />
+            <Abertura titulo="Por produto e kit" linhas={dre.aberturas.porItem} />
           </div>
         </>
       )}
@@ -137,7 +164,7 @@ function Linha({ rotulo, linha, destaque, negativo }: { rotulo: string; linha: L
   );
 }
 
-function Abertura({ titulo, linhas }: { titulo: string; linhas: Array<{ nome: string; receitaBruta: Decimal; margemContribuicao: Decimal }> }) {
+function Abertura({ titulo, linhas }: { titulo: string; linhas: AberturaDRE[] }) {
   return (
     <Card>
       <h2 className="mb-2 text-lg font-semibold">{titulo}</h2>
@@ -151,13 +178,44 @@ function Abertura({ titulo, linhas }: { titulo: string; linhas: Array<{ nome: st
         </thead>
         <tbody>
           {linhas.map((l) => (
-            <tr key={l.nome} className="border-b border-[var(--cor-borda)] last:border-0">
+            <tr key={l.id} className="border-b border-[var(--cor-borda)] last:border-0">
               <td className="py-2 font-medium">{l.nome}</td>
               <td className="py-2 text-right">{reais(l.receitaBruta.toString())}</td>
               <td className="py-2 text-right">{reais(l.margemContribuicao.toString())}</td>
             </tr>
           ))}
         </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function Comparativo({ atual, anterior, mesAnterior: periodoAnterior }: { atual: DRE; anterior: DRE; mesAnterior: string }) {
+  const linhas = [
+    ["Receita bruta", atual.receitaBruta.valor, anterior.receitaBruta.valor],
+    ["Receita líquida", atual.receitaLiquida.valor, anterior.receitaLiquida.valor],
+    ["Margem de contribuição", atual.margemContribuicao.valor, anterior.margemContribuicao.valor],
+    ["Resultado operacional", atual.resultadoOperacional?.valor ?? null, anterior.resultadoOperacional?.valor ?? null],
+  ] as const;
+  return (
+    <Card>
+      <h2 className="mb-2 text-lg font-semibold">Comparativo com {periodoAnterior}</h2>
+      <table className="w-full text-sm">
+        <thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
+          <th className="py-2">Indicador</th><th className="py-2 text-right">Mês atual</th>
+          <th className="py-2 text-right">Mês anterior</th><th className="py-2 text-right">Variação</th>
+        </tr></thead>
+        <tbody>{linhas.map(([rotulo, valorAtual, valorAnterior]) => {
+          const variacao = valorAtual && valorAnterior && !valorAnterior.isZero()
+            ? valorAtual.minus(valorAnterior).div(valorAnterior)
+            : null;
+          return <tr key={rotulo} className="border-b border-[var(--cor-borda)] last:border-0">
+            <td className="py-2 font-medium">{rotulo}</td>
+            <td className="py-2 text-right">{valorAtual ? reais(valorAtual.toString()) : "—"}</td>
+            <td className="py-2 text-right">{valorAnterior ? reais(valorAnterior.toString()) : "—"}</td>
+            <td className="py-2 text-right">{variacao ? `${toPercent(variacao).replace(".", ",")}%` : "—"}</td>
+          </tr>;
+        })}</tbody>
       </table>
     </Card>
   );
