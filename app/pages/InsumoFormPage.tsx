@@ -12,7 +12,6 @@ import {
   obterInsumo,
   type InsumoFormulario,
 } from "../lib/db/insumos";
-import { recalcularCMVsVigentes } from "../lib/db/recompute";
 import { reais, dataCurta } from "../lib/format";
 import { toMoney } from "@calc";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
@@ -84,8 +83,6 @@ export default function InsumoFormPage() {
     mutationFn: async (form: InsumoFormulario) => {
       if (editando) await atualizarInsumo(id!, form);
       else await criarInsumo(form);
-      // Recálculo em cascata dos CMVs vigentes (PRD §6.1).
-      await recalcularCMVsVigentes();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["insumos"] });
