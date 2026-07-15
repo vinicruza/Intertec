@@ -18,7 +18,6 @@ import {
 } from "../lib/db/produtos";
 import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
-import { recalcularCMVsVigentes } from "../lib/db/recompute";
 import { reais, percentual } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
@@ -96,7 +95,6 @@ export default function ProdutoFormPage() {
   const salvar = useMutation({
     mutationFn: async (form: ProdutoForm) => {
       await salvarProduto(id ?? null, form);
-      await recalcularCMVsVigentes();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
