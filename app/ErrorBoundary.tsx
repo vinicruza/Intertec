@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { registrarErroCliente } from "./lib/db/observabilidade";
 
 type Props = { children: ReactNode };
 type State = { erro: Error | null };
@@ -12,6 +13,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(erro: Error, info: ErrorInfo) {
     console.error("Erro nao tratado na interface", erro, info);
+    void registrarErroCliente(erro, { componentStack: info.componentStack });
   }
 
   render() {

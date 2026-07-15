@@ -17,3 +17,17 @@ export async function carregarResumoIntegridade(): Promise<ResumoIntegridade> {
   if (error) throw error;
   return data as ResumoIntegridade;
 }
+
+export type PendenciaProduto = { id: string; code: string; name: string };
+export type DetalhesIntegridade = {
+  open_period_id: string | null;
+  open_period: string | null;
+  products_without_components: PendenciaProduto[];
+  products_without_allocation: PendenciaProduto[];
+};
+
+export async function carregarDetalhesIntegridade(): Promise<DetalhesIntegridade> {
+  const { data, error } = await supabase.rpc("get_data_quality_details");
+  if (error) throw error;
+  return data as DetalhesIntegridade;
+}
