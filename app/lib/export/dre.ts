@@ -11,6 +11,8 @@ export async function exportarDREExcel(dre: DRE, mes: string): Promise<void> {
   const resumo = workbook.addWorksheet("DRE");
   resumo.columns = [{ header: "Linha", key: "linha", width: 42 }, { header: "Valor (R$)", key: "valor", width: 18 }];
   [
+    ["Fechamentos no período", dre.pedidos],
+    ["Cancelamentos estornados no período", dre.cancelamentos],
     ["Receita bruta", numero(dre.receitaBruta)],
     ["Impostos + DIFAL", numero(dre.impostosEDifal)],
     ["Receita líquida", numero(dre.receitaLiquida)],

@@ -14,17 +14,27 @@ export async function carregarDadosDashboard(mes: string | null): Promise<{
   let q = supabase
     .from("orders")
     .select(
-      "id, gross_revenue_snapshot, net_revenue_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name)"
+      "id, closed_at, cancelled_at, gross_revenue_snapshot, net_revenue_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name)"
     )
     .eq("status", "closed");
   if (mes) {
     const { inicio, fim } = limitesMesSaoPaulo(mes);
-    q = q.gte("closed_at", inicio).lt("closed_at", fim);
+    q = q.or(`and(closed_at.gte.${inicio},closed_at.lt.${fim}),and(cancelled_at.gte.${inicio},cancelled_at.lt.${fim})`);
   }
   const { data: pedidos, error } = await q;
   if (error) throw error;
 
-  const ids = (pedidos ?? []).map((p) => p.id as string);
+  const limites = mes ? limitesMesSaoPaulo(mes) : null;
+  const eventosPorPedido = new Map<string, Array<1 | -1>>();
+  for (const p of pedidos ?? []) {
+    const eventos: Array<1 | -1> = [];
+    const fechadoEm = p.closed_at as string | null;
+    const canceladoEm = p.cancelled_at as string | null;
+    if (!limites || (fechadoEm && fechadoEm >= limites.inicio && fechadoEm < limites.fim)) eventos.push(1);
+    if (canceladoEm && (!limites || (canceladoEm >= limites.inicio && canceladoEm < limites.fim))) eventos.push(-1);
+    eventosPorPedido.set(p.id as string, eventos);
+  }
+  const ids = [...eventosPorPedido.keys()];
   let itens: ItemDash[] = [];
   if (ids.length > 0) {
     const { data: rows, error: e2 } = await supabase
@@ -32,17 +42,18 @@ export async function carregarDadosDashboard(mes: string | null): Promise<{
       .select("order_id, product_id, kit_id, quantity, unit_price, products(name), kits(name)")
       .in("order_id", ids);
     if (e2) throw e2;
-    itens = (rows ?? []).map((i) => {
+    itens = (rows ?? []).flatMap((i) => {
       const produto = (i.products as unknown as { name: string } | null)?.name;
       const kit = (i.kits as unknown as { name: string } | null)?.name;
-      return {
+      return (eventosPorPedido.get(i.order_id as string) ?? []).map((sinal) => ({
         id: (i.product_id ?? i.kit_id) as string,
         tipo: i.product_id ? "produto" as const : "kit" as const,
         nome: produto ?? (kit ? `[Kit] ${kit}` : "—"),
         // Dinheiro nunca em float — mesmo num ranking (regra do CLAUDE.md).
-        receita: dec(i.unit_price as string).times(dec(i.quantity as string)).toString(),
-        quantidade: i.quantity as string,
-      };
+        receita: dec(String(i.unit_price)).times(dec(String(i.quantity))).toString(),
+        quantidade: String(i.quantity),
+        sinal,
+      }));
     });
   }
 
@@ -52,18 +63,19 @@ export async function carregarDadosDashboard(mes: string | null): Promise<{
   if (e3) throw e3;
 
   return {
-    pedidos: (pedidos ?? []).map((p) => {
+    pedidos: (pedidos ?? []).flatMap((p) => {
       const cliente = p.customers as unknown as { id: string; name: string } | null;
       const vendedor = p.sellers as unknown as { id: string; name: string } | null;
-      return {
-      gross_revenue_snapshot: (p.gross_revenue_snapshot as string) ?? "0",
-      net_revenue_snapshot: (p.net_revenue_snapshot as string) ?? "0",
-      contribution_margin_snapshot: (p.contribution_margin_snapshot as string) ?? "0",
+      return (eventosPorPedido.get(p.id as string) ?? []).map((sinal) => ({
+      gross_revenue_snapshot: String(p.gross_revenue_snapshot ?? 0),
+      net_revenue_snapshot: String(p.net_revenue_snapshot ?? 0),
+      contribution_margin_snapshot: String(p.contribution_margin_snapshot ?? 0),
       clienteId: cliente?.id ?? "sem-cliente",
       cliente: cliente?.name ?? "—",
       vendedorId: vendedor?.id ?? "sem-vendedor",
       vendedor: vendedor?.name ?? "—",
-    };}),
+      sinal,
+    }));}),
     itens,
     regras: (regras ?? []) as RegraMargem[],
   };

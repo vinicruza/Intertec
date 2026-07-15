@@ -24,6 +24,7 @@ export type PedidoParaDRE = {
   canal: string;
   clienteId?: string;
   cliente?: string;
+  sinal?: 1 | -1;
 };
 
 export type ItemParaDRE = {
@@ -35,6 +36,7 @@ export type ItemParaDRE = {
   quantidade: string;
   precoUnitario: string;
   cmvUnitario: string;
+  sinal?: 1 | -1;
 };
 
 export type AberturaDRE = {
@@ -51,6 +53,7 @@ export type LinhaDRE = {
 
 export type DRE = {
   pedidos: number;
+  cancelamentos: number;
   receitaBruta: LinhaDRE;
   impostosEDifal: LinhaDRE;
   receitaLiquida: LinhaDRE;
@@ -75,7 +78,7 @@ const ZERO = new Decimal(0);
 
 export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | null, itens: ItemParaDRE[] = []): DRE {
   const soma = (f: (p: PedidoParaDRE) => string) =>
-    pedidos.reduce((s, p) => s.plus(dec(f(p))), ZERO);
+    pedidos.reduce((s, p) => s.plus(dec(f(p)).times(p.sinal ?? 1)), ZERO);
 
   const receitaBruta = soma((p) => p.gross_revenue_snapshot);
   // Impostos sobre venda + DIFAL (o imposto sobre o frete entra na linha de frete).
@@ -102,8 +105,8 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
       grupos.set(k.id, {
         id: g.id,
         nome: g.nome,
-        receitaBruta: g.receitaBruta.plus(dec(p.gross_revenue_snapshot)),
-        margemContribuicao: g.margemContribuicao.plus(dec(p.contribution_margin_snapshot)),
+        receitaBruta: g.receitaBruta.plus(dec(p.gross_revenue_snapshot).times(p.sinal ?? 1)),
+        margemContribuicao: g.margemContribuicao.plus(dec(p.contribution_margin_snapshot).times(p.sinal ?? 1)),
       });
     }
     return [...grupos.entries()]
@@ -117,17 +120,20 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
     for (const item of itens) {
       const pedido = pedidoPorId.get(item.orderId);
       if (!pedido) continue;
-      const brutoItem = dec(item.precoUnitario).times(dec(item.quantidade));
-      const cmvItem = dec(item.cmvUnitario).times(dec(item.quantidade));
+      const sinal = item.sinal ?? 1;
+      const brutoItemBase = dec(item.precoUnitario).times(dec(item.quantidade));
+      const cmvItemBase = dec(item.cmvUnitario).times(dec(item.quantidade));
       const brutoPedido = dec(pedido.gross_revenue_snapshot);
       // Impostos, frete e comissão são do pedido. Para a abertura por item,
       // rateamos esse bloco pela participação na receita e preservamos o CMV exato.
       const deducoesSemCmv = brutoPedido
         .minus(dec(pedido.contribution_margin_snapshot))
         .minus(dec(pedido.cmv_total_snapshot));
-      const margemItem = brutoItem.minus(cmvItem).minus(
-        brutoPedido.isZero() ? ZERO : deducoesSemCmv.times(brutoItem.div(brutoPedido))
+      const margemItemBase = brutoItemBase.minus(cmvItemBase).minus(
+        brutoPedido.isZero() ? ZERO : deducoesSemCmv.times(brutoItemBase.div(brutoPedido))
       );
+      const brutoItem = brutoItemBase.times(sinal);
+      const margemItem = margemItemBase.times(sinal);
       const k = identidade(item);
       const g = grupos.get(k.id) ?? { id: k.id, nome: k.nome, receitaBruta: ZERO, margemContribuicao: ZERO };
       grupos.set(k.id, {
@@ -141,7 +147,8 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
   };
 
   return {
-    pedidos: pedidos.length,
+    pedidos: pedidos.filter((p) => (p.sinal ?? 1) === 1).length,
+    cancelamentos: pedidos.filter((p) => p.sinal === -1).length,
     receitaBruta: { valor: receitaBruta, pct: null },
     impostosEDifal: { valor: impostosEDifal, pct: pct(impostosEDifal) },
     receitaLiquida: { valor: receitaLiquida, pct: pct(receitaLiquida) },

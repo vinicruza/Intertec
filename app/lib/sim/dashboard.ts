@@ -14,6 +14,7 @@ export type PedidoDash = {
   cliente: string;
   vendedorId: string;
   vendedor: string;
+  sinal?: 1 | -1;
 };
 
 export type ItemDash = {
@@ -22,6 +23,7 @@ export type ItemDash = {
   nome: string; // nome do produto ou "[Kit] ..."
   receita: string; // preço × quantidade
   quantidade: string;
+  sinal?: 1 | -1;
 };
 
 export type RankingLinha = { id: string; nome: string; receita: Decimal; quantidade?: Decimal; margem?: Decimal };
@@ -29,6 +31,7 @@ export type RankingLinha = { id: string; nome: string; receita: Decimal; quantid
 export type Dashboard = {
   cards: {
     pedidosFechados: number;
+    cancelamentos: number;
     receitaBruta: Decimal;
     margemContribuicao: Decimal;
     margemMediaPct: Decimal | null; // Σ MC ÷ Σ receita líquida (D2)
@@ -49,12 +52,13 @@ export function montarDashboard(
   regras: RegraMargem[],
   topo = 5
 ): Dashboard {
-  const receitaBruta = pedidos.reduce((s, p) => s.plus(dec(p.gross_revenue_snapshot)), ZERO);
-  const receitaLiquida = pedidos.reduce((s, p) => s.plus(dec(p.net_revenue_snapshot)), ZERO);
-  const margem = pedidos.reduce((s, p) => s.plus(dec(p.contribution_margin_snapshot)), ZERO);
+  const receitaBruta = pedidos.reduce((s, p) => s.plus(dec(p.gross_revenue_snapshot).times(p.sinal ?? 1)), ZERO);
+  const receitaLiquida = pedidos.reduce((s, p) => s.plus(dec(p.net_revenue_snapshot).times(p.sinal ?? 1)), ZERO);
+  const margem = pedidos.reduce((s, p) => s.plus(dec(p.contribution_margin_snapshot).times(p.sinal ?? 1)), ZERO);
 
   // Pedidos em faixa Crítica ou Negativa: classifica cada pedido pela SUA margem %.
   const criticos = pedidos.filter((p) => {
+    if (p.sinal === -1) return false;
     const rl = dec(p.net_revenue_snapshot);
     if (rl.isZero()) return true; // sem receita líquida = problema
     const st = statusMargem(dec(p.contribution_margin_snapshot).div(rl), regras);
@@ -68,8 +72,8 @@ export function montarDashboard(
       const g = grupos.get(k.id) ?? { nome: k.nome, receita: ZERO, margem: ZERO };
       grupos.set(k.id, {
         nome: g.nome,
-        receita: g.receita.plus(dec(p.gross_revenue_snapshot)),
-        margem: g.margem.plus(dec(p.contribution_margin_snapshot)),
+        receita: g.receita.plus(dec(p.gross_revenue_snapshot).times(p.sinal ?? 1)),
+        margem: g.margem.plus(dec(p.contribution_margin_snapshot).times(p.sinal ?? 1)),
       });
     }
     return [...grupos.entries()]
@@ -84,8 +88,8 @@ export function montarDashboard(
     const g = gruposItens.get(chave) ?? { nome: i.nome, receita: ZERO, quantidade: ZERO };
     gruposItens.set(chave, {
       nome: g.nome,
-      receita: g.receita.plus(dec(i.receita)),
-      quantidade: g.quantidade.plus(dec(i.quantidade)),
+      receita: g.receita.plus(dec(i.receita).times(i.sinal ?? 1)),
+      quantidade: g.quantidade.plus(dec(i.quantidade).times(i.sinal ?? 1)),
     });
   }
   const rankingItens = [...gruposItens.entries()]
@@ -95,7 +99,8 @@ export function montarDashboard(
 
   return {
     cards: {
-      pedidosFechados: pedidos.length,
+      pedidosFechados: pedidos.filter((p) => (p.sinal ?? 1) === 1).length,
+      cancelamentos: pedidos.filter((p) => p.sinal === -1).length,
       receitaBruta,
       margemContribuicao: margem,
       margemMediaPct: receitaLiquida.isZero() ? null : margem.div(receitaLiquida),

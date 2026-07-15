@@ -8,11 +8,10 @@ export async function dadosDREDoMes(mes: string): Promise<{ pedidos: PedidoParaD
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, gross_revenue_snapshot, tax_snapshot, freight_tax_snapshot, difal_snapshot, commission_amount_snapshot, cmv_total_snapshot, expense_total_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name), channels(id, name), order_items(id, order_id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, item_name_snapshot, item_category_snapshot)"
+      "id, closed_at, cancelled_at, gross_revenue_snapshot, tax_snapshot, freight_tax_snapshot, difal_snapshot, commission_amount_snapshot, cmv_total_snapshot, expense_total_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name), channels(id, name), order_items(id, order_id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, item_name_snapshot, item_category_snapshot)"
     )
     .eq("status", "closed")
-    .gte("closed_at", inicio)
-    .lt("closed_at", fim);
+    .or(`and(closed_at.gte.${inicio},closed_at.lt.${fim}),and(cancelled_at.gte.${inicio},cancelled_at.lt.${fim})`);
   if (error) throw error;
   const pedidos: PedidoParaDRE[] = [];
   const itens: ItemParaDRE[] = [];
@@ -20,8 +19,7 @@ export async function dadosDREDoMes(mes: string): Promise<{ pedidos: PedidoParaD
     const cliente = p.customers as unknown as { id: string; name: string } | null;
     const vendedor = p.sellers as unknown as { id: string; name: string } | null;
     const canal = p.channels as unknown as { id: string; name: string } | null;
-    pedidos.push({
-      id: p.id as string,
+    const base = {
       gross_revenue_snapshot: String(p.gross_revenue_snapshot ?? 0),
       tax_snapshot: String(p.tax_snapshot ?? 0),
       freight_tax_snapshot: String(p.freight_tax_snapshot ?? 0),
@@ -36,22 +34,31 @@ export async function dadosDREDoMes(mes: string): Promise<{ pedidos: PedidoParaD
       vendedor: vendedor?.name ?? "—",
       canalId: canal?.id ?? "sem-canal",
       canal: canal?.name ?? "—",
-    });
+    };
     const linhas = p.order_items as unknown as Array<{
       id: string; order_id: string; product_id: string | null; kit_id: string | null;
       quantity: string | number; unit_price: string | number; cmv_unit_snapshot: string | number | null;
       item_name_snapshot: string | null; item_category_snapshot: string | null;
     }>;
-    for (const item of linhas ?? []) itens.push({
-      id: (item.product_id ?? item.kit_id) as string,
-      orderId: item.order_id,
-      tipo: item.product_id ? "produto" : "kit",
-      nome: item.item_name_snapshot ?? "—",
-      categoria: item.item_category_snapshot ?? "Sem categoria",
-      quantidade: String(item.quantity),
-      precoUnitario: String(item.unit_price),
-      cmvUnitario: String(item.cmv_unit_snapshot ?? 0),
-    });
+    const eventos: Array<{ id: string; sinal: 1 | -1 }> = [];
+    const fechadoEm = p.closed_at as string | null;
+    const canceladoEm = p.cancelled_at as string | null;
+    if (fechadoEm && fechadoEm >= inicio && fechadoEm < fim) eventos.push({ id: `${p.id}:sale`, sinal: 1 });
+    if (canceladoEm && canceladoEm >= inicio && canceladoEm < fim) eventos.push({ id: `${p.id}:cancel`, sinal: -1 });
+    for (const evento of eventos) {
+      pedidos.push({ id: evento.id, sinal: evento.sinal, ...base });
+      for (const item of linhas ?? []) itens.push({
+        id: (item.product_id ?? item.kit_id) as string,
+        orderId: evento.id,
+        tipo: item.product_id ? "produto" : "kit",
+        nome: item.item_name_snapshot ?? "—",
+        categoria: item.item_category_snapshot ?? "Sem categoria",
+        quantidade: String(item.quantity),
+        precoUnitario: String(item.unit_price),
+        cmvUnitario: String(item.cmv_unit_snapshot ?? 0),
+        sinal: evento.sinal,
+      });
+    }
   }
   return { pedidos, itens };
 }

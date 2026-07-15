@@ -70,7 +70,7 @@ export default function DREPage() {
 
       {dadosQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
 
-      {dre && dre.pedidos === 0 && (
+      {dre && dre.pedidos === 0 && dre.cancelamentos === 0 && (
         <Card>
           <p className="text-sm text-[var(--cor-texto-suave)]">
             Nenhum pedido fechado neste mês. Simulações são projeções e não entram na DRE realizada.
@@ -79,10 +79,12 @@ export default function DREPage() {
         </Card>
       )}
 
-      {dre && dre.pedidos > 0 && (
+      {dre && dre.pedidos + dre.cancelamentos > 0 && (
         <>
           <Card>
-            <p className="mb-3 text-sm text-[var(--cor-texto-suave)]">{dre.pedidos} pedido(s) fechado(s) no mês</p>
+            <p className="mb-3 text-sm text-[var(--cor-texto-suave)]">
+              {dre.pedidos} fechamento(s){dre.cancelamentos > 0 ? ` · ${dre.cancelamentos} cancelamento(s) estornado(s) no mês` : ""}
+            </p>
             <table className="w-full text-sm">
               <tbody>
                 <Linha rotulo="Receita bruta" linha={dre.receitaBruta} />
