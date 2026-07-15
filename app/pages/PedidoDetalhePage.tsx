@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { duplicarPedido, fecharPedido, obterPedidoCompleto, reabrirPedido } from "../lib/db/fechamento";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta } from "../lib/format";
+import { dataCurta, reais } from "../lib/format";
 import { Badge, Button, Card } from "@components/ui/primitives";
 
 // Detalhe do pedido. Para pedido FECHADO, tudo vem do snapshot congelado —
@@ -23,6 +23,8 @@ export default function PedidoDetalhePage() {
   const recarregar = () => {
     queryClient.invalidateQueries({ queryKey: ["pedido", id] });
     queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    queryClient.invalidateQueries({ queryKey: ["drePedidos"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
   const fechar = useMutation({
@@ -93,8 +95,8 @@ export default function PedidoDetalhePage() {
                   )}
                 </td>
                 <td className="px-4 py-3">{i.quantity}</td>
-                <td className="px-4 py-3">R$ {i.unit_price.replace(".", ",")}</td>
-                <td className="px-4 py-3">{i.cmv_unit_snapshot ? `R$ ${Number(i.cmv_unit_snapshot).toFixed(2).replace(".", ",")}` : "—"}</td>
+                <td className="px-4 py-3">{reais(i.unit_price)}</td>
+                <td className="px-4 py-3">{reais(i.cmv_unit_snapshot)}</td>
               </tr>
             ))}
           </tbody>
@@ -160,7 +162,7 @@ function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; des
   return (
     <tr className={destaque ? "font-semibold" : ""}>
       <td className="py-1">{rotulo}</td>
-      <td className="py-1 text-right">R$ {valor.replace(".", ",")}</td>
+      <td className="py-1 text-right">{reais(valor)}</td>
     </tr>
   );
 }
