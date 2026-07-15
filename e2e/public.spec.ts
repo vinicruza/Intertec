@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("carrega o login com os campos essenciais", async ({ page }) => {
   await page.goto("/login");
-  await expect(page).toHaveTitle(/Intertec/);
-  await expect(page.getByRole("heading", { name: "Intertec" })).toBeVisible();
+  await expect(page).toHaveTitle(/Intertech Surgical/);
+  await expect(page.getByText("Intertech", { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("E-mail")).toBeVisible();
   await expect(page.getByLabel("Senha")).toBeVisible();
   await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();

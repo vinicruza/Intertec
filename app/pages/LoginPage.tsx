@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { IntertechLogo } from "@components/brand/IntertechLogo";
 
 const esquema = z.object({
   email: z.string().email("Informe um e-mail válido."),
@@ -30,27 +31,50 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <h1 className="mb-1 text-xl font-semibold">Intertec</h1>
-        <p className="mb-6 text-sm text-[var(--cor-texto-suave)]">CMV e Rentabilidade — entre para continuar.</p>
-        <form onSubmit={handleSubmit(aoEnviar)} className="space-y-4" noValidate>
-          <div>
-            <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" autoComplete="email" {...register("email")} />
-            {formState.errors.email && <p className="mt-1 text-xs text-red-600">{formState.errors.email.message}</p>}
+    <div className="grid min-h-full bg-white lg:grid-cols-[1.05fr_.95fr]">
+      <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full border-[5rem] border-white/5" />
+        <div className="absolute -bottom-64 -left-32 h-[38rem] w-[38rem] rounded-full border-[7rem] border-[#6d5bd0]/25" />
+        <IntertechLogo inverse />
+        <div className="relative max-w-xl">
+          <div className="mb-5 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">
+            Gestão orientada por dados
           </div>
-          <div>
-            <Label htmlFor="senha">Senha</Label>
-            <Input id="senha" type="password" autoComplete="current-password" {...register("senha")} />
-            {formState.errors.senha && <p className="mt-1 text-xs text-red-600">{formState.errors.senha.message}</p>}
-          </div>
-          {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
-          <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
-            {formState.isSubmitting ? "Entrando…" : "Entrar"}
-          </Button>
-        </form>
-      </Card>
+          <h1 className="text-4xl font-semibold leading-tight tracking-[-0.04em] xl:text-5xl">
+            Clareza sobre o custo real de cada produto e kit.
+          </h1>
+          <p className="mt-6 max-w-lg text-base leading-7 text-indigo-100">
+            Da composição ao DRE: acompanhe CMV, margens e rentabilidade com rastreabilidade e segurança.
+          </p>
+        </div>
+        <p className="relative text-xs text-indigo-200">Intertech Surgical · Tecnologia para decisões financeiras precisas</p>
+      </section>
+
+      <main className="flex items-center justify-center bg-[var(--cor-fundo)] p-5 sm:p-10">
+        <Card className="w-full max-w-md border-0 p-7 shadow-[0_24px_70px_rgb(4_4_100/0.10)] sm:p-10">
+          <div className="mb-8 lg:hidden"><IntertechLogo /></div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--cor-destaque)]">Acesso seguro</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">Bem-vindo</h2>
+          <p className="mb-8 mt-2 text-sm leading-6 text-[var(--cor-texto-suave)]">Entre para acessar o painel de CMV e rentabilidade.</p>
+          <form onSubmit={handleSubmit(aoEnviar)} className="space-y-5" noValidate>
+            <div>
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" type="email" autoComplete="email" placeholder="seuemail@intertech.com.br" {...register("email")} />
+              {formState.errors.email && <p className="mt-1.5 text-xs text-red-600">{formState.errors.email.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="senha">Senha</Label>
+              <Input id="senha" type="password" autoComplete="current-password" placeholder="Sua senha" {...register("senha")} />
+              {formState.errors.senha && <p className="mt-1.5 text-xs text-red-600">{formState.errors.senha.message}</p>}
+            </div>
+            {erro && <p role="alert" className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm text-red-700">{erro}</p>}
+            <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
+              {formState.isSubmitting ? "Entrando…" : "Entrar no sistema"}
+            </Button>
+          </form>
+          <p className="mt-8 text-center text-xs text-[var(--cor-texto-suave)]">Acesso restrito a usuários autorizados.</p>
+        </Card>
+      </main>
     </div>
   );
 }

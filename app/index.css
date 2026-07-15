@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
-/* Tema base do Intertec. Cores neutras + um azul institucional.
-   Claro e escuro tratados via prefers-color-scheme no futuro; por ora, claro. */
+/* Identidade Intertech Surgical, inspirada no site institucional. */
 :root {
-  --cor-fundo: #f6f7f9;
+  --cor-fundo: #f7f7fa;
   --cor-cartao: #ffffff;
-  --cor-borda: #e3e6ea;
-  --cor-primaria: #1f5fa8;
-  --cor-texto: #1a2230;
-  --cor-texto-suave: #5a6472;
+  --cor-borda: #e5e5ec;
+  --cor-primaria: #040464;
+  --cor-primaria-clara: #eeeeff;
+  --cor-destaque: #6d5bd0;
+  --cor-texto: #17172b;
+  --cor-texto-suave: #66677a;
+  --sombra-cartao: 0 1px 2px rgb(4 4 100 / 4%), 0 10px 30px rgb(4 4 100 / 5%);
 }
 
 html,
@@ -21,7 +23,31 @@ body {
   margin: 0;
   background: var(--cor-fundo);
   color: var(--cor-texto);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: Inter, "Inter Display", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: #dcdcff; color: #040464; }
+
+button, a, input, select, textarea { transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, opacity 160ms ease; }
+
+select, textarea {
+  border-color: var(--cor-borda);
+  border-radius: .625rem;
+}
+
+select:focus, textarea:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px rgb(4 4 100 / 10%);
+  outline: none;
+}
+
+table { border-collapse: separate; border-spacing: 0; }
+thead { background: #fafafd; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
 
 @media print {
