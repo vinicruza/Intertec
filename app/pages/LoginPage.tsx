@@ -50,7 +50,7 @@ export default function LoginPage() {
           <div className="mb-8 lg:hidden"><IntertechLogo /></div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--cor-destaque)]">Acesso seguro</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">Bem-vindo</h2>
-          <p className="mb-8 mt-2 text-sm leading-6 text-[var(--cor-texto-suave)]">Entre para acessar o painel de CMV e rentabilidade.</p>
+          <p className="mb-8 mt-2 text-sm leading-6 text-[var(--cor-texto-suave)]">Entre para acessar o sistema.</p>
           <form onSubmit={handleSubmit(aoEnviar)} className="space-y-5" noValidate>
             <div>
               <Label htmlFor="email">E-mail</Label>
