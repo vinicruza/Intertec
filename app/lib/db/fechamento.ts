@@ -12,23 +12,31 @@ export type PedidoResumo = {
   uf: string | null;
   created_at: string;
   closed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  revised_from_order_id: string | null;
+  revision_reason: string | null;
   totals_display: Record<string, string> | null;
   contribution_margin_snapshot: string | null;
   net_revenue_snapshot: string | null;
-  customers: { name: string } | null;
-  sellers: { name: string } | null;
+  customers: { id: string; name: string } | null;
+  sellers: { id: string; name: string } | null;
+  channels: { id: string; name: string } | null;
+  order_items: Array<{
+    item_name_snapshot: string | null;
+    products: { name: string } | null;
+    kits: { name: string } | null;
+  }>;
 };
 
-export async function listarPedidos(filtroStatus: "todos" | "simulation" | "closed"): Promise<PedidoResumo[]> {
-  let q = supabase
+export async function listarPedidos(): Promise<PedidoResumo[]> {
+  const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, uf, created_at, closed_at, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(name), sellers(name)"
+      "id, status, uf, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name), sellers(id, name), channels(id, name), order_items(item_name_snapshot, products(name), kits(name))"
     )
     .order("created_at", { ascending: false })
-    .limit(200);
-  if (filtroStatus !== "todos") q = q.eq("status", filtroStatus);
-  const { data, error } = await q;
+    .limit(500);
   if (error) throw error;
   return (data ?? []) as unknown as PedidoResumo[];
 }
@@ -44,9 +52,14 @@ export type PedidoCompleto = {
   seller_id: string | null;
   created_at: string;
   closed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  revised_from_order_id: string | null;
+  revision_reason: string | null;
   totals_display: Record<string, string> | null;
   customers: { name: string } | null;
   sellers: { name: string } | null;
+  revisoes: Array<{ id: string; status: "simulation" | "closed"; cancelled_at: string | null; created_at: string }>;
   itens: Array<{
     id: string;
     product_id: string | null;
@@ -65,7 +78,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, totals_display, customers(name), sellers(name)"
+      "id, status, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -78,6 +91,12 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     )
     .eq("order_id", id);
   if (e2) throw e2;
+  const { data: revisoes, error: e3 } = await supabase
+    .from("orders")
+    .select("id, status, cancelled_at, created_at")
+    .eq("revised_from_order_id", id)
+    .order("created_at", { ascending: false });
+  if (e3) throw e3;
   const itensNormalizados = (itens ?? []).map((item) => ({
     ...item,
     quantity: String(item.quantity),
@@ -86,8 +105,9 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
   }));
   return {
-    ...(pedido as unknown as Omit<PedidoCompleto, "itens">),
+    ...(pedido as unknown as Omit<PedidoCompleto, "itens" | "revisoes">),
     itens: itensNormalizados as unknown as PedidoCompleto["itens"],
+    revisoes: (revisoes ?? []) as PedidoCompleto["revisoes"],
   };
 }
 
@@ -100,6 +120,7 @@ export async function fecharPedido(orderId: string): Promise<void> {
   const pedido = await obterPedidoCompleto(orderId);
   if (!pedido) throw new Error("Pedido não encontrado.");
   if (pedido.status === "closed") throw new Error("Pedido já está fechado.");
+  if (pedido.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
   if (!pedido.uf) throw new Error("Fechamento exige UF definida.");
 
   const ctx = await carregarContextoSimulador();
@@ -199,4 +220,9 @@ export async function duplicarPedido(orderId: string): Promise<string> {
   });
   if (error) throw error;
   return data as string;
+}
+
+export async function cancelarPedido(orderId: string, motivo: string): Promise<void> {
+  const { error } = await supabase.rpc("cancel_order", { p_order_id: orderId, p_reason: motivo });
+  if (error) throw error;
 }

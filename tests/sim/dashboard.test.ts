@@ -63,4 +63,14 @@ describe("dashboard — cards e rankings", () => {
     expect(resultado.rankings.clientes).toHaveLength(2);
     expect(resultado.rankings.clientes.map((x) => x.id).sort()).toEqual(["c1", "c2"]);
   });
+
+  it("estorna cancelamentos nos cards e rankings", () => {
+    const cancelado = { ...PEDIDOS[0], sinal: -1 as const };
+    const itensCancelados = [{ ...ITENS[0], sinal: -1 as const }];
+    const resultado = montarDashboard([PEDIDOS[0], cancelado], [ITENS[0], ...itensCancelados], REGRAS);
+    expect(resultado.cards.pedidosFechados).toBe(1);
+    expect(resultado.cards.cancelamentos).toBe(1);
+    expect(resultado.cards.receitaBruta.isZero()).toBe(true);
+    expect(resultado.rankings.itens[0].receita.isZero()).toBe(true);
+  });
 });

@@ -95,4 +95,13 @@ describe("DRE mensal — conferência manual", () => {
     const margemItens = detalhada.aberturas.porItem.reduce((s, x) => s.plus(x.margemContribuicao), new Decimal(0));
     expect(toMoney(margemItens)).toBe(toMoney(detalhada.margemContribuicao.valor));
   });
+
+  it("estorna cancelamento no mês do evento sem apagar o fechamento histórico", () => {
+    const cancelamento: PedidoParaDRE = { ...PEDIDOS[0], id: "o1:cancel", sinal: -1 };
+    const estornada = montarDRE([PEDIDOS[0], cancelamento], "0");
+    expect(estornada.pedidos).toBe(1);
+    expect(estornada.cancelamentos).toBe(1);
+    expect(estornada.receitaBruta.valor.isZero()).toBe(true);
+    expect(estornada.margemContribuicao.valor.isZero()).toBe(true);
+  });
 });

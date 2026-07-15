@@ -45,8 +45,9 @@ export default function InicioPage() {
 
       {dash && (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-6">
             <CardNumero titulo="Pedidos fechados" valor={String(dash.cards.pedidosFechados)} />
+            <CardNumero titulo="Cancelamentos" valor={String(dash.cards.cancelamentos)} alerta={dash.cards.cancelamentos > 0} />
             <CardNumero titulo="Receita bruta" valor={reais(dash.cards.receitaBruta.toString())} />
             <CardNumero titulo="Margem de contribuição" valor={reais(dash.cards.margemContribuicao.toString())} />
             <CardNumero
@@ -60,7 +61,7 @@ export default function InicioPage() {
             />
           </div>
 
-          {dash.cards.pedidosFechados === 0 ? (
+          {dash.cards.pedidosFechados + dash.cards.cancelamentos === 0 ? (
             <Card>
               <p className="text-sm text-[var(--cor-texto-suave)]">
                 Nenhum pedido fechado {mes ? "neste mês" : "ainda"}. Os rankings aparecem conforme os
