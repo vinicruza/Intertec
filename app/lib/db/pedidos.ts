@@ -2,8 +2,6 @@ import { Decimal, calcularAlocacao, custoKit, somaDosPesos, type EntradaDecimal 
 import { supabase } from "../supabase";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
 
 export type VendedorOpcao = {
@@ -165,45 +163,24 @@ export type DadosSimulacao = {
 // Salva a simulação (status = simulation). Snapshots NÃO são gravados aqui —
 // o congelamento acontece só no fechamento do pedido (D7, Sprint 11).
 export async function salvarSimulacao(d: DadosSimulacao): Promise<string> {
-  let customerId = d.clienteId;
-  if (!customerId && d.clienteNovoNome?.trim()) {
-    const { data, error } = await supabase
-      .from("customers")
-      .insert({ tenant_id: TENANT_FIXO, name: d.clienteNovoNome.trim(), uf: d.uf })
-      .select("id")
-      .single();
-    if (error) throw error;
-    customerId = data.id as string;
-  }
-
-  const { data: pedido, error } = await supabase
-    .from("orders")
-    .insert({
-      tenant_id: TENANT_FIXO,
-      status: "simulation",
-      customer_id: customerId,
+  const { data, error } = await supabase.rpc("create_order_with_items", {
+    p_order: {
+      customer_id: d.clienteId,
+      customer_name: d.clienteNovoNome?.trim() || null,
       uf: d.uf,
       seller_id: d.vendedorId,
       channel_id: d.channelId,
       freight: d.frete.trim().replace(",", "."),
       freight_paid_by_customer: d.fretePorContaCliente,
       commission_rate: d.comissao,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-
-  const { error: eItens } = await supabase.from("order_items").insert(
-    d.itens.map((i) => ({
-      tenant_id: TENANT_FIXO,
-      order_id: pedido.id as string,
+    },
+    p_items: d.itens.map((i) => ({
       product_id: i.tipo === "produto" ? i.refId : null,
       kit_id: i.tipo === "kit" ? i.refId : null,
       quantity: i.quantidade.trim().replace(",", "."),
       unit_price: i.precoVenda.trim().replace(",", "."),
-    }))
-  );
-  if (eItens) throw eItens;
-
-  return pedido.id as string;
+    })),
+  });
+  if (error) throw error;
+  return data as string;
 }
