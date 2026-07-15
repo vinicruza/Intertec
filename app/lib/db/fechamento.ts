@@ -4,8 +4,6 @@ import { simular } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot } from "../sim/snapshot";
 import { carregarContextoSimulador } from "./pedidos";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 // ---------- Histórico ----------
 
 export type PedidoResumo = {
@@ -162,58 +160,33 @@ export async function fecharPedido(orderId: string): Promise<void> {
 
   const snap = montarSnapshot(sim, tabela.aliquotaIcsm, itensSnapshot);
 
-  // 1) Snapshot nos itens (pedido ainda em simulação: updates permitidos).
-  for (const item of snap.itens) {
-    const { orderItemId, ...campos } = item;
-    const { error } = await supabase.from("order_items").update(campos).eq("id", orderItemId);
-    if (error) throw error;
-  }
-
-  // 2) Snapshot no pedido + fechamento (trigger valida UF/comissão/frete e CMVs).
-  const { error } = await supabase
-    .from("orders")
-    .update({ ...snap.pedido, freight: sim.freteUsado.toString(), commission_rate: sim.comissaoUsada.toString(), status: "closed" })
-    .eq("id", orderId);
+  // Snapshot dos itens e do pedido são persistidos na mesma transação.
+  const { error } = await supabase.rpc("close_order_with_snapshots", {
+    p_order_id: orderId,
+    p_order_snapshot: snap.pedido,
+    p_item_snapshots: snap.itens,
+    p_freight: sim.freteUsado.toString(),
+    p_commission_rate: sim.comissaoUsada.toString(),
+  });
   if (error) throw error;
 }
 
-// Reabrir: o RLS só deixa o Admin; o trigger grava a auditoria.
-export async function reabrirPedido(orderId: string): Promise<void> {
-  const { error } = await supabase.from("orders").update({ status: "simulation" }).eq("id", orderId);
+// Pedido fechado permanece imutável; a revisão é uma nova simulação vinculada.
+export async function reabrirPedido(orderId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("copy_order_as_simulation", {
+    p_order_id: orderId,
+    p_reason: "revision",
+  });
   if (error) throw error;
+  return data as string;
 }
 
 // Duplicar como nova simulação (PRD §6.7): copia dados e itens, sem snapshots.
 export async function duplicarPedido(orderId: string): Promise<string> {
-  const pedido = await obterPedidoCompleto(orderId);
-  if (!pedido) throw new Error("Pedido não encontrado.");
-
-  const { data: novo, error } = await supabase
-    .from("orders")
-    .insert({
-      tenant_id: TENANT_FIXO,
-      status: "simulation",
-      uf: pedido.uf,
-      seller_id: pedido.seller_id,
-      channel_id: pedido.channel_id,
-      freight: pedido.freight,
-      freight_paid_by_customer: pedido.freight_paid_by_customer,
-      commission_rate: pedido.commission_rate,
-    })
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("copy_order_as_simulation", {
+    p_order_id: orderId,
+    p_reason: "duplicate",
+  });
   if (error) throw error;
-
-  const { error: eItens } = await supabase.from("order_items").insert(
-    pedido.itens.map((i) => ({
-      tenant_id: TENANT_FIXO,
-      order_id: novo.id as string,
-      product_id: i.product_id,
-      kit_id: i.kit_id,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-    }))
-  );
-  if (eItens) throw eItens;
-  return novo.id as string;
+  return data as string;
 }

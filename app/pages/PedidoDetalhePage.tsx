@@ -32,7 +32,7 @@ export default function PedidoDetalhePage() {
   });
   const reabrir = useMutation({
     mutationFn: () => reabrirPedido(id!),
-    onSuccess: recarregar,
+    onSuccess: (novoId) => navigate(`/pedidos/${novoId}`),
     onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao reabrir (apenas Administrador)."),
   });
   const duplicar = useMutation({
@@ -140,12 +140,12 @@ export default function PedidoDetalhePage() {
             disabled={reabrir.isPending}
             onClick={() => {
               setErro(null);
-              if (window.confirm("Reabrir o pedido? A reabertura é auditada e um novo snapshot será gerado no próximo fechamento.")) {
+              if (window.confirm("Criar uma revisão? O pedido fechado continuará imutável e uma nova simulação vinculada será criada.")) {
                 reabrir.mutate();
               }
             }}
           >
-            Reabrir (Admin)
+            Criar revisão (Admin)
           </Button>
         )}
         <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" disabled={duplicar.isPending} onClick={() => duplicar.mutate()}>
