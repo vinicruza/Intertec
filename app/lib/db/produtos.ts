@@ -171,22 +171,23 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
     grammage: form.grammage.trim() || null,
   };
 
-  let produtoId = id;
-  if (produtoId) {
-    const { error } = await supabase.from("products").update(campos).eq("id", produtoId);
-    if (error) throw error;
-    const { error: eDel } = await supabase.from("product_components").delete().eq("product_id", produtoId);
-    if (eDel) throw eDel;
-  } else {
-    const { data, error } = await supabase.from("products").insert(campos).select("id").single();
-    if (error) throw error;
-    produtoId = data.id as string;
-  }
-
-  const linhas = componentesParaBanco(produtoId, form);
-  if (linhas.length > 0) {
-    const { error } = await supabase.from("product_components").insert(linhas);
-    if (error) throw error; // inclui a exceção do trigger anti-ciclo
-  }
-  return produtoId;
+  const linhas = componentesParaBanco(id ?? "00000000-0000-0000-0000-000000000000", form)
+    .map((linha) => ({
+      component_input_id: linha.component_input_id,
+      component_product_id: linha.component_product_id,
+      quantity_type: linha.quantity_type,
+      quantity: linha.quantity,
+      width: linha.width,
+      length: linha.length,
+      yield_rate: linha.yield_rate,
+      lot_size: linha.lot_size,
+      computed_quantity: linha.computed_quantity,
+    }));
+  const { data, error } = await supabase.rpc("save_product_with_components", {
+    p_product_id: id,
+    p_product: campos,
+    p_components: linhas,
+  });
+  if (error) throw error;
+  return data as string;
 }
