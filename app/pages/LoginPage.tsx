@@ -32,17 +32,13 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-full bg-white lg:grid-cols-[1.05fr_.95fr]">
-      <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-center text-white lg:flex lg:flex-col lg:items-center lg:justify-center">
         <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full border-[5rem] border-white/5" />
         <div className="absolute -bottom-64 -left-32 h-[38rem] w-[38rem] rounded-full border-[7rem] border-[#6d5bd0]/25" />
-        <IntertechLogo inverse size="lg" />
-        <div className="relative max-w-md">
-          <h1 className="text-2xl font-semibold tracking-[-0.03em]">Sistema Interno</h1>
-          <p className="mt-3 text-sm leading-6 text-indigo-100">
-            Plataforma de gestão da Intertech. Novos módulos serão adicionados ao longo do tempo.
-          </p>
+        <div className="relative flex flex-col items-center">
+          <IntertechLogo inverse size="lg" />
+          <h1 className="mt-10 text-4xl font-semibold tracking-[0.14em] xl:text-5xl">SISTEMA INTERNO</h1>
         </div>
-        <p className="relative text-xs text-indigo-200">Intertech Surgical · Ambiente interno seguro</p>
       </section>
 
       <main className="flex items-center justify-center bg-[var(--cor-fundo)] p-5 sm:p-10">

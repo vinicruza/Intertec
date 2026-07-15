@@ -13,7 +13,7 @@ type Props = {
 // Marca oficial Intertech, vetorizada (SVG) para nitidez em qualquer tamanho.
 // Em superfícies escuras usamos `inverse` para renderizá-la em branco.
 export function IntertechLogo({ compact = false, inverse = false, size = "md", className }: Props) {
-  const altura = compact ? "h-9" : size === "lg" ? "h-32 xl:h-40" : "h-14";
+  const altura = compact ? "h-9" : size === "lg" ? "h-44 xl:h-52" : "h-14";
 
   return (
     <div className={cn("flex items-center", className)}>
