@@ -23,3 +23,10 @@ body {
   color: var(--cor-texto);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  main { padding: 0 !important; }
+  [class*="shadow"] { box-shadow: none !important; }
+}

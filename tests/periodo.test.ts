@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limitesMesSaoPaulo } from "../app/lib/periodo";
+import { limitesMesSaoPaulo, mesAnterior } from "../app/lib/periodo";
 
 describe("limites mensais em America/Sao_Paulo", () => {
   it("converte a meia-noite brasileira para UTC", () => {
@@ -15,5 +15,10 @@ describe("limites mensais em America/Sao_Paulo", () => {
 
   it.each(["", "2026-13", "07-2026"])("rejeita período inválido %j", (mes) => {
     expect(() => limitesMesSaoPaulo(mes)).toThrow(/Mês inválido/);
+  });
+
+  it("calcula o mês anterior inclusive na virada do ano", () => {
+    expect(mesAnterior("2026-07")).toBe("2026-06");
+    expect(mesAnterior("2026-01")).toBe("2025-12");
   });
 });

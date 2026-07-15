@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toMoney } from "@calc";
-import { montarDRE, type PedidoParaDRE } from "../../app/lib/sim/dre";
+import { Decimal, toMoney } from "@calc";
+import { montarDRE, type ItemParaDRE, type PedidoParaDRE } from "../../app/lib/sim/dre";
 
 // Critério de aceite da Sprint 12: o DRE de um mês bate com a CONFERÊNCIA
 // MANUAL. Dois pedidos fechados com valores conferíveis à mão:
@@ -13,6 +13,7 @@ import { montarDRE, type PedidoParaDRE } from "../../app/lib/sim/dre";
 //   margem contribuição 4.069,08         margem contribuição 4.125
 const PEDIDOS: PedidoParaDRE[] = [
   {
+    id: "o1",
     gross_revenue_snapshot: "16800",
     tax_snapshot: "2730",
     freight_tax_snapshot: "162.50",
@@ -23,8 +24,11 @@ const PEDIDOS: PedidoParaDRE[] = [
     contribution_margin_snapshot: "4069.08",
     vendedor: "Patricia",
     canal: "Interno",
+    clienteId: "c1",
+    cliente: "Hospital Central",
   },
   {
+    id: "o2",
     gross_revenue_snapshot: "10000",
     tax_snapshot: "1625",
     freight_tax_snapshot: "0",
@@ -35,7 +39,14 @@ const PEDIDOS: PedidoParaDRE[] = [
     contribution_margin_snapshot: "4125",
     vendedor: "Revendas",
     canal: "Revendas",
+    clienteId: "c2",
+    cliente: "Clínica Sul",
   },
+];
+
+const ITENS: ItemParaDRE[] = [
+  { id: "p1", orderId: "o1", tipo: "produto", nome: "Avental", categoria: "Vestuário", quantidade: "100", precoUnitario: "168", cmvUnitario: "61.5042" },
+  { id: "k1", orderId: "o2", tipo: "kit", nome: "[Kit] Básico", categoria: "Kit", quantidade: "10", precoUnitario: "1000", cmvUnitario: "400" },
 ];
 
 describe("DRE mensal — conferência manual", () => {
@@ -75,5 +86,13 @@ describe("DRE mensal — conferência manual", () => {
     expect(semReal.despesaFixaReal).toBeNull();
     expect(semReal.resultadoOperacional).toBeNull();
     expect(semReal.variacaoAbsorcao).toBeNull();
+  });
+
+  it("abre por cliente, categoria e item sem perder a margem total", () => {
+    const detalhada = montarDRE(PEDIDOS, "7000", ITENS);
+    expect(detalhada.aberturas.porCliente.map((x) => x.nome)).toEqual(["Hospital Central", "Clínica Sul"]);
+    expect(detalhada.aberturas.porCategoria.map((x) => x.nome)).toEqual(["Vestuário", "Kit"]);
+    const margemItens = detalhada.aberturas.porItem.reduce((s, x) => s.plus(x.margemContribuicao), new Decimal(0));
+    expect(toMoney(margemItens)).toBe(toMoney(detalhada.margemContribuicao.valor));
   });
 });
