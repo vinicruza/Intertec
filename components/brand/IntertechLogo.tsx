@@ -1,6 +1,6 @@
 import { cn } from "@components/ui/cn";
 
-import logoUrl from "./intertek-logo.png";
+import logoUrl from "./intertech-logo.svg";
 
 type Props = {
   compact?: boolean;
@@ -8,14 +8,14 @@ type Props = {
   className?: string;
 };
 
-// Marca oficial Intertek. A imagem tem fundo transparente; em superfícies
-// escuras usamos `inverse` para renderizá-la em branco (brightness-0 invert).
+// Marca oficial Intertech, vetorizada (SVG) para nitidez em qualquer tamanho.
+// Em superfícies escuras usamos `inverse` para renderizá-la em branco.
 export function IntertechLogo({ compact = false, inverse = false, className }: Props) {
   return (
     <div className={cn("flex items-center", className)}>
       <img
         src={logoUrl}
-        alt="Intertek"
+        alt="Intertech"
         className={cn(
           "w-auto shrink-0 select-none",
           compact ? "h-9" : "h-14",
