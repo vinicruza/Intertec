@@ -106,7 +106,7 @@ function Ranking({ titulo, linhas, colunaExtra }: { titulo: string; linhas: Rank
           </thead>
           <tbody>
             {linhas.map((l) => (
-              <tr key={l.nome} className="border-b border-[var(--cor-borda)] last:border-0">
+              <tr key={l.id} className="border-b border-[var(--cor-borda)] last:border-0">
                 <td className="py-1.5 font-medium">{l.nome}</td>
                 <td className="py-1.5 text-right">{reais(l.receita.toString())}</td>
                 <td className="py-1.5 text-right">

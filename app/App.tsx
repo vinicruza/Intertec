@@ -19,6 +19,7 @@ import PedidosPage from "./pages/PedidosPage";
 import PedidoDetalhePage from "./pages/PedidoDetalhePage";
 import DREPage from "./pages/DREPage";
 import ConfiguracoesPage from "./pages/ConfiguracoesPage";
+import IntegridadePage from "./pages/IntegridadePage";
 
 const queryClient = new QueryClient();
 
@@ -101,6 +102,10 @@ export default function App() {
               <Route
                 path="/configuracoes"
                 element={<ExigirAcesso caminho="/configuracoes"><ConfiguracoesPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/integridade"
+                element={<ExigirAcesso caminho="/integridade"><IntegridadePage /></ExigirAcesso>}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

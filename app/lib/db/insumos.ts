@@ -1,8 +1,6 @@
 import { Decimal, dec, precoSemImposto } from "@calc";
 import { supabase } from "../supabase";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001"; // multi-tenant preparado (PRD §8)
-
 // Linha da tabela `inputs` como vem do banco (numeric chega como texto — nunca float).
 export type InsumoLinha = {
   id: string;
@@ -65,7 +63,6 @@ export async function obterInsumo(id: string): Promise<InsumoLinha | null> {
 function paraRegistro(form: InsumoFormulario) {
   const { comImposto, semImposto } = derivarPrecos(form);
   return {
-    tenant_id: TENANT_FIXO,
     name: form.name.trim(),
     category: form.category.trim() || null,
     purchase_unit: form.purchase_unit.trim() || null,
@@ -80,18 +77,14 @@ function paraRegistro(form: InsumoFormulario) {
 }
 
 export async function criarInsumo(form: InsumoFormulario): Promise<string> {
-  const { tenant_id, ...input } = paraRegistro(form);
-  void tenant_id;
-  const { data, error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: null, p_input: input });
+  const { data, error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: null, p_input: paraRegistro(form) });
   if (error) throw error;
   return data as string;
 }
 
 export async function atualizarInsumo(id: string, form: InsumoFormulario): Promise<void> {
   // O trigger do banco registra a mudança de preço em input_cost_history.
-  const { tenant_id, ...input } = paraRegistro(form);
-  void tenant_id;
-  const { error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: id, p_input: input });
+  const { error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: id, p_input: paraRegistro(form) });
   if (error) throw error;
 }
 
