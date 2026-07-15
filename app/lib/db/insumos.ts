@@ -80,18 +80,18 @@ function paraRegistro(form: InsumoFormulario) {
 }
 
 export async function criarInsumo(form: InsumoFormulario): Promise<string> {
-  const { data, error } = await supabase
-    .from("inputs")
-    .insert({ ...paraRegistro(form), price_updated_at: new Date().toISOString() })
-    .select("id")
-    .single();
+  const { tenant_id, ...input } = paraRegistro(form);
+  void tenant_id;
+  const { data, error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: null, p_input: input });
   if (error) throw error;
-  return data.id as string;
+  return data as string;
 }
 
 export async function atualizarInsumo(id: string, form: InsumoFormulario): Promise<void> {
   // O trigger do banco registra a mudança de preço em input_cost_history.
-  const { error } = await supabase.from("inputs").update(paraRegistro(form)).eq("id", id);
+  const { tenant_id, ...input } = paraRegistro(form);
+  void tenant_id;
+  const { error } = await supabase.rpc("save_input_and_recalculate", { p_input_id: id, p_input: input });
   if (error) throw error;
 }
 
