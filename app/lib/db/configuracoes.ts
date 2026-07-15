@@ -1,7 +1,5 @@
 import { supabase } from "../supabase";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 // Camada de dados de Configurações (PRD §6.11). Só Admin escreve (RLS já
 // garante isso no banco); Financeiro só lê. Nenhuma regra de cálculo aqui —
 // só leitura/gravação das tabelas de parâmetros.
@@ -93,6 +91,3 @@ export async function atualizarPortal(id: string, freight_percent: string): Prom
   const { error } = await supabase.from("portal_freight_rates").update({ freight_percent }).eq("id", id);
   if (error) throw error;
 }
-
-// Referência ao tenant fixo — útil se telas futuras precisarem gravar novas linhas.
-export { TENANT_FIXO };

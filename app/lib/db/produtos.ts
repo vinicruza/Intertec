@@ -1,8 +1,6 @@
 import { Decimal, resolverQuantidade, type InsumoCascata, type ProdutoCascata, type Quantidade } from "@calc";
 import { supabase } from "../supabase";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 export type ProdutoLinha = {
   id: string;
   code: string;
@@ -138,12 +136,10 @@ export async function obterProduto(id: string): Promise<ProdutoCompleto | null> 
   return { produto, componentes: (componentes ?? []) as ProdutoCompleto["componentes"] };
 }
 
-function componentesParaBanco(produtoId: string, form: ProdutoForm) {
+function componentesParaBanco(form: ProdutoForm) {
   return form.componentes.map((c) => {
     const { valor } = quantidadeDoComponente(c);
     return {
-      tenant_id: TENANT_FIXO,
-      product_id: produtoId,
       component_input_id: c.tipo === "insumo" ? c.refId : null,
       component_product_id: c.tipo === "produto" ? c.refId : null,
       quantity_type: c.quantity_type,
@@ -161,7 +157,6 @@ function componentesParaBanco(produtoId: string, form: ProdutoForm) {
 // (trigger) e do motor; aqui o erro do banco sobe para a tela.
 export async function salvarProduto(id: string | null, form: ProdutoForm): Promise<string> {
   const campos = {
-    tenant_id: TENANT_FIXO,
     code: form.code?.trim() ?? "",
     name: form.name.trim(),
     category: form.category.trim() || null,
@@ -171,18 +166,7 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
     grammage: form.grammage.trim() || null,
   };
 
-  const linhas = componentesParaBanco(id ?? "00000000-0000-0000-0000-000000000000", form)
-    .map((linha) => ({
-      component_input_id: linha.component_input_id,
-      component_product_id: linha.component_product_id,
-      quantity_type: linha.quantity_type,
-      quantity: linha.quantity,
-      width: linha.width,
-      length: linha.length,
-      yield_rate: linha.yield_rate,
-      lot_size: linha.lot_size,
-      computed_quantity: linha.computed_quantity,
-    }));
+  const linhas = componentesParaBanco(form);
   const { data, error } = await supabase.rpc("save_product_with_components", {
     p_product_id: id,
     p_product: campos,

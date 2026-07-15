@@ -10,17 +10,21 @@ export type PedidoDash = {
   net_revenue_snapshot: string;
   gross_revenue_snapshot: string;
   contribution_margin_snapshot: string;
+  clienteId: string;
   cliente: string;
+  vendedorId: string;
   vendedor: string;
 };
 
 export type ItemDash = {
+  id: string;
+  tipo: "produto" | "kit";
   nome: string; // nome do produto ou "[Kit] ..."
   receita: string; // preço × quantidade
   quantidade: string;
 };
 
-export type RankingLinha = { nome: string; receita: Decimal; quantidade?: Decimal; margem?: Decimal };
+export type RankingLinha = { id: string; nome: string; receita: Decimal; quantidade?: Decimal; margem?: Decimal };
 
 export type Dashboard = {
   cards: {
@@ -57,32 +61,35 @@ export function montarDashboard(
     return st !== null && /crítica|negativa/i.test(st.label);
   }).length;
 
-  const rankearPedidos = (chave: (p: PedidoDash) => string): RankingLinha[] => {
-    const grupos = new Map<string, { receita: Decimal; margem: Decimal }>();
+  const rankearPedidos = (identidade: (p: PedidoDash) => { id: string; nome: string }): RankingLinha[] => {
+    const grupos = new Map<string, { nome: string; receita: Decimal; margem: Decimal }>();
     for (const p of pedidos) {
-      const k = chave(p);
-      const g = grupos.get(k) ?? { receita: ZERO, margem: ZERO };
-      grupos.set(k, {
+      const k = identidade(p);
+      const g = grupos.get(k.id) ?? { nome: k.nome, receita: ZERO, margem: ZERO };
+      grupos.set(k.id, {
+        nome: g.nome,
         receita: g.receita.plus(dec(p.gross_revenue_snapshot)),
         margem: g.margem.plus(dec(p.contribution_margin_snapshot)),
       });
     }
     return [...grupos.entries()]
-      .map(([nome, v]) => ({ nome, ...v }))
+      .map(([id, v]) => ({ id, ...v }))
       .sort((a, b) => b.receita.comparedTo(a.receita))
       .slice(0, topo);
   };
 
-  const gruposItens = new Map<string, { receita: Decimal; quantidade: Decimal }>();
+  const gruposItens = new Map<string, { nome: string; receita: Decimal; quantidade: Decimal }>();
   for (const i of itens) {
-    const g = gruposItens.get(i.nome) ?? { receita: ZERO, quantidade: ZERO };
-    gruposItens.set(i.nome, {
+    const chave = `${i.tipo}:${i.id}`;
+    const g = gruposItens.get(chave) ?? { nome: i.nome, receita: ZERO, quantidade: ZERO };
+    gruposItens.set(chave, {
+      nome: g.nome,
       receita: g.receita.plus(dec(i.receita)),
       quantidade: g.quantidade.plus(dec(i.quantidade)),
     });
   }
   const rankingItens = [...gruposItens.entries()]
-    .map(([nome, v]) => ({ nome, ...v }))
+    .map(([id, v]) => ({ id, ...v }))
     .sort((a, b) => b.receita.comparedTo(a.receita))
     .slice(0, topo);
 
@@ -95,8 +102,8 @@ export function montarDashboard(
       pedidosCriticosOuNegativos: criticos,
     },
     rankings: {
-      clientes: rankearPedidos((p) => p.cliente),
-      vendedores: rankearPedidos((p) => p.vendedor),
+      clientes: rankearPedidos((p) => ({ id: p.clienteId, nome: p.cliente })),
+      vendedores: rankearPedidos((p) => ({ id: p.vendedorId, nome: p.vendedor })),
       itens: rankingItens,
     },
   };

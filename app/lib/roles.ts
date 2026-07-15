@@ -28,6 +28,7 @@ export const MENU: ItemMenu[] = [
   { caminho: "/alocacao", rotulo: "Alocação de despesas", perfis: ["admin", "financeiro"] },
   { caminho: "/dre", rotulo: "DRE mensal", perfis: ["admin", "financeiro"] },
   { caminho: "/configuracoes", rotulo: "Configurações", perfis: ["admin", "financeiro"] },
+  { caminho: "/integridade", rotulo: "Integridade dos dados", perfis: ["admin", "financeiro"] },
   { caminho: "/perfil", rotulo: "Meu perfil", perfis: ["admin", "financeiro", "comercial", "producao"] },
 ];
 

@@ -17,7 +17,9 @@ export type PedidoParaDRE = {
   cmv_total_snapshot: string;
   expense_total_snapshot: string;
   contribution_margin_snapshot: string;
+  vendedorId?: string;
   vendedor: string;
+  canalId?: string;
   canal: string;
 };
 
@@ -68,18 +70,19 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
   const real = despesaFixaReal === null ? null : dec(despesaFixaReal);
   const resultadoOperacional = real === null ? null : margemContribuicao.minus(real);
 
-  const agrupar = (chave: (p: PedidoParaDRE) => string) => {
-    const grupos = new Map<string, { receitaBruta: Decimal; margemContribuicao: Decimal }>();
+  const agrupar = (identidade: (p: PedidoParaDRE) => { id: string; nome: string }) => {
+    const grupos = new Map<string, { nome: string; receitaBruta: Decimal; margemContribuicao: Decimal }>();
     for (const p of pedidos) {
-      const k = chave(p);
-      const g = grupos.get(k) ?? { receitaBruta: ZERO, margemContribuicao: ZERO };
-      grupos.set(k, {
+      const k = identidade(p);
+      const g = grupos.get(k.id) ?? { nome: k.nome, receitaBruta: ZERO, margemContribuicao: ZERO };
+      grupos.set(k.id, {
+        nome: g.nome,
         receitaBruta: g.receitaBruta.plus(dec(p.gross_revenue_snapshot)),
         margemContribuicao: g.margemContribuicao.plus(dec(p.contribution_margin_snapshot)),
       });
     }
     return [...grupos.entries()]
-      .map(([nome, v]) => ({ nome, ...v }))
+      .map(([, v]) => v)
       .sort((a, b) => b.receitaBruta.comparedTo(a.receitaBruta));
   };
 
@@ -98,8 +101,8 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
     variacaoAbsorcao: real === null ? null : somaRateios.minus(real),
     somaRateios,
     aberturas: {
-      porVendedor: agrupar((p) => p.vendedor),
-      porCanal: agrupar((p) => p.canal),
+      porVendedor: agrupar((p) => ({ id: p.vendedorId ?? p.vendedor, nome: p.vendedor })),
+      porCanal: agrupar((p) => ({ id: p.canalId ?? p.canal, nome: p.canal })),
     },
   };
 }

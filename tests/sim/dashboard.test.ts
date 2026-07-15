@@ -15,15 +15,15 @@ const REGRAS: RegraMargem[] = [
 //   P2: RL 8.000     | MC 1.200    (15% → Crítica)      cliente Hospital X, vend. Camila
 //   P3: RL 5.000     | MC 250      (5% → Negativa)      cliente Unimed, vend. Patricia
 const PEDIDOS: PedidoDash[] = [
-  { gross_revenue_snapshot: "16800", net_revenue_snapshot: "10219.50", contribution_margin_snapshot: "4069.08", cliente: "Unimed", vendedor: "Patricia" },
-  { gross_revenue_snapshot: "10000", net_revenue_snapshot: "8000", contribution_margin_snapshot: "1200", cliente: "Hospital X", vendedor: "Camila" },
-  { gross_revenue_snapshot: "6000", net_revenue_snapshot: "5000", contribution_margin_snapshot: "250", cliente: "Unimed", vendedor: "Patricia" },
+  { gross_revenue_snapshot: "16800", net_revenue_snapshot: "10219.50", contribution_margin_snapshot: "4069.08", clienteId: "c1", cliente: "Unimed", vendedorId: "v1", vendedor: "Patricia" },
+  { gross_revenue_snapshot: "10000", net_revenue_snapshot: "8000", contribution_margin_snapshot: "1200", clienteId: "c2", cliente: "Hospital X", vendedorId: "v2", vendedor: "Camila" },
+  { gross_revenue_snapshot: "6000", net_revenue_snapshot: "5000", contribution_margin_snapshot: "250", clienteId: "c1", cliente: "Unimed", vendedorId: "v1", vendedor: "Patricia" },
 ];
 
 const ITENS: ItemDash[] = [
-  { nome: "Avental", receita: "16800", quantidade: "4000" },
-  { nome: "[Kit] Cirurgia Básica", receita: "10000", quantidade: "50" },
-  { nome: "Avental", receita: "6000", quantidade: "1500" },
+  { id: "p1", tipo: "produto", nome: "Avental", receita: "16800", quantidade: "4000" },
+  { id: "k1", tipo: "kit", nome: "[Kit] Cirurgia Básica", receita: "10000", quantidade: "50" },
+  { id: "p1", tipo: "produto", nome: "Avental", receita: "6000", quantidade: "1500" },
 ];
 
 describe("dashboard — cards e rankings", () => {
@@ -52,5 +52,15 @@ describe("dashboard — cards e rankings", () => {
 
   it("ranking de vendedores", () => {
     expect(d.rankings.vendedores.map((v) => v.nome)).toEqual(["Patricia", "Camila"]);
+  });
+
+  it("não mistura entidades diferentes que têm o mesmo nome", () => {
+    const pedidos = [
+      { ...PEDIDOS[0], clienteId: "c1", cliente: "Mesmo nome" },
+      { ...PEDIDOS[1], clienteId: "c2", cliente: "Mesmo nome" },
+    ];
+    const resultado = montarDashboard(pedidos, [], REGRAS);
+    expect(resultado.rankings.clientes).toHaveLength(2);
+    expect(resultado.rankings.clientes.map((x) => x.id).sort()).toEqual(["c1", "c2"]);
   });
 });

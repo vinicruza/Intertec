@@ -1,7 +1,5 @@
 import { supabase } from "../supabase";
 
-const TENANT_FIXO = "00000000-0000-0000-0000-000000000001";
-
 // Camada de dados da alocação de despesa mensal (Decisão D3).
 // As fórmulas do rateio ficam no motor (lib/calculations/allocation.ts — T4/T5);
 // aqui só entra leitura/gravação. Alterar o mês corrente não altera meses
@@ -41,17 +39,12 @@ export async function listarPeriodos(): Promise<PeriodoLinha[]> {
 
 // `mes` no formato "YYYY-MM" (input type="month").
 export async function criarPeriodo(mes: string, total: string): Promise<string> {
-  const { data, error } = await supabase
-    .from("expense_allocation_periods")
-    .insert({
-      tenant_id: TENANT_FIXO,
-      period: `${mes}-01`,
-      total_expense: total.trim().replace(",", "."),
-    })
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("create_expense_allocation_period", {
+    p_period: `${mes}-01`,
+    p_total_expense: total.trim().replace(",", "."),
+  });
   if (error) throw error;
-  return data.id as string;
+  return data as string;
 }
 
 export async function obterPeriodo(id: string): Promise<PeriodoLinha | null> {
@@ -80,12 +73,11 @@ export async function incluirProdutoNoPeriodo(
   producao: string,
   fator: string
 ): Promise<void> {
-  const { error } = await supabase.from("expense_allocations").insert({
-    tenant_id: TENANT_FIXO,
-    period_id: periodId,
-    product_id: productId,
-    estimated_production: producao.trim().replace(",", "."),
-    complexity_factor: fator.trim().replace(",", "."),
+  const { error } = await supabase.rpc("add_expense_allocation", {
+    p_period_id: periodId,
+    p_product_id: productId,
+    p_estimated_production: producao.trim().replace(",", "."),
+    p_complexity_factor: fator.trim().replace(",", "."),
   });
   if (error) throw error;
 }
