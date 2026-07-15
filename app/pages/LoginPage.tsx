@@ -36,18 +36,13 @@ export default function LoginPage() {
         <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full border-[5rem] border-white/5" />
         <div className="absolute -bottom-64 -left-32 h-[38rem] w-[38rem] rounded-full border-[7rem] border-[#6d5bd0]/25" />
         <IntertechLogo inverse size="lg" />
-        <div className="relative max-w-xl">
-          <div className="mb-5 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">
-            Gestão orientada por dados
-          </div>
-          <h1 className="text-4xl font-semibold leading-tight tracking-[-0.04em] xl:text-5xl">
-            Clareza sobre o custo real de cada produto e kit.
-          </h1>
-          <p className="mt-6 max-w-lg text-base leading-7 text-indigo-100">
-            Da composição ao DRE: acompanhe CMV, margens e rentabilidade com rastreabilidade e segurança.
+        <div className="relative max-w-md">
+          <h1 className="text-2xl font-semibold tracking-[-0.03em]">Sistema Interno</h1>
+          <p className="mt-3 text-sm leading-6 text-indigo-100">
+            Plataforma de gestão da Intertech. Novos módulos serão adicionados ao longo do tempo.
           </p>
         </div>
-        <p className="relative text-xs text-indigo-200">Intertech Surgical · Tecnologia para decisões financeiras precisas</p>
+        <p className="relative text-xs text-indigo-200">Intertech Surgical · Ambiente interno seguro</p>
       </section>
 
       <main className="flex items-center justify-center bg-[var(--cor-fundo)] p-5 sm:p-10">
