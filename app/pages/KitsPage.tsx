@@ -67,7 +67,7 @@ export default function KitsPage() {
                   className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]"
                   onClick={() => navigate(`/kits/${k.id}`)}
                 >
-                  <td className="px-4 py-3 text-[var(--cor-texto-suave)]">{k.code}</td>
+                  <td className="px-4 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{k.code}</strong>{k.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {k.legacy_code}</div>}</td>
                   <td className="px-4 py-3 font-medium">{k.name}</td>
                   <td className="px-4 py-3 text-[var(--cor-texto-suave)]">
                     {k.kit_items.map((i) => `${i.quantity}× ${i.products?.name ?? "?"}`).join(" · ")}

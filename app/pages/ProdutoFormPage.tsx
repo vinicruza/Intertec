@@ -15,6 +15,7 @@ import {
   salvarProduto,
   type ComponenteForm,
   type ProdutoForm,
+  listarCategoriasProduto,
 } from "../lib/db/produtos";
 import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
@@ -38,7 +39,7 @@ export default function ProdutoFormPage() {
 
   const { register, control, handleSubmit, reset, watch } = useForm<ProdutoForm>({
     defaultValues: {
-      code: "", name: "", category: "", type: "", sterile: false, size: "", grammage: "",
+      code: "", name: "", categoryId: "", type: "", sterile: false, size: "", grammage: "",
       componentes: [COMPONENTE_VAZIO],
     },
   });
@@ -46,6 +47,7 @@ export default function ProdutoFormPage() {
 
   const insumosQuery = useQuery({ queryKey: ["insumos"], queryFn: listarInsumos });
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
+  const categoriasQuery = useQuery({ queryKey: ["categorias-produto"], queryFn: listarCategoriasProduto });
   const baseQuery = useQuery({ queryKey: ["baseCascata", id ?? "novo"], queryFn: () => carregarBaseCascata(id ?? null) });
   const produtoQuery = useQuery({ queryKey: ["produto", id], queryFn: () => obterProduto(id!), enabled: editando });
 
@@ -53,7 +55,7 @@ export default function ProdutoFormPage() {
     const p = produtoQuery.data;
     if (!p) return;
     reset({
-      code: p.produto.code, name: p.produto.name, category: p.produto.category ?? "",
+      code: p.produto.code, name: p.produto.name, categoryId: p.produto.category_id,
       type: p.produto.type ?? "", sterile: p.produto.sterile ?? false,
       size: p.produto.size ?? "", grammage: p.produto.grammage ?? "",
       componentes: p.componentes.length
@@ -124,7 +126,10 @@ export default function ProdutoFormPage() {
             <div><Label>Nome</Label><Input {...register("name", { required: true })} /></div>
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <div><Label>Categoria</Label><Input {...register("category")} /></div>
+            <div><Label>Categoria</Label><select className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm" {...register("categoryId", { required: true })}>
+              <option value="">Selecione…</option>
+              {(categoriasQuery.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.prefix} — {c.name}</option>)}
+            </select></div>
             <div><Label>Tamanho</Label><Input {...register("size")} /></div>
             <div><Label>Gramatura</Label><Input {...register("grammage")} /></div>
           </div>

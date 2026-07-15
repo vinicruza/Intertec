@@ -199,7 +199,7 @@ export default function SimuladorPage() {
                 <Label>Produto ou kit</Label>
                 <select className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={l.itemId} onChange={(e) => atualizarLinha(i, "itemId", e.target.value)}>
                   <option value="">Selecione…</option>
-                  {ctx.itens.map((it) => <option key={it.id} value={it.id}>{it.nome}</option>)}
+                  {ctx.itens.map((it) => <option key={it.id} value={it.id}>{it.codigo} — {it.nome}</option>)}
                 </select>
               </div>
               <div><Label>Quantidade</Label><Input className="w-28" value={l.quantidade} onChange={(e) => atualizarLinha(i, "quantidade", e.target.value)} /></div>
