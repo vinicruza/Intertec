@@ -32,22 +32,13 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-full bg-white lg:grid-cols-[1.05fr_.95fr]">
-      <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden bg-[var(--cor-primaria)] p-12 text-center text-white lg:flex lg:flex-col lg:items-center lg:justify-center">
         <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full border-[5rem] border-white/5" />
         <div className="absolute -bottom-64 -left-32 h-[38rem] w-[38rem] rounded-full border-[7rem] border-[#6d5bd0]/25" />
-        <IntertechLogo inverse />
-        <div className="relative max-w-xl">
-          <div className="mb-5 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">
-            Gestão orientada por dados
-          </div>
-          <h1 className="text-4xl font-semibold leading-tight tracking-[-0.04em] xl:text-5xl">
-            Clareza sobre o custo real de cada produto e kit.
-          </h1>
-          <p className="mt-6 max-w-lg text-base leading-7 text-indigo-100">
-            Da composição ao DRE: acompanhe CMV, margens e rentabilidade com rastreabilidade e segurança.
-          </p>
+        <div className="relative flex flex-col items-center">
+          <IntertechLogo inverse size="lg" />
+          <h1 className="mt-10 text-4xl font-semibold tracking-[0.14em] xl:text-5xl">SISTEMA INTERNO</h1>
         </div>
-        <p className="relative text-xs text-indigo-200">Intertech Surgical · Tecnologia para decisões financeiras precisas</p>
       </section>
 
       <main className="flex items-center justify-center bg-[var(--cor-fundo)] p-5 sm:p-10">
@@ -55,7 +46,7 @@ export default function LoginPage() {
           <div className="mb-8 lg:hidden"><IntertechLogo /></div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--cor-destaque)]">Acesso seguro</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">Bem-vindo</h2>
-          <p className="mb-8 mt-2 text-sm leading-6 text-[var(--cor-texto-suave)]">Entre para acessar o painel de CMV e rentabilidade.</p>
+          <p className="mb-8 mt-2 text-sm leading-6 text-[var(--cor-texto-suave)]">Entre para acessar o sistema.</p>
           <form onSubmit={handleSubmit(aoEnviar)} className="space-y-5" noValidate>
             <div>
               <Label htmlFor="email">E-mail</Label>
