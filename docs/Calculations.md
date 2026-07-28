@@ -246,6 +246,21 @@ A margem de contribuição coincide numericamente com a margem que a planilha j�
 
 **D2 — Denominador dos percentuais = receita líquida.** Padrão de DRE e compatível com a planilha atual; as faixas de status (40/25/10%) permanecem válidas. Valores em R$ sempre exibidos junto ao %.
 
+**D2.1 — O percentual usa o MÓDULO da receita líquida (regra de sinal).** A receita líquida pode ser negativa: basta um pedido pequeno com frete alto pago pela empresa, ou impostos e comissão que superem a receita. Dividir um prejuízo por uma base negativa devolve um percentual **positivo** — e o pedido apareceria como excelente. Exemplo real encontrado na varredura de 28/07/2026:
+
+| Etapa | Valor |
+|---|---|
+| Receita bruta | 1.000,00 |
+| Frete (pago pela empresa) | 2.000,00 |
+| Receita líquida | **−1.647,50** |
+| Margem de contribuição | **−2.147,50** |
+| Margem exibida (antes da correção) | **+130,35% → status "Boa"** |
+| Margem correta | **−130,35% → status "Negativa"** |
+
+Regra: **o sinal do percentual acompanha sempre o sinal do valor, nunca o da base.** Implementada em `lib/calculations/percent.ts` (`pctSobre`) e usada em todo percentual sobre receita líquida — simulador, histórico, dashboard e DRE. Base zero devolve `null` (exibir "—"), nunca `Infinity`. Quando a receita líquida é positiva — o caso normal — o resultado é idêntico ao anterior e os golden tests T6/T7 seguem batendo com a planilha. Receita líquida ≤ 0 também dispara aviso obrigatório na simulação.
+
+A mesma regra vale para a **variação entre meses no DRE**: um resultado operacional que vai de −1.000 para −500 melhorou 50%; dividindo pela base negativa apareceria como −50% (piora).
+
 **D3 — Alocação de despesa com vigência mensal.** Cada mês tem seu total de despesa e produções estimadas (tabela versionada). Na importação, validar se os R$ 450.000 são mensais comparando com a despesa fixa real de um mês; se anuais, dividir por 12 na carga. **Regra do DRE:** o DRE da empresa usa a despesa fixa REAL do mês; a soma dos rateios dos pedidos serve para análise por produto/kit, e a diferença entre os dois é exibida como "variação de absorção". Nunca somar rateios como se fossem a despesa do mês.
 
 **D4 — Tributação e comissão viram parâmetros de canal.** Canal define: aplica DIFAL (sim/não), fonte de alíquota de imposto, comissão padrão, modelo de frete (manual ou % por UF). Migração: Revendas = sem DIFAL (venda a contribuinte); Descpro = abandona o 10% fixo e passa a usar a tabela ICSM por UF (o relatório de importação quantifica a diferença nos pedidos existentes); Mari/Temporária = frete por % da tabela Portal.
@@ -276,5 +291,6 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T8 | kit em cascata | alterar preço da Bobina SMS e recalcular kit que contém Avental | CMV do kit reflete a mudança |
 | T9 | validação | produto sem ficha ou CMV=0 em pedido | erro bloqueante (não zero silencioso) |
 | T10 | assinatura de kit | mesma composição em ordem diferente | mesma assinatura |
+| T11 | pedido com receita líquida negativa (D2.1) | receita 1.000, frete 2.000, CMV 500, UF BA | RL −1.647,50; margem **−130,35%**; status "Negativa"; aviso disparado |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.

@@ -1,4 +1,5 @@
 import { Decimal, dec } from "./decimal";
+import { pctSobre } from "./percent";
 import { ErroCalculoBloqueante, type EntradaDecimal } from "./types";
 
 // ============================================================
@@ -41,6 +42,9 @@ export type ResultadoPedido = {
   // Nível informativo: resultado após descontar também a despesa rateada
   resultadoAposRateio: Decimal;
   resultadoAposRateioPct: Decimal;
+  // true quando a receita líquida é zero ou negativa — percentual sem
+  // significado usual; a tela deve alertar (ver percent.ts).
+  receitaLiquidaNaoPositiva: boolean;
   itens: ResultadoItem[];
 };
 
@@ -111,7 +115,10 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
 
   const margemContribuicao = receitaLiquida.minus(cmvTotal);
   const resultadoAposRateio = margemContribuicao.minus(despesaTotal);
-  const semDenominador = receitaLiquida.isZero();
+  // Percentuais sobre a receita líquida (D2), pelo módulo da base: um pedido
+  // com receita líquida negativa não pode exibir margem positiva (ver percent.ts).
+  const margemContribuicaoPct = pctSobre(margemContribuicao, receitaLiquida);
+  const resultadoAposRateioPct = pctSobre(resultadoAposRateio, receitaLiquida);
 
   return {
     receitaBruta,
@@ -125,9 +132,12 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
     ajusteFrete,
     receitaLiquida,
     margemContribuicao,
-    margemContribuicaoPct: semDenominador ? zero : margemContribuicao.div(receitaLiquida),
+    margemContribuicaoPct: margemContribuicaoPct ?? zero,
     resultadoAposRateio,
-    resultadoAposRateioPct: semDenominador ? zero : resultadoAposRateio.div(receitaLiquida),
+    resultadoAposRateioPct: resultadoAposRateioPct ?? zero,
+    // Receita líquida ≤ 0: o percentual perde o significado usual e o pedido é,
+    // por definição, catastrófico. A tela precisa avisar em vez de só pintar a faixa.
+    receitaLiquidaNaoPositiva: receitaLiquida.lte(0),
     itens,
   };
 }

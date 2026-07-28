@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toPercent } from "@calc";
-import { montarDRE, type AberturaDRE, type DRE, type LinhaDRE } from "../lib/sim/dre";
+import { montarDRE, variacaoPercentual, type AberturaDRE, type DRE, type LinhaDRE } from "../lib/sim/dre";
 import { dadosDREDoMes, obterDespesaReal, salvarDespesaReal } from "../lib/db/dre";
 import { exportarDREExcel } from "../lib/export/dre";
 import { mesAnterior } from "../lib/periodo";
@@ -208,9 +208,7 @@ function Comparativo({ atual, anterior, mesAnterior: periodoAnterior }: { atual:
           <th className="py-2 text-right">Mês anterior</th><th className="py-2 text-right">Variação</th>
         </tr></thead>
         <tbody>{linhas.map(([rotulo, valorAtual, valorAnterior]) => {
-          const variacao = valorAtual && valorAnterior && !valorAnterior.isZero()
-            ? valorAtual.minus(valorAnterior).div(valorAnterior)
-            : null;
+          const variacao = variacaoPercentual(valorAtual, valorAnterior);
           return <tr key={rotulo} className="border-b border-[var(--cor-borda)] last:border-0">
             <td className="py-2 font-medium">{rotulo}</td>
             <td className="py-2 text-right">{valorAtual ? reais(valorAtual.toString()) : "—"}</td>

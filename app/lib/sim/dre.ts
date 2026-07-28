@@ -1,4 +1,4 @@
-import { Decimal, dec } from "@calc";
+import { Decimal, dec, pctSobre } from "@calc";
 
 // ============================================================
 // DRE gerencial mensal (PRD §6.8 + Decisão D3)
@@ -76,6 +76,15 @@ export type DRE = {
 
 const ZERO = new Decimal(0);
 
+// Variação percentual entre dois meses. Também divide pelo MÓDULO da base: um
+// resultado operacional que sai de −1.000 para −500 MELHOROU 50%; dividindo pela
+// base negativa apareceria como −50%, ou seja, uma piora. Regra: o sinal segue a
+// diferença (atual − anterior), nunca o sinal do mês anterior.
+export function variacaoPercentual(atual: Decimal | null, anterior: Decimal | null): Decimal | null {
+  if (atual === null || anterior === null) return null;
+  return pctSobre(atual.minus(anterior), anterior);
+}
+
 export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | null, itens: ItemParaDRE[] = []): DRE {
   const soma = (f: (p: PedidoParaDRE) => string) =>
     pedidos.reduce((s, p) => s.plus(dec(f(p)).times(p.sinal ?? 1)), ZERO);
@@ -91,8 +100,9 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
   const freteEComissoes = lucroBruto.minus(margemContribuicao);
   const somaRateios = soma((p) => p.expense_total_snapshot);
 
-  const pct = (v: Decimal): Decimal | null =>
-    receitaLiquida.isZero() ? null : v.div(receitaLiquida);
+  // Percentuais sobre a receita líquida (D2), pelo módulo da base: um mês com
+  // receita líquida negativa não pode exibir margem positiva (ver percent.ts).
+  const pct = (v: Decimal): Decimal | null => pctSobre(v, receitaLiquida);
 
   const real = despesaFixaReal === null ? null : dec(despesaFixaReal);
   const resultadoOperacional = real === null ? null : margemContribuicao.minus(real);

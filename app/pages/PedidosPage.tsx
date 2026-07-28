@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { dec } from "@calc";
 import { listarPedidos } from "../lib/db/fechamento";
 import { listarRegrasMargem } from "../lib/db/configuracoes";
-import { statusMargem, type RegraMargem } from "../lib/sim/params";
+import { statusMargemPedido, type RegraMargem } from "../lib/sim/params";
 import { exportarHistoricoPedidos } from "../lib/export/pedidos";
 import { dataCurta, reais } from "../lib/format";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
@@ -47,8 +46,7 @@ export default function PedidosPage() {
       const nomesItens = p.order_items.map((i) => i.item_name_snapshot ?? i.products?.name ?? i.kits?.name ?? "").join(" ");
       if (busca && !`${p.customers?.name ?? ""} ${nomesItens}`.toLocaleLowerCase("pt-BR").includes(busca)) return false;
       if (faixa) {
-        if (!p.net_revenue_snapshot || !p.contribution_margin_snapshot || dec(p.net_revenue_snapshot).isZero()) return false;
-        const regra = statusMargem(dec(p.contribution_margin_snapshot).div(p.net_revenue_snapshot), regras);
+        const regra = statusMargemPedido(p.contribution_margin_snapshot, p.net_revenue_snapshot, regras);
         if (regra?.label !== faixa) return false;
       }
       return true;

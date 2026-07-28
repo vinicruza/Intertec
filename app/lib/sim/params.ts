@@ -2,6 +2,7 @@ import {
   Decimal,
   calcularPedido,
   dec,
+  pctSobre,
   type EntradaDecimal,
   type ItemPedido,
   type ResultadoPedido,
@@ -74,6 +75,17 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     aliquotaComissao: comissaoUsada,
   });
 
+  // Receita líquida ≤ 0: deduções (frete, impostos, comissão) consumiram toda a
+  // receita. O percentual de margem deixa de ter o significado usual, então o
+  // aviso é obrigatório — nunca deixar a tela sugerir que o pedido está saudável.
+  if (resultado.receitaLiquidaNaoPositiva) {
+    avisos.push(
+      "Receita líquida zero ou negativa: as deduções (frete, impostos e comissão) " +
+        "consumiram toda a receita. Confira o frete e o preço de venda — os percentuais " +
+        "de margem não têm o significado usual neste pedido."
+    );
+  }
+
   return { resultado, freteUsado, comissaoUsada, difalAplicado, avisos };
 }
 
@@ -85,6 +97,20 @@ export type RegraMargem = {
   color: string | null;
   sort_order: number;
 };
+
+// Classifica um pedido FECHADO pela margem de contribuição sobre a receita
+// líquida do snapshot. Fica aqui, e não na tela, por duas razões: é cálculo
+// financeiro (regra do projeto) e precisa da mesma proteção de base negativa
+// usada no simulador — senão a lista de pedidos classifica prejuízo como "Boa".
+export function statusMargemPedido(
+  margemContribuicao: EntradaDecimal | null | undefined,
+  receitaLiquida: EntradaDecimal | null | undefined,
+  regras: RegraMargem[]
+): RegraMargem | null {
+  if (margemContribuicao == null || receitaLiquida == null) return null;
+  const pct = pctSobre(dec(margemContribuicao), dec(receitaLiquida));
+  return pct === null ? null : statusMargem(pct, regras);
+}
 
 export function statusMargem(pct: Decimal, regras: RegraMargem[]): RegraMargem | null {
   const ordenadas = [...regras].sort((a, b) => a.sort_order - b.sort_order);

@@ -1,4 +1,4 @@
-import { Decimal, dec } from "@calc";
+import { Decimal, dec, pctSobre } from "@calc";
 import { statusMargem, type RegraMargem } from "./params";
 
 // ============================================================
@@ -60,8 +60,11 @@ export function montarDashboard(
   const criticos = pedidos.filter((p) => {
     if (p.sinal === -1) return false;
     const rl = dec(p.net_revenue_snapshot);
-    if (rl.isZero()) return true; // sem receita líquida = problema
-    const st = statusMargem(dec(p.contribution_margin_snapshot).div(rl), regras);
+    // Receita líquida ≤ 0 é problema por definição, sem passar pelas faixas:
+    // dividir por base negativa devolveria um percentual positivo (ver percent.ts).
+    if (rl.lte(0)) return true;
+    const pct = pctSobre(dec(p.contribution_margin_snapshot), rl);
+    const st = pct === null ? null : statusMargem(pct, regras);
     return st !== null && /crítica|negativa/i.test(st.label);
   }).length;
 
@@ -103,7 +106,7 @@ export function montarDashboard(
       cancelamentos: pedidos.filter((p) => p.sinal === -1).length,
       receitaBruta,
       margemContribuicao: margem,
-      margemMediaPct: receitaLiquida.isZero() ? null : margem.div(receitaLiquida),
+      margemMediaPct: pctSobre(margem, receitaLiquida),
       pedidosCriticosOuNegativos: criticos,
     },
     rankings: {
