@@ -22,6 +22,7 @@ const PedidoDetalhePage = lazyComRetry(() => import("./pages/PedidoDetalhePage")
 const DREPage = lazyComRetry(() => import("./pages/DREPage"));
 const ConfiguracoesPage = lazyComRetry(() => import("./pages/ConfiguracoesPage"));
 const IntegridadePage = lazyComRetry(() => import("./pages/IntegridadePage"));
+const ComoECalculadoPage = lazyComRetry(() => import("./pages/ComoECalculadoPage"));
 
 const queryClient = new QueryClient();
 
@@ -105,6 +106,10 @@ export default function App() {
               <Route
                 path="/configuracoes"
                 element={<ExigirAcesso caminho="/configuracoes"><ConfiguracoesPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/como-e-calculado"
+                element={<ExigirAcesso caminho="/como-e-calculado"><ComoECalculadoPage /></ExigirAcesso>}
               />
               <Route
                 path="/integridade"

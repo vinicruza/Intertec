@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthProvider";
+import { perfilPodeAcessar } from "../lib/roles";
 import { Decimal, ErroCalculoBloqueante, lerValorNaoNegativo, toMoney, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
 import {
@@ -33,6 +36,11 @@ export default function SimuladorPage() {
   const [linhas, setLinhas] = useState<LinhaItem[]>([{ itemId: "", quantidade: "1", preco: "" }]);
   const [salvo, setSalvo] = useState<string | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+
+  // A memória de cálculo abre o preço dos insumos, que o Comercial não pode
+  // ver (PRD §4). Sem isso o link levaria a uma rota bloqueada.
+  const { perfil } = useAuth();
+  const podeVerMemoria = perfil ? perfilPodeAcessar(perfil.perfil, "/como-e-calculado") : false;
 
   const ctx = ctxQuery.data;
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
@@ -214,7 +222,20 @@ export default function SimuladorPage() {
               <div><Label>Preço de venda</Label><Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} /></div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {item && (item.cmvUnitario
-                  ? <>CMV un.: {reais(item.cmvUnitario)} · Despesa un.: {item.despesaUnitaria ? reais(item.despesaUnitaria) : "—"}</>
+                  ? <>
+                      CMV un.: {reais(item.cmvUnitario)} · Despesa un.:{" "}
+                      {item.despesaUnitaria ? reais(item.despesaUnitaria) : "—"}
+                      {/* De onde vem este CMV: a memória de cálculo completa. */}
+                      {item.tipo === "produto" && podeVerMemoria && (
+                        <Link
+                          to={`/como-e-calculado?produto=${item.id}`}
+                          className="ml-2 underline underline-offset-2 hover:no-underline"
+                          title="Ver de onde vem este custo"
+                        >
+                          de onde vem?
+                        </Link>
+                      )}
+                    </>
                   : <span className="text-red-600">sem custo vigente (bloqueante)</span>)}
               </div>
               <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={() => setLinhas((a) => a.filter((_, idx) => idx !== i))}>

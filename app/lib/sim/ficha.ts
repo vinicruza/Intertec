@@ -28,6 +28,45 @@ export type ComponenteForm = {
   lot_size: string; // lote
 };
 
+// ---------- Expressão do consumo ----------
+//
+// A ficha guarda a quantidade como EXPRESSÃO ESTRUTURADA, não só o número
+// final (Calculations.md §3): "senão ninguém saberá de onde veio 1,212121
+// daqui a um ano". Esta função faz o caminho de volta — do que está gravado
+// para a conta legível — e é o que permite mostrar a memória de cálculo.
+export type QuantidadeArmazenada = {
+  quantity_type: TipoQuantidade;
+  quantity: string | null;
+  width: string | null;
+  length: string | null;
+  yield_rate: string | null;
+  lot_size: string | null;
+};
+
+// Número como o usuário escreve (pt-BR), preservando o que foi digitado.
+function ptBR(valor: string | null): string {
+  return (valor ?? "").trim().replace(".", ",");
+}
+
+// Exemplos: "1 × 1,2 ÷ 0,99" (área), "1 ÷ 150" (lote), "2" (direta).
+export function descreverQuantidade(q: QuantidadeArmazenada): string {
+  if (q.quantity_type === "area") {
+    const base = `${ptBR(q.width)} × ${ptBR(q.length)}`;
+    const rend = ptBR(q.yield_rate);
+    // Rendimento 1 (ou ausente) não agrega informação: 100%, sem perda.
+    return rend === "" || rend === "1" ? base : `${base} ÷ ${rend}`;
+  }
+  if (q.quantity_type === "lot") return `1 ÷ ${ptBR(q.lot_size)}`;
+  return ptBR(q.quantity);
+}
+
+// Explica o que a expressão significa, para quem nunca viu a ficha.
+export function explicarQuantidade(q: QuantidadeArmazenada): string {
+  if (q.quantity_type === "area") return "largura × comprimento ÷ rendimento";
+  if (q.quantity_type === "lot") return "uma unidade de compra rende este tanto";
+  return "quantidade direta";
+}
+
 // Devolve a mensagem do primeiro problema do componente, ou null se válido.
 // Rendimento em branco continua valendo 1 (100%, sem perda) — padrão histórico
 // do formulário, preservado de propósito.

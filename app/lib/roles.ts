@@ -28,6 +28,11 @@ export const MENU: ItemMenu[] = [
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },
   { caminho: "/alocacao", rotulo: "Alocação de despesas", icone: "%", perfis: ["admin", "financeiro"] },
   { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"] },
+  // Mesmos perfis de /insumos, e pelo mesmo motivo: a tela abre o preço de
+  // cada insumo (Camada 1). O Comercial não vê custo de insumo (PRD §4) e o
+  // RLS já barra a leitura — deixá-lo entrar aqui mostraria custo zerado, que
+  // é justamente o erro que o sistema existe para extinguir.
+  { caminho: "/como-e-calculado", rotulo: "Como o custo é formado", icone: "?", perfis: ["admin", "financeiro", "producao"] },
   { caminho: "/configuracoes", rotulo: "Configurações", icone: "⚙", perfis: ["admin", "financeiro"] },
   { caminho: "/integridade", rotulo: "Integridade dos dados", icone: "✓", perfis: ["admin", "financeiro"] },
   { caminho: "/perfil", rotulo: "Meu perfil", icone: "●", perfis: ["admin", "financeiro", "comercial", "producao"] },

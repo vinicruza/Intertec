@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { validarComponente, validarFicha, type ComponenteForm } from "../../app/lib/sim/ficha";
+import {
+  descreverQuantidade,
+  explicarQuantidade,
+  validarComponente,
+  validarFicha,
+  type ComponenteForm,
+  type QuantidadeArmazenada,
+} from "../../app/lib/sim/ficha";
 
 // Validação da ficha técnica antes do banco. Espelha as constraints da
 // migration `catalog`: quantity > 0, width/length/yield_rate > 0, lot_size > 0.
@@ -92,5 +99,44 @@ describe("validarFicha — ficha inteira", () => {
 
   it("ficha vazia é recusada", () => {
     expect(validarFicha([])).toBe("A ficha técnica precisa de ao menos um componente.");
+  });
+});
+
+// ---------- Expressão do consumo (memória de cálculo) ----------
+// A ficha guarda a expressão, não só o número final: é o que responde
+// "de onde veio 1,212121?" um ano depois (Calculations.md §3).
+
+describe("descreverQuantidade", () => {
+  const q = (o: Partial<QuantidadeArmazenada>): QuantidadeArmazenada => ({
+    quantity_type: "direct", quantity: null, width: null, length: null,
+    yield_rate: null, lot_size: null, ...o,
+  });
+
+  it("área com rendimento reproduz a conta do Campo Catarata", () => {
+    expect(descreverQuantidade(q({ quantity_type: "area", width: "1", length: "1.2", yield_rate: "0.99" })))
+      .toBe("1 × 1,2 ÷ 0,99");
+  });
+
+  it("área com rendimento 1 omite a divisão (não agrega informação)", () => {
+    expect(descreverQuantidade(q({ quantity_type: "area", width: "2", length: "3", yield_rate: "1" })))
+      .toBe("2 × 3");
+  });
+
+  it("área sem rendimento informado também omite", () => {
+    expect(descreverQuantidade(q({ quantity_type: "area", width: "2", length: "3" }))).toBe("2 × 3");
+  });
+
+  it("lote vira 1 ÷ tamanho (uma caixa serve 150 unidades)", () => {
+    expect(descreverQuantidade(q({ quantity_type: "lot", lot_size: "150" }))).toBe("1 ÷ 150");
+  });
+
+  it("direta mostra o número em pt-BR", () => {
+    expect(descreverQuantidade(q({ quantity: "1.5" }))).toBe("1,5");
+  });
+
+  it("explica o significado de cada tipo", () => {
+    expect(explicarQuantidade(q({ quantity_type: "area" }))).toContain("rendimento");
+    expect(explicarQuantidade(q({ quantity_type: "lot" }))).toContain("rende");
+    expect(explicarQuantidade(q({}))).toBe("quantidade direta");
   });
 });
