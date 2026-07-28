@@ -131,6 +131,17 @@ export async function fecharPedido(orderId: string): Promise<void> {
   const vendedor = ctx.vendedores.find((v) => v.id === pedido.seller_id);
   if (!vendedor) throw new Error("Pedido sem vendedor/canal definido.");
 
+  // PRD §7: fechar sem definição de frete é BLOQUEANTE. Vale só para canais de
+  // frete manual — no marketplace o frete vem da tabela Portal por UF, então
+  // não há o que o usuário deixar em branco. Frete zero digitado é válido; o
+  // que não pode é frete indefinido virar zero em silêncio e inflar a margem.
+  if (vendedor.regras.modeloFrete === "manual" && pedido.freight === null) {
+    throw new Error(
+      "Fechamento exige definição de frete. Informe o valor do frete (use 0 se não houver) " +
+        "antes de fechar o pedido."
+    );
+  }
+
   const custoPorItemVendavel = new Map(ctx.itens.map((i) => [i.id, i]));
 
   // Composição expandida dos kits do pedido (D7): produto, quantidade e CMV do momento.

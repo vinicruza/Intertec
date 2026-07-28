@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ErroCalculoBloqueante, toMoney, type ItemPedido } from "@calc";
+import { Decimal, ErroCalculoBloqueante, lerValorNaoNegativo, toMoney, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
 import {
   carregarContextoSimulador,
@@ -50,6 +50,14 @@ export default function SimuladorPage() {
     const escolhidas = linhas.filter((l) => l.itemId && l.quantidade && l.preco);
     if (escolhidas.length === 0) return { estado: "incompleto" as const };
 
+    // Frete em branco ou inválido NÃO vira zero em silêncio (PRD §7): zero
+    // silencioso infla a margem. Só vale para canal de frete manual — no
+    // marketplace o valor vem da tabela Portal por UF.
+    const freteManual = vendedor.regras.modeloFrete === "manual"
+      ? lerValorNaoNegativo(frete, "o frete")
+      : ({ ok: true, valor: new Decimal(0) } as const);
+    if (!freteManual.ok) return { estado: "bloqueado" as const, msg: freteManual.motivo };
+
     try {
       const itens: ItemPedido[] = escolhidas.map((l) => {
         const item = itemPorId.get(l.itemId) as ItemVendavel;
@@ -63,7 +71,7 @@ export default function SimuladorPage() {
       });
       const s = simular({
         itens,
-        freteManual: frete.trim().replace(",", ".") || "0",
+        freteManual: freteManual.valor,
         fretePorContaCliente: freteCliente,
         comissao: comissao ? comissao.trim().replace(",", ".") : null,
         canal: vendedor.regras,

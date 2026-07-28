@@ -5,6 +5,7 @@
 export * from "./decimal";
 export * from "./types";
 export * from "./percent";
+export * from "./entrada";
 export * from "./inputs";
 export * from "./cmv";
 export * from "./allocation";
