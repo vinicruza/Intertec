@@ -13,6 +13,7 @@ import {
   obterProduto,
   quantidadeDoComponente,
   salvarProduto,
+  validarFicha,
   type ComponenteForm,
   type ProdutoForm,
   listarCategoriasProduto,
@@ -78,6 +79,11 @@ export default function ProdutoFormPage() {
     const base = baseQuery.data;
     if (!base) return { estado: "carregando" as const };
     if (!componentes.every((c) => c.refId)) return { estado: "incompleto" as const };
+    // Quantidades inválidas (rendimento ou lote zerado, campo em branco) são
+    // barradas aqui com mensagem legível — antes disso o motor chegava a
+    // calcular 1 ÷ 0 = Infinity e o erro só aparecia como recusa do banco.
+    const problema = validarFicha(componentes);
+    if (problema) return { estado: "erro" as const, msg: problema };
     try {
       const refs: ComponenteRef[] = componentes.map((c) => {
         const { estrutura } = quantidadeDoComponente(c);
@@ -96,6 +102,10 @@ export default function ProdutoFormPage() {
 
   const salvar = useMutation({
     mutationFn: async (form: ProdutoForm) => {
+      // Rede de segurança: o formulário pode ser submetido sem que a prévia
+      // tenha rodado (ex.: componente sem referência escolhida).
+      const problema = validarFicha(form.componentes);
+      if (problema) throw new Error(problema);
       await salvarProduto(id ?? null, form);
     },
     onSuccess: () => {

@@ -1,5 +1,6 @@
 import { Decimal, resolverQuantidade, type InsumoCascata, type ProdutoCascata, type Quantidade } from "@calc";
 import { supabase } from "../supabase";
+import type { ComponenteForm, TipoQuantidade } from "../sim/ficha";
 
 export type ProdutoLinha = {
   id: string;
@@ -16,19 +17,10 @@ export type ProdutoLinha = {
   cmv: string | null; // de product_costs (pode não existir ainda)
 };
 
-export type TipoQuantidade = "direct" | "area" | "lot";
-
-// Um componente da ficha como o formulário coleta.
-export type ComponenteForm = {
-  tipo: "insumo" | "produto";
-  refId: string; // id do insumo ou produto-componente
-  quantity_type: TipoQuantidade;
-  quantity: string; // direta
-  width: string; // area
-  length: string; // area
-  yield_rate: string; // area
-  lot_size: string; // lote
-};
+// A forma do componente e a validação da ficha vivem em módulo puro
+// (app/lib/sim/ficha.ts), sem banco, para poderem ser testadas isoladas.
+export type { ComponenteForm, TipoQuantidade } from "../sim/ficha";
+export { validarComponente, validarFicha } from "../sim/ficha";
 
 export type ProdutoForm = {
   code?: string;
@@ -54,6 +46,7 @@ function num(texto: string): string {
   const limpo = (texto ?? "").trim().replace(",", ".");
   return limpo === "" ? "0" : limpo;
 }
+
 
 // Constrói a expressão estruturada de quantidade e resolve o número (motor).
 export function quantidadeDoComponente(c: ComponenteForm): { estrutura: Quantidade; valor: Decimal } {
