@@ -135,9 +135,21 @@ function relatorioMarkdown(r: ResultadoReconciliacao, arquivo: string): string {
   if (r.divergenciasLayer1.length === 0) {
     l.push("Todos os preços sem imposto recalculados batem com a coluna G da planilha dentro de R$ 0,01. ✅");
   } else {
-    l.push("| Insumo | Motor | Planilha (col G) | Diferença |");
+    l.push("O preço sem imposto de cada insumo deve sair da **própria linha**:");
+    l.push("`G<n> = F<n> × (1 − D<n> − E<n>)`. Quando o motor diverge da coluna G, a causa");
+    l.push("quase sempre é a fórmula da célula apontando para **outra linha** — o valor exibido");
+    l.push("passa a ser o de outro insumo, e quem lê a planilha não tem como perceber.");
+    l.push("");
+    l.push("**Como conferir:** abrir a célula G da linha citada e verificar se as referências");
+    l.push("(F, D, E) usam o número da própria linha.");
+    l.push("");
+    l.push("| Insumo | Motor (correto) | Planilha (col G) | Diferença |");
     l.push("|---|---|---|---|");
     for (const d of r.divergenciasLayer1) l.push(`| ${d.nome} | ${toMoney(d.motor)} | ${toMoney(d.planilha)} | ${toMoney(d.diferenca)} |`);
+    l.push("");
+    l.push("> No sistema esta classe de erro deixa de existir: o preço sem imposto é **derivado**");
+    l.push("> do próprio cadastro do insumo a cada cálculo, nunca um valor digitado numa célula");
+    l.push("> que pode escorregar de linha.");
   }
   l.push("");
 

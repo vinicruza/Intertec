@@ -1,6 +1,6 @@
 # 05 — Relatório de Reconciliação da Planilha
 
-> Gerado em 2026-07-07 a partir de `c5e212f9-C_pia_de_Rentabilidade_2026.xlsx` pelo script `scripts/reconcile.ts`.
+> Gerado em 2026-07-28 a partir de `92a37db7-Rentabilidade_2026.xlsx` pelo script `scripts/reconcile.ts`.
 > Recálculo dos CMVs pelo motor puro (lib/calculations) comparado com a coluna "Input" da Alocação.
 > Tolerância: R$ 0,01. Nada foi alterado na planilha nem gravado no banco (opção A).
 
@@ -12,16 +12,16 @@ o que a planilha calcula na coluna "Custo", e o que a Alocação usa na coluna "
 | Métrica | Valor |
 |---|---|
 | Insumos lidos | 85 |
-| Produtos no Input Preço | 325 |
-| ✅ Reconciliam perfeitamente (motor = Alocação ≤ R$ 0,01) | 252 |
+| Produtos no Input Preço | 327 |
+| ✅ Reconciliam perfeitamente (motor = Alocação ≤ R$ 0,01) | 253 |
 | 🟡 Ficha com fórmula especial (planilha OK, modelo uniforme não reproduz) | 45 |
 | 🔴 Lookup divergente (coluna Custo ≠ Alocação — bug de nome/SUMIF) | 7 |
-| Produtos sem linha na Alocação (nome exato) | 21 |
-| — dos quais recuperáveis só por grafia | 5 |
-| Nomes na Alocação sem bloco no Input | 18 |
+| Produtos sem linha na Alocação (nome exato) | 22 |
+| — dos quais recuperáveis só por grafia | 6 |
+| Nomes na Alocação sem bloco no Input | 19 |
 | Nomes de produto duplicados (Input) | 3 |
 | Nomes de produto duplicados (Alocação) | 1 |
-| Insumos com preço sem imposto inconsistente (Camada 1) | 0 |
+| Insumos com preço sem imposto inconsistente (Camada 1) | 1 |
 
 ## 2. Alocação de despesa — consistente ✅
 
@@ -29,8 +29,8 @@ Desconsiderando a linha de resumo "TOTAL" (que não é um produto), a alocação
 
 | Métrica | Valor na planilha | Esperado |
 |---|---|---|
-| Produtos na Alocação | 322 | 322 (Calc.md) |
-| Σ produção × fator (soma dos pesos) | 14445616 | 14.445.616 (Calc.md) |
+| Produtos na Alocação | 324 | 322 (Calc.md) |
+| Σ produção × fator (soma dos pesos) | 14446816 | 14.445.616 (Calc.md) |
 | Σ participações | 100.00% | 100% |
 | Σ despesa alocada | R$ 450000.00 | R$ 450.000 |
 
@@ -119,6 +119,7 @@ No sistema, a busca será por ID e CMV = 0 é erro bloqueante — a classe de er
 
 | Nome no Input Preço | Nome na Alocação |
 |---|---|
+| `Campo de Mesa 1,30 x 2,00 + Fen Bino` | `Campo de Mesa 1,30 x 2,00  + Fen Bino` |
 | `Campo de Mesa 1,50 x 1,50 + Tape 1m Não Estéril` | `Campo de Mesa 1,50 x 1,50  + Tape 1m Não Estéril` |
 | `Campo Simples 1,00 x 1,40 GR40` | `Campo SImples  1,00 x 1,40 GR40` |
 | `Campo Simples 1,00 x 1,40 GR40 Não Estéril` | `Campo SImples  1,00 x 1,40 GR40 Não Estéril` |
@@ -157,7 +158,21 @@ Duplicatas causam custo somado (dobrado) no SUMIF das abas de vendedor — Calcu
 
 ## 6. Camada 1 — preço sem imposto
 
-Todos os preços sem imposto recalculados batem com a coluna G da planilha dentro de R$ 0,01. ✅
+O preço sem imposto de cada insumo deve sair da **própria linha**:
+`G<n> = F<n> × (1 − D<n> − E<n>)`. Quando o motor diverge da coluna G, a causa
+quase sempre é a fórmula da célula apontando para **outra linha** — o valor exibido
+passa a ser o de outro insumo, e quem lê a planilha não tem como perceber.
+
+**Como conferir:** abrir a célula G da linha citada e verificar se as referências
+(F, D, E) usam o número da própria linha.
+
+| Insumo | Motor (correto) | Planilha (col G) | Diferença |
+|---|---|---|---|
+| Caixa 5 | 3.88 | 9.98 | -6.10 |
+
+> No sistema esta classe de erro deixa de existir: o preço sem imposto é **derivado**
+> do próprio cadastro do insumo a cada cálculo, nunca um valor digitado numa célula
+> que pode escorregar de linha.
 
 ## 7. Itens para confirmação humana (antes de gravar no banco)
 
