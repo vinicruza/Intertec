@@ -21,16 +21,63 @@ import { Badge, Button, Card, Input } from "@components/ui/primitives";
 
 type Aba = "canais" | "margem" | "icsm" | "difal" | "portal";
 
-const ABAS: Array<{ id: Aba; rotulo: string }> = [
-  { id: "canais", rotulo: "Canais" },
-  { id: "margem", rotulo: "Faixas de margem" },
-  { id: "icsm", rotulo: "ICSM por UF" },
-  { id: "difal", rotulo: "DIFAL por UF" },
-  { id: "portal", rotulo: "Frete Portal (Marketplace)" },
+// Procedência de cada tabela: o nome de negócio, DE ONDE o dado veio na
+// planilha (ponte para quem conhece a "Rentabilidade 2026") e ONDE ele entra
+// no cálculo. Esta é a resposta às duas perguntas que o Administrador faz ao
+// abrir uma tabela de parâmetros: "de onde vem isto?" e "o que eu quebro se
+// mudar?".
+type Procedencia = {
+  rotulo: string; // rótulo curto da aba
+  titulo: string; // nome de negócio, por extenso
+  planilha: string; // origem na planilha
+  usadoEm: string; // onde o número entra no cálculo
+  formula?: string; // a conta, quando ajuda a entender
+};
+
+const ABAS: Array<{ id: Aba } & Procedencia> = [
+  {
+    id: "canais",
+    rotulo: "Canais de venda",
+    titulo: "Canais de venda",
+    planilha: "As 12 abas de vendedor da planilha, que tinham divergido entre si, viraram um modelo único parametrizado por canal (Decisão D4).",
+    usadoEm: "Todo pedido herda do canal: se aplica DIFAL, a comissão padrão e o modelo de frete (digitado ou % por estado).",
+  },
+  {
+    id: "margem",
+    rotulo: "Faixas de margem",
+    titulo: "Faixas de status da margem",
+    planilha: "Não existia na planilha — lá a margem era ambígua (o mesmo pedido exibia três números diferentes).",
+    usadoEm: "Classifica cada pedido em Boa / Atenção / Crítica / Negativa no simulador, no histórico e no dashboard.",
+    formula: "faixa = margem de contribuição ÷ receita líquida",
+  },
+  {
+    id: "icsm",
+    rotulo: "Imposto por estado",
+    titulo: "Imposto sobre venda por estado de destino",
+    planilha: "Aba ICSM.",
+    usadoEm: "Aplicado sobre a receita de todo pedido com destino a este estado — e também sobre o frete.",
+    formula: "alíquota total = ICMS interestadual + PIS/COFINS (9,25%)",
+  },
+  {
+    id: "difal",
+    rotulo: "DIFAL por estado",
+    titulo: "DIFAL por estado de destino",
+    planilha: "Aba DIFAL, migrada como está (Decisão D5) — incluindo as 4 UFs cujo valor final não bate com Pobreza + Alíquota, sinalizadas com ⚠️ para o contador confirmar.",
+    usadoEm: "Somado ao imposto sobre a receita, apenas nos canais que aplicam DIFAL. São Paulo não tem linha (venda interna).",
+  },
+  {
+    id: "portal",
+    rotulo: "Frete Marketplace",
+    titulo: "Frete estimado por estado (Marketplace)",
+    planilha: "Aba Portal.",
+    usadoEm: "Nos canais com modelo de frete por percentual (Mari, Temporária), substitui o frete digitado.",
+    formula: "frete = % do estado × receita do pedido",
+  },
 ];
 
 export default function ConfiguracoesPage() {
   const [aba, setAba] = useState<Aba>("canais");
+  const atual = ABAS.find((a) => a.id === aba)!;
 
   return (
     <div className="space-y-4">
@@ -55,6 +102,8 @@ export default function ConfiguracoesPage() {
           </button>
         ))}
       </div>
+
+      <PainelProcedencia p={atual} />
 
       {aba === "canais" && <AbaCanais />}
       {aba === "margem" && <AbaMargem />}
@@ -208,7 +257,7 @@ function AbaIcsm() {
 
   if (isLoading) return <Carregando />;
   return (
-    <TabelaUF titulo="Alíquota total = ICMS interestadual + PIS/COFINS (Calculations.md §7.1)">
+    <TabelaUF>
       <thead>
         <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
           <th className="px-4 py-3 font-medium">UF</th>
@@ -253,7 +302,7 @@ function AbaDifal() {
 
   if (isLoading) return <Carregando />;
   return (
-    <TabelaUF titulo="Migrado da planilha como está (Decisão D5). UFs sinalizadas: valor final não bate com Pobreza + Alíquota — confirmar com o contador.">
+    <TabelaUF>
       <thead>
         <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
           <th className="px-4 py-3 font-medium">UF</th>
@@ -302,7 +351,7 @@ function AbaPortal() {
 
   if (isLoading) return <Carregando />;
   return (
-    <TabelaUF titulo="Frete estimado como % da receita, usado pelos canais com modelo 'uf_percent' (ex.: Marketplace).">
+    <TabelaUF>
       <thead>
         <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
           <th className="px-4 py-3 font-medium">UF</th>
@@ -334,10 +383,38 @@ function LinhaPortal({ linha, onSalvar }: { linha: PortalLinha; onSalvar: (pct: 
 
 // ---------- Utilitários ----------
 
-function TabelaUF({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+// Cabeçalho de procedência: responde "de onde vem este dado?" e "onde ele é
+// usado?" sem tirar o Administrador da tela. Mantém o nome da aba da planilha
+// à vista de propósito — quem administra o sistema conhece a "Rentabilidade
+// 2026", e o vocabulário dela é a ponte mais rápida para o modelo novo.
+function PainelProcedencia({ p }: { p: Procedencia }) {
+  return (
+    <Card className="space-y-2 border-l-4 border-l-[var(--cor-primaria)]">
+      <h2 className="font-semibold">{p.titulo}</h2>
+      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+        <dt className="font-medium text-[var(--cor-texto-suave)]">Vem da planilha</dt>
+        <dd>{p.planilha}</dd>
+        <dt className="font-medium text-[var(--cor-texto-suave)]">Usado em</dt>
+        <dd>{p.usadoEm}</dd>
+        {p.formula && (
+          <>
+            <dt className="font-medium text-[var(--cor-texto-suave)]">Conta</dt>
+            <dd>
+              <code className="rounded bg-[var(--cor-fundo-suave,#f3f4f6)] px-1.5 py-0.5 text-xs">
+                {p.formula}
+              </code>
+            </dd>
+          </>
+        )}
+      </dl>
+    </Card>
+  );
+}
+
+// O contexto da tabela agora vive no PainelProcedencia, acima dela.
+function TabelaUF({ children }: { children: React.ReactNode }) {
   return (
     <Card className="overflow-x-auto p-0">
-      <p className="px-4 pt-4 text-xs text-[var(--cor-texto-suave)]">{titulo}</p>
       <table className="w-full text-sm">{children}</table>
     </Card>
   );

@@ -1,5 +1,6 @@
-import { Decimal, dec, precoSemImposto } from "@calc";
+import { Decimal, dec, precoSemImposto, produtosAfetadosPorInsumo } from "@calc";
 import { supabase } from "../supabase";
+import { carregarBaseCascata } from "./produtos";
 
 // Linha da tabela `inputs` como vem do banco (numeric chega como texto — nunca float).
 export type InsumoLinha = {
@@ -105,4 +106,49 @@ export async function listarHistorico(insumoId: string): Promise<HistoricoCusto[
     .order("changed_at", { ascending: false });
   if (error) throw error;
   return data as HistoricoCusto[];
+}
+
+// ---------- Impacto de uma alteração de preço ----------
+
+// "O que eu quebro se mudar este preço?" — a pergunta que a planilha nunca
+// soube responder. O motor já sabe: `produtosAfetadosPorInsumo` percorre a
+// cascata e devolve os produtos que dependem do insumo, direta ou
+// indiretamente (via outro produto que o consome).
+//
+// Aqui só traduzimos esses IDs em nomes e acrescentamos os kits que contêm
+// algum desses produtos. Nada é recalculado nem gravado — é uma consulta de
+// leitura, feita ANTES de salvar.
+export type ImpactoInsumo = {
+  produtos: Array<{ id: string; nome: string; codigo: string | null }>;
+  kits: Array<{ id: string; nome: string; codigo: string | null }>;
+};
+
+export async function impactoDoInsumo(insumoId: string): Promise<ImpactoInsumo> {
+  const { produtos: base } = await carregarBaseCascata(null);
+  const afetados = produtosAfetadosPorInsumo(insumoId, base);
+  if (afetados.size === 0) return { produtos: [], kits: [] };
+
+  const ids = [...afetados];
+  const [{ data: prods, error: e1 }, { data: kitItems, error: e2 }] = await Promise.all([
+    supabase.from("products").select("id, name, code").in("id", ids).order("name"),
+    supabase.from("kit_items").select("kit_id, product_id, kits(id, name, code)").in("product_id", ids),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+
+  // Um kit pode conter vários produtos afetados — conta uma vez só.
+  const kitsPorId = new Map<string, { id: string; nome: string; codigo: string | null }>();
+  for (const ki of kitItems ?? []) {
+    const k = ki.kits as unknown as { id: string; name: string; code: string | null } | null;
+    if (k) kitsPorId.set(k.id, { id: k.id, nome: k.name, codigo: k.code });
+  }
+
+  return {
+    produtos: (prods ?? []).map((p) => ({
+      id: p.id as string,
+      nome: p.name as string,
+      codigo: (p.code as string | null) ?? null,
+    })),
+    kits: [...kitsPorId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+  };
 }
