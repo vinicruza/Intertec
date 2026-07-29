@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { custoKit, type EntradaDecimal } from "@calc";
+import { custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc";
 import { listarKits, type KitLinha } from "../lib/db/kits";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais } from "../lib/format";
@@ -12,16 +12,28 @@ export default function KitsPage() {
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
 
   // CMV vigente por produto (de product_costs) para o custo do kit em cascata.
-  const custoPorProduto = new Map<string, EntradaDecimal>(
-    (produtosQuery.data ?? []).filter((p) => p.cmv !== null).map((p) => [p.id, p.cmv as string])
+  const custoPorProduto = new Map<string, CustoProdutoKit>(
+    (produtosQuery.data ?? []).filter((p) => p.cmv !== null).map((p) => [p.id, { cmv: p.cmv as string }])
   );
 
+  // Custo do kit = produtos + embalagem/esterilização consumida uma vez por kit.
   function cmvDoKit(kit: KitLinha): string | null {
+    const embalagem: EmbalagemKit[] = kit.kit_packaging.flatMap((e) =>
+      e.inputs?.price_without_tax
+        ? [{
+            nome: e.inputs.name,
+            custoUnitario: e.inputs.price_without_tax,
+            quantidade: e.quantity,
+            maoDeObra: e.inputs.is_labor,
+          }]
+        : []
+    );
     try {
-      return custoKit(
+      return custoKitCompleto(
         kit.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity })),
-        custoPorProduto
-      ).toString();
+        custoPorProduto,
+        embalagem
+      ).custoTotal.toString();
     } catch {
       return null; // produto do kit sem custo vigente ainda
     }

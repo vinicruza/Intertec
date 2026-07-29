@@ -64,9 +64,9 @@ Todo pedido pertence a um canal. O canal parametriza o cálculo:
 
 Canais na carga inicial: Interno (Patricia, Camila, Isabela, Priscilene, Suellen, Nathalia, Edmilson), Marketplace (Mari, Temporária), Externos, Revendas, Descpro. Vendedor é entidade separada, vinculada a canal.
 
-### 5.2 Período de alocação (novo — Decisão D3)
+### 5.2 Período de alocação (Decisão D3) — **DESCONTINUADO em 29/07/2026**
 
-A alocação de despesa tem vigência mensal e é versionada: cada mês tem seu total de despesa a ratear e as produções estimadas por produto. Cálculo no Calculations.md §5. O sistema mantém histórico; alterar o mês corrente não altera meses fechados.
+Módulo retirado do produto (ver §6.4). As tabelas e os snapshots de pedidos já fechados permanecem no banco como dado histórico.
 
 ### 5.3 Snapshot de custos (novo — Decisão D7)
 
@@ -80,9 +80,10 @@ Todo pedido, simulação, e o DRE exibem a mesma cascata:
 Receita bruta
 (−) Impostos sobre venda + DIFAL          = Receita líquida
 (−) CMV                                   = Lucro bruto
-(−) Frete líquido + Comissão              = MARGEM DE CONTRIBUIÇÃO  ← métrica oficial
-(−) Despesa alocada (rateio)              = Resultado após rateio
+(−) Frete líquido + Comissão              = MARGEM DE CONTRIBUIÇÃO  ← métrica oficial e última linha
 ```
+
+A linha `(−) Despesa alocada (rateio)` foi retirada em 29/07/2026 junto com o módulo de Alocação (§6.4). Nenhum número usado para decisão mudou: a margem de contribuição sempre foi calculada **antes** do rateio.
 
 Percentuais sempre sobre a **receita líquida**, com o valor em R$ ao lado. Alertas de status usam a margem de contribuição.
 
@@ -103,6 +104,8 @@ Percentuais em tabela de configuração, editáveis pelo Administrador.
 
 Campos: nome, categoria, fornecedor, **unidade de compra, preço de compra, fator de conversão, unidade de consumo** (o preço de consumo é derivado — ex.: bobina comprada por kg, consumida por m²; ver Calculations.md §2), ICMS, PIS/COFINS, preço sem imposto (calculado), data de atualização, status.
 
+O insumo também tem a flag **é mão de obra** (ex.: custo de costureira). Ela não muda o CMV cheio — muda o CMV de competência, que exclui mão de obra para o DRE (Calculations.md §4.2).
+
 Toda alteração de preço gera registro em `input_cost_history` (valor anterior, novo, quem, quando). Alterar preço dispara recálculo do CMV vigente de todos os produtos e kits que usam o insumo (cascata), sem tocar em pedidos fechados.
 
 ### 6.2 Cadastro de Produtos
@@ -119,9 +122,11 @@ Componentes de dois tipos: **insumo** ou **produto** (composição em cascata �
 
 Regras: proibir referência circular (A contém B que contém A — validação na gravação); CMV do produto = soma dos custos dos componentes; participação % de cada componente exibida.
 
-### 6.4 Alocação de Despesas
+### 6.4 Alocação de Despesas — **REMOVIDO em 29/07/2026**
 
-Por período mensal (§5.2): total a ratear, e por produto a produção estimada e o fator de complexidade. Fórmulas no Calculations.md §5. Tela mostra a memória de cálculo (peso, participação, alocada, unitária) e o histórico de fatores.
+Decisão do cliente: o módulo sai. A empresa passou a raciocinar por margem de contribuição, e o rateio só alimentava uma linha informativa depois dela. Detalhamento em `docs/07-Reuniao-Intertech-2026-07-16.md` §11.
+
+Saíram: as telas de alocação, a linha de rateio da cascata (§5.4) e a variação de absorção do DRE (§6.8). Permanecem no repositório, sem uso em tela: o módulo puro de cálculo, os golden tests T4/T5 e os snapshots de pedidos fechados.
 
 ### 6.5 Kits
 
@@ -129,7 +134,9 @@ Kit = composição de produtos com quantidades. Código, nome, descrição, comp
 
 **Assinatura única:** composição ordenada por ID do produto — `produto_3:2|produto_7:1|produto_12:5`. Ao salvar, se a assinatura já existe, o sistema oferece reutilizar o kit existente em vez de duplicar. Golden test T10.
 
-CMV, despesa e custo total do kit = soma ponderada dos componentes (Calculations.md §4), com recálculo em cascata quando um insumo ou produto muda.
+**Embalagem e esterilização do kit:** o envelope é um só e a caixa de esterilização é uma só por kit, não por produto dentro dele. São insumos com quantidade por kit, somados ao CMV em cima da soma dos produtos e exibidos destacados (Calculations.md §4.1). Entram na assinatura, porque mudam o custo. Golden test T11.
+
+CMV e custo total do kit = soma ponderada dos componentes + embalagem (Calculations.md §4), com recálculo em cascata quando um insumo ou produto muda.
 
 ### 6.6 Simulador de Pedido
 
@@ -158,8 +165,9 @@ Receita bruta            = Σ pedidos fechados no mês
 (−) Despesa fixa REAL do mês   ← digitada/importada pelo Financeiro, não é a soma dos rateios
 = Resultado operacional
 
-Linha informativa: Variação de absorção = Σ despesas alocadas nos pedidos − despesa fixa real
 ```
+
+A linha informativa de **variação de absorção** saiu com o módulo de Alocação (§6.4). Ela ainda aparece em meses cujos pedidos fechados têm rateio gravado no snapshot — histórico não se reescreve.
 
 Aberturas: por canal, por vendedor, por categoria de produto, por cliente. Comparativo entre meses. Exportação em xlsx/PDF.
 
@@ -197,7 +205,7 @@ Alertas (permitem com aviso): insumo com custo desatualizado há mais de N dias 
 
 ## 9. Banco de dados (entidades)
 
-`tenants`, `users/profiles`, `channels` (D4), `sellers`, `suppliers`, `customers`, `inputs`, `input_cost_history`, `products`, `product_components` (ficha técnica — componente insumo OU produto), `expense_allocation_periods` + `expense_allocations` (D3), `kits`, `kit_items`, `orders`, `order_items` (com campos de snapshot — D7), `real_monthly_expenses` (DRE), `tax_tables` (ICSM/DIFAL/Portal), `margin_rules`, `audit_logs`.
+`tenants`, `users/profiles`, `channels` (D4), `sellers`, `suppliers`, `customers`, `inputs`, `input_cost_history`, `products`, `product_components` (ficha técnica — componente insumo OU produto), `expense_allocation_periods` + `expense_allocations` (D3 — descontinuadas, mantidas por histórico), `kits`, `kit_items`, `kit_packaging` (embalagem/esterilização do kit), `orders`, `order_items` (com campos de snapshot — D7), `real_monthly_expenses` (DRE), `tax_tables` (ICSM/DIFAL/Portal), `margin_rules`, `audit_logs`.
 
 Modelagem detalhada em `03-Banco-de-Dados.md` (documento da Sprint 1).
 
@@ -214,7 +222,7 @@ O risco nº 1 do projeto é o sistema dar números diferentes da planilha e perd
 | 5 | Autenticação, perfis e permissões | 4 perfis funcionando com RLS |
 | 6 | Cadastro de insumos + histórico de custos + recálculo em cascata | T8 passando |
 | 7 | Cadastro de produtos + ficha técnica | validação circular; participação % |
-| 8 | Alocação de despesas com períodos mensais | memória de cálculo visível |
+| 8 | ~~Alocação de despesas com períodos mensais~~ | **Removido em 29/07/2026** (§6.4) |
 | 9 | Kits + assinatura única | T10 passando; dedupe funcionando |
 | 10 | Simulador de pedidos + validações | fixture Patricia reproduzido na tela |
 | 11 | Fechamento com snapshot + histórico de pedidos | pedido fechado imutável |

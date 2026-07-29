@@ -20,6 +20,8 @@ export type InsumoCascata = {
   precoComImposto: EntradaDecimal;
   icms: EntradaDecimal;
   pisCofins: EntradaDecimal;
+  // Insumo que representa mão de obra (costureira). Ver cmv.ts.
+  maoDeObra?: boolean;
 };
 
 export type ComponenteRef =
@@ -31,21 +33,33 @@ export type ProdutoCascata = {
   componentes: ComponenteRef[];
 };
 
-export function calcularCMVsEmCascata(
+// CMV de um produto nas duas leituras que a Intertech pediu na reunião de
+// 16/07/2026: o cheio (usado no pedido) e o sem mão de obra (usado no DRE por
+// competência). A mão de obra propaga em cascata — se um kit leva um avental
+// que tem costureira na ficha, o "sem mão de obra" do kit também a exclui.
+export type CMVDetalhado = {
+  cmv: Decimal;
+  cmvSemMaoDeObra: Decimal;
+  custoMaoDeObra: Decimal;
+};
+
+export function calcularCMVsEmCascataDetalhado(
   insumos: InsumoCascata[],
   produtos: ProdutoCascata[]
-): Map<string, Decimal> {
+): Map<string, CMVDetalhado> {
   // Camada 1: preço sem imposto de cada insumo (uma vez).
   const precoSemPorInsumo = new Map<string, Decimal>();
+  const maoDeObraPorInsumo = new Map<string, boolean>();
   for (const i of insumos) {
     precoSemPorInsumo.set(i.id, precoSemImposto(i.precoComImposto, i.icms, i.pisCofins));
+    maoDeObraPorInsumo.set(i.id, i.maoDeObra === true);
   }
 
   const produtoPorId = new Map(produtos.map((p) => [p.id, p]));
-  const cmvPorProduto = new Map<string, Decimal>();
+  const cmvPorProduto = new Map<string, CMVDetalhado>();
   const emCalculo = new Set<string>(); // para detectar ciclos
 
-  function cmvDe(produtoId: string): Decimal {
+  function cmvDe(produtoId: string): CMVDetalhado {
     const memo = cmvPorProduto.get(produtoId);
     if (memo) return memo;
     if (emCalculo.has(produtoId)) {
@@ -60,20 +74,43 @@ export function calcularCMVsEmCascata(
 
     emCalculo.add(produtoId);
     let cmv = new Decimal(0);
+    let custoMaoDeObra = new Decimal(0);
     for (const c of produto.componentes) {
       const quantidade = resolverQuantidade(c.quantidade);
-      const custoUnitario =
-        c.tipo === "insumo" ? precoSemInsumo(precoSemPorInsumo, c.insumoId) : cmvDe(c.produtoId);
-      cmv = cmv.plus(custoUnitario.times(quantidade));
+      if (c.tipo === "insumo") {
+        const custo = precoSemInsumo(precoSemPorInsumo, c.insumoId).times(quantidade);
+        cmv = cmv.plus(custo);
+        if (maoDeObraPorInsumo.get(c.insumoId)) custoMaoDeObra = custoMaoDeObra.plus(custo);
+      } else {
+        // Produto-componente: leva junto a mão de obra que já vem dentro dele.
+        const filho = cmvDe(c.produtoId);
+        cmv = cmv.plus(filho.cmv.times(quantidade));
+        custoMaoDeObra = custoMaoDeObra.plus(filho.custoMaoDeObra.times(quantidade));
+      }
     }
     emCalculo.delete(produtoId);
 
-    cmvPorProduto.set(produtoId, cmv);
-    return cmv;
+    const detalhe: CMVDetalhado = {
+      cmv,
+      cmvSemMaoDeObra: cmv.minus(custoMaoDeObra),
+      custoMaoDeObra,
+    };
+    cmvPorProduto.set(produtoId, detalhe);
+    return detalhe;
   }
 
   for (const p of produtos) cmvDe(p.id);
   return cmvPorProduto;
+}
+
+// Assinatura histórica (só o CMV cheio). Mantida porque é o que a maior parte
+// do app consome — quem precisa das duas leituras chama a versão detalhada.
+export function calcularCMVsEmCascata(
+  insumos: InsumoCascata[],
+  produtos: ProdutoCascata[]
+): Map<string, Decimal> {
+  const detalhado = calcularCMVsEmCascataDetalhado(insumos, produtos);
+  return new Map([...detalhado].map(([id, d]) => [id, d.cmv]));
 }
 
 function precoSemInsumo(mapa: Map<string, Decimal>, insumoId: string): Decimal {

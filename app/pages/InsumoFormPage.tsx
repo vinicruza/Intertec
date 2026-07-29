@@ -25,11 +25,13 @@ const esquema = z.object({
   consumption_unit: z.string(),
   icms_rate: z.string(),
   pis_cofins_rate: z.string(),
+  is_labor: z.boolean(),
 });
 
 const VAZIO: InsumoFormulario = {
   name: "", category: "", purchase_unit: "", purchase_price: "",
   conversion_factor: "1", consumption_unit: "", icms_rate: "0", pis_cofins_rate: "0.0925",
+  is_labor: false,
 };
 
 export default function InsumoFormPage() {
@@ -63,6 +65,7 @@ export default function InsumoFormPage() {
         purchase_price: i.purchase_price ?? "", conversion_factor: i.conversion_factor ?? "1",
         consumption_unit: i.consumption_unit ?? "", icms_rate: i.icms_rate ?? "0",
         pis_cofins_rate: i.pis_cofins_rate ?? "0",
+        is_labor: i.is_labor ?? false,
       });
     }
   }, [insumoQuery.data, reset]);
@@ -115,6 +118,18 @@ export default function InsumoFormPage() {
             <Campo label="ICMS (fração, ex.: 0,18)"><Input {...register("icms_rate")} /></Campo>
             <Campo label="PIS/COFINS (fração, ex.: 0,0925)"><Input {...register("pis_cofins_rate")} /></Campo>
           </div>
+
+          <label className="flex items-start gap-2 rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
+            <input type="checkbox" className="mt-1" {...register("is_labor")} />
+            <span>
+              <strong>É mão de obra</strong> (ex.: custo de costureira)
+              <span className="block text-xs text-[var(--cor-texto-suave)]">
+                Continua entrando no CMV cheio usado no pedido. O sistema passa a
+                calcular também o CMV sem mão de obra, que é o usado no DRE por
+                competência — paga-se costureira referente à produção passada.
+              </span>
+            </span>
+          </label>
 
           <div className="grid grid-cols-2 gap-4 rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
             <div>

@@ -1,4 +1,4 @@
-import { Decimal, calcularAlocacao, custoKit, somaDosPesos, type EntradaDecimal } from "@calc";
+import { Decimal, custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc";
 import { supabase } from "../supabase";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 
@@ -31,7 +31,7 @@ export type ContextoSimulador = {
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, periodo] = await Promise.all([
+  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("customers").select("id, name, uf").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
@@ -39,70 +39,74 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
     supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
-    supabase.from("product_costs").select("product_id, cmv"),
-    supabase.from("kits").select("id, code, name, kit_items(product_id, quantity)").eq("status", "active").order("name"),
-    supabase.from("expense_allocation_periods").select("id, total_expense").eq("status", "open").order("period", { ascending: false }).limit(1),
+    supabase.from("product_costs").select("product_id, cmv, cmv_without_labor"),
+    supabase
+      .from("kits")
+      .select("id, code, name, kit_items(product_id, quantity), kit_packaging(quantity, inputs(name, price_without_tax, is_labor))")
+      .eq("status", "active")
+      .order("name"),
   ]);
-  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, periodo]) {
+  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits]) {
     if (r.error) throw r.error;
   }
 
-  // Despesa unitária vigente: período de alocação ABERTO mais recente (D3).
-  const despesaPorProduto = new Map<string, string>();
-  const periodoAberto = periodo.data?.[0];
-  if (periodoAberto) {
-    const { data: alocs, error } = await supabase
-      .from("expense_allocations")
-      .select("product_id, estimated_production, complexity_factor")
-      .eq("period_id", periodoAberto.id);
-    if (error) throw error;
-    const linhas = alocs ?? [];
-    const pesos = somaDosPesos(
-      linhas.map((l) => ({ producaoEstimada: l.estimated_production as string, fatorComplexidade: l.complexity_factor as string }))
-    );
-    if (pesos.gt(0)) {
-      for (const l of linhas) {
-        const r = calcularAlocacao({
-          producaoEstimada: l.estimated_production as string,
-          fatorComplexidade: l.complexity_factor as string,
-          totalDespesa: periodoAberto.total_expense as string,
-          somaPesos: pesos,
-        });
-        despesaPorProduto.set(l.product_id as string, r.despesaUnitaria.toString());
-      }
-    }
-  }
-
-  const cmvPorProduto = new Map<string, string>((custos.data ?? []).map((c) => [c.product_id as string, c.cmv as string]));
+  const custoPorProduto = new Map<string, CustoProdutoKit>(
+    (custos.data ?? []).map((c) => [
+      c.product_id as string,
+      { cmv: c.cmv as string, cmvSemMaoDeObra: (c.cmv_without_labor as string | null) ?? undefined },
+    ])
+  );
 
   const itensProdutos: ItemVendavel[] = (prods.data ?? []).map((p) => ({
     tipo: "produto",
     id: p.id as string,
     nome: p.name as string,
     codigo: p.code as string,
-    cmvUnitario: cmvPorProduto.get(p.id as string) ?? null,
-    despesaUnitaria: despesaPorProduto.get(p.id as string) ?? null,
+    cmvUnitario: custoPorProduto.get(p.id as string)?.cmv.toString() ?? null,
+    // A alocação de despesas saiu do produto (decisão do cliente em 29/07/2026).
+    despesaUnitaria: "0",
   }));
 
-  // Kit: CMV e despesa = soma ponderada dos produtos (Calculations.md §4).
+  type EmbalagemBruta = {
+    quantity: string;
+    inputs?:
+      | { name: string; price_without_tax: string | null; is_labor: boolean }
+      | Array<{ name: string; price_without_tax: string | null; is_labor: boolean }>
+      | null;
+  };
+
+  // Kit: CMV = soma ponderada dos produtos + embalagem/esterilização do kit
+  // (Calculations.md §4 — envelope e caixa são consumidos UMA vez por kit).
   const itensKits: ItemVendavel[] = (kits.data ?? []).map((k) => {
     const composicao = (k.kit_items as Array<{ product_id: string; quantity: string }>).map((i) => ({
       produtoId: i.product_id,
       quantidade: i.quantity,
     }));
+    const embalagem: EmbalagemKit[] = ((k.kit_packaging ?? []) as EmbalagemBruta[]).flatMap((e) => {
+      const insumo = Array.isArray(e.inputs) ? e.inputs[0] ?? null : e.inputs ?? null;
+      if (!insumo?.price_without_tax) return [];
+      return [{
+        nome: insumo.name,
+        custoUnitario: insumo.price_without_tax,
+        quantidade: String(e.quantity),
+        maoDeObra: insumo.is_labor,
+      }];
+    });
+
     let cmv: string | null = null;
-    let despesa: string | null = null;
     try {
-      cmv = custoKit(composicao, cmvPorProduto as Map<string, EntradaDecimal>).toString();
+      cmv = custoKitCompleto(composicao, custoPorProduto, embalagem).custoTotal.toString();
     } catch {
       cmv = null;
     }
-    try {
-      despesa = custoKit(composicao, despesaPorProduto as Map<string, EntradaDecimal>).toString();
-    } catch {
-      despesa = null;
-    }
-    return { tipo: "kit", id: k.id as string, codigo: k.code as string, nome: `[Kit] ${k.name as string}`, cmvUnitario: cmv, despesaUnitaria: despesa };
+    return {
+      tipo: "kit",
+      id: k.id as string,
+      codigo: k.code as string,
+      nome: `[Kit] ${k.name as string}`,
+      cmvUnitario: cmv,
+      despesaUnitaria: "0",
+    };
   });
 
   const tabelaPorUF = new Map<string, TabelasUF>();

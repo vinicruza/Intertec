@@ -3,10 +3,14 @@ import {
   Decimal,
   ErroCalculoBloqueante,
   assinaturaKit,
+  assinaturaKitCompleta,
   calcularAlocacao,
   calcularCMV,
   calcularCMVsEmCascata,
+  calcularCMVsEmCascataDetalhado,
   calcularPedido,
+  custoKit,
+  custoKitCompleto,
   precoSemImposto,
   toMoney,
   toPercent,
@@ -243,6 +247,140 @@ describe("Kits — assinatura única (PRD §6.5)", () => {
   it("kit sem itens ou com quantidade inválida é erro bloqueante", () => {
     expect(() => assinaturaKit([])).toThrow(ErroCalculoBloqueante);
     expect(() => assinaturaKit([{ produtoId: "p1", quantidade: "0" }])).toThrow(ErroCalculoBloqueante);
+  });
+
+  it("a embalagem faz parte da identidade do kit, sem quebrar os kits antigos", () => {
+    const itens = [{ produtoId: "p1", quantidade: "2" }];
+    // Sem embalagem: assinatura idêntica à de antes (kits já cadastrados valem).
+    expect(assinaturaKitCompleta(itens)).toBe(assinaturaKit(itens));
+
+    // Mesmos produtos, número de caixas diferente = kits diferentes, porque o
+    // CMV é diferente. Colidir aqui faria o segundo herdar o custo do primeiro.
+    const umaCaixa = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: "1" }]);
+    const duasCaixas = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: "2" }]);
+    expect(umaCaixa).not.toBe(duasCaixas);
+    expect(umaCaixa).not.toBe(assinaturaKit(itens));
+
+    // A ordem da embalagem não importa, como nos produtos.
+    const ordemA = assinaturaKitCompleta(itens, [
+      { insumoId: "envelope", quantidade: "1" },
+      { insumoId: "caixa", quantidade: "2" },
+    ]);
+    const ordemB = assinaturaKitCompleta(itens, [
+      { insumoId: "caixa", quantidade: "2" },
+      { insumoId: "envelope", quantidade: "1" },
+    ]);
+    expect(ordemA).toBe(ordemB);
+  });
+});
+
+describe("Kits — embalagem e esterilização do kit (T11)", () => {
+  // Reunião Intertech 16/07/2026: o envelope é UM só e a caixa de esterilização
+  // é UMA só POR KIT. Antes disso a rentabilidade usava um valor aproximado
+  // ("kit aleatório"), que a própria empresa apontou como errado.
+  const custos = new Map([
+    ["avental", { cmv: "4.043151" }],
+    ["campo", { cmv: "2.935400" }],
+  ]);
+  const itens = [
+    { produtoId: "avental", quantidade: "2" },
+    { produtoId: "campo", quantidade: "3" },
+  ];
+
+  it("T11 — soma a embalagem UMA vez por kit, não por produto", () => {
+    // Produtos: 4,043151×2 + 2,935400×3 = 8,086302 + 8,806200 = 16,892502
+    // Embalagem: 1 envelope (0,51802) + 2 caixas (9,9813 ÷ 150 = 0,066542 cada)
+    const r = custoKitCompleto(itens, custos, [
+      { nome: "Envelope 25x30", custoUnitario: "0.51802", quantidade: "1" },
+      { nome: "Caixa 6 (rateada por 150)", custoUnitario: "0.066542", quantidade: "2" },
+    ]);
+
+    esperarProximo(r.custoProdutos, "16.892502");
+    esperarProximo(r.custoEmbalagem, "0.651104"); // 0,51802 + 0,133084
+    esperarProximo(r.custoTotal, "17.543606");
+
+    // O custo de embalagem fica DESTACADO, não diluído (pedido na reunião).
+    expect(r.linhasEmbalagem).toHaveLength(2);
+    esperarProximo(r.linhasEmbalagem[1].custo, "0.133084");
+  });
+
+  it("T11b — kit sem embalagem informada tem custo igual à soma dos produtos", () => {
+    const r = custoKitCompleto(itens, custos);
+    esperarProximo(r.custoEmbalagem, "0");
+    esperarProximo(r.custoTotal, "16.892502");
+    // Compatível com o custoKit histórico (só a soma ponderada dos produtos).
+    const legado = custoKit(itens, new Map([["avental", "4.043151"], ["campo", "2.935400"]]));
+    esperarProximo(r.custoTotal, legado.toString());
+  });
+
+  it("produto sem custo vigente é erro bloqueante (nunca zero silencioso)", () => {
+    expect(() =>
+      custoKitCompleto([{ produtoId: "fantasma", quantidade: "1" }], custos)
+    ).toThrow(ErroCalculoBloqueante);
+  });
+});
+
+describe("CMV com e sem mão de obra (T12)", () => {
+  // Reunião Intertech 16/07/2026: a costureira fica dentro do CMV, mas o DRE
+  // por competência precisa do CMV sem ela — paga-se por produção passada.
+  it("T12 — separa a costureira do CMV do produto", () => {
+    const ficha: ComponenteFicha[] = [
+      { nome: "Bobina SMS 40gr m²", custoUnitario: "0.6867", quantidade: { tipo: "area", largura: "1", comprimento: "1.2", rendimento: "0.99" } },
+      { nome: "Punho", custoUnitario: "0.1457425", quantidade: { tipo: "direta", quantidade: "2" } },
+      { nome: "Custo costureira avental M G", custoUnitario: "0.85", quantidade: { tipo: "direta", quantidade: "1" }, maoDeObra: true },
+    ];
+
+    const r = calcularCMV(ficha);
+    // Bobina 0,832363… + punho 0,291485 + costureira 0,85
+    esperarProximo(r.custoMaoDeObra, "0.85");
+    esperarProximo(r.cmv, "1.973848");
+    esperarProximo(r.cmvSemMaoDeObra, "1.123848");
+    // As duas leituras diferem exatamente pelo custo de mão de obra.
+    esperarProximo(r.cmv.minus(r.cmvSemMaoDeObra), "0.85");
+    // A participação continua sobre o CMV cheio e ainda soma 100%.
+    const somaPart = r.componentes.reduce((s, c) => s.plus(c.participacao), new Decimal(0));
+    esperarProximo(somaPart, "1");
+  });
+
+  it("T12b — a mão de obra propaga em cascata até o kit", () => {
+    const insumos: InsumoCascata[] = [
+      { id: "bobina", precoComImposto: "0.872", icms: "0.12", pisCofins: "0.0925" },
+      // Insumo de mão de obra: sem imposto a recuperar, valor cheio.
+      { id: "costureira", precoComImposto: "0.85", icms: "0", pisCofins: "0", maoDeObra: true },
+    ];
+    const produtos: ProdutoCascata[] = [
+      {
+        id: "avental",
+        componentes: [
+          { tipo: "insumo", insumoId: "bobina", quantidade: { tipo: "area", largura: "1", comprimento: "1.2", rendimento: "0.99" } },
+          { tipo: "insumo", insumoId: "costureira", quantidade: { tipo: "direta", quantidade: "1" } },
+        ],
+      },
+      // Kit leva 2 aventais → deve carregar 2 × a costureira.
+      {
+        id: "kit",
+        componentes: [{ tipo: "produto", produtoId: "avental", quantidade: { tipo: "direta", quantidade: "2" } }],
+      },
+    ];
+
+    const mapa = calcularCMVsEmCascataDetalhado(insumos, produtos);
+    const avental = mapa.get("avental")!;
+    const kit = mapa.get("kit")!;
+
+    esperarProximo(avental.custoMaoDeObra, "0.85");
+    esperarProximo(avental.cmvSemMaoDeObra, "0.832363");
+    // O kit herda a mão de obra dos produtos que o compõem.
+    esperarProximo(kit.custoMaoDeObra, "1.70");
+    esperarProximo(kit.cmv, avental.cmv.times(2).toString());
+    esperarProximo(kit.cmvSemMaoDeObra, "1.664727");
+  });
+
+  it("T12c — ficha sem mão de obra: as duas leituras são iguais", () => {
+    const r = calcularCMV([
+      { nome: "Bag", custoUnitario: "0.6351075", quantidade: { tipo: "direta", quantidade: "1" } },
+    ]);
+    esperarProximo(r.custoMaoDeObra, "0");
+    esperarProximo(r.cmvSemMaoDeObra, r.cmv.toString());
   });
 });
 

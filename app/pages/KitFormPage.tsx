@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { assinaturaKit, custoKit, type EntradaDecimal, type ItemKit } from "@calc";
+import {
+  assinaturaKitCompleta,
+  custoKitCompleto,
+  type CustoProdutoKit,
+  type EmbalagemKit,
+  type ItemEmbalagem,
+  type ItemKit,
+} from "@calc";
 import { obterKit, salvarKit, type ResultadoSalvarKit } from "../lib/db/kits";
+import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
 type ItemEdicao = { produtoId: string; quantidade: string };
+// Envelope e caixas de esterilização: consumidos UMA vez por kit montado
+// (reunião Intertech 16/07/2026 — antes disso o custo era aproximado).
+type EmbalagemEdicao = { insumoId: string; quantidade: string };
 
 export default function KitFormPage() {
   const { id } = useParams();
@@ -19,10 +30,12 @@ export default function KitFormPage() {
   const [codigo, setCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [itens, setItens] = useState<ItemEdicao[]>([{ produtoId: "", quantidade: "1" }]);
+  const [embalagem, setEmbalagem] = useState<EmbalagemEdicao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [duplicado, setDuplicado] = useState<{ id: string; name: string } | null>(null);
 
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
+  const insumosQuery = useQuery({ queryKey: ["insumos"], queryFn: listarInsumos });
   const kitQuery = useQuery({ queryKey: ["kit", id], queryFn: () => obterKit(id!), enabled: editando });
 
   useEffect(() => {
@@ -35,14 +48,48 @@ export default function KitFormPage() {
       ? k.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity }))
       : [{ produtoId: "", quantidade: "1" }]
     );
+    setEmbalagem(k.kit_packaging.map((e) => ({ insumoId: e.input_id, quantidade: e.quantity })));
   }, [kitQuery.data]);
 
   const custoPorProduto = useMemo(
     () =>
-      new Map<string, EntradaDecimal>(
-        (produtosQuery.data ?? []).filter((p) => p.cmv !== null).map((p) => [p.id, p.cmv as string])
+      new Map<string, CustoProdutoKit>(
+        (produtosQuery.data ?? [])
+          .filter((p) => p.cmv !== null)
+          .map((p) => [p.id, { cmv: p.cmv as string }])
       ),
     [produtosQuery.data]
+  );
+
+  const insumos = insumosQuery.data ?? [];
+  const insumoPorId = useMemo(() => new Map(insumos.map((i) => [i.id, i])), [insumos]);
+
+  const embalagemValida: EmbalagemEdicao[] = useMemo(
+    () =>
+      embalagem
+        .filter((e) => e.insumoId && e.quantidade.trim() !== "")
+        .map((e) => ({ insumoId: e.insumoId, quantidade: e.quantidade.trim().replace(",", ".") })),
+    [embalagem]
+  );
+
+  const embalagemParaAssinatura: ItemEmbalagem[] = useMemo(
+    () => embalagemValida.map((e) => ({ insumoId: e.insumoId, quantidade: e.quantidade })),
+    [embalagemValida]
+  );
+
+  const embalagemParaCusto: EmbalagemKit[] = useMemo(
+    () =>
+      embalagemValida.flatMap((e) => {
+        const insumo = insumoPorId.get(e.insumoId);
+        if (!insumo?.price_without_tax) return [];
+        return [{
+          nome: insumo.name,
+          custoUnitario: insumo.price_without_tax,
+          quantidade: e.quantidade,
+          maoDeObra: insumo.is_labor,
+        }];
+      }),
+    [embalagemValida, insumoPorId]
   );
 
   const itensValidos: ItemKit[] = useMemo(
@@ -57,22 +104,33 @@ export default function KitFormPage() {
   const previa = useMemo(() => {
     if (itensValidos.length === 0) return null;
     try {
-      const assinatura = assinaturaKit(itensValidos);
-      let custo: string | null = null;
+      const assinatura = assinaturaKitCompleta(itensValidos, embalagemParaAssinatura);
       try {
-        custo = custoKit(itensValidos, custoPorProduto).toString();
+        const r = custoKitCompleto(itensValidos, custoPorProduto, embalagemParaCusto);
+        return {
+          assinatura,
+          custo: r.custoTotal.toString(),
+          custoProdutos: r.custoProdutos.toString(),
+          custoEmbalagem: r.custoEmbalagem.toString(),
+        };
       } catch {
-        custo = null; // algum produto ainda sem custo vigente
+        // algum produto ainda sem custo vigente
+        return { assinatura, custo: null, custoProdutos: null, custoEmbalagem: null };
       }
-      return { assinatura, custo };
     } catch {
       return null;
     }
-  }, [itensValidos, custoPorProduto]);
+  }, [itensValidos, custoPorProduto, embalagemParaAssinatura, embalagemParaCusto]);
 
   const salvar = useMutation({
     mutationFn: () =>
-      salvarKit(id ?? null, { code: codigo, name: nome, description: descricao, itens: itensValidos }),
+      salvarKit(id ?? null, {
+        code: codigo,
+        name: nome,
+        description: descricao,
+        itens: itensValidos,
+        embalagem: embalagemParaAssinatura,
+      }),
     onSuccess: (r: ResultadoSalvarKit) => {
       if (r.tipo === "duplicado") {
         setDuplicado(r.kitExistente);
@@ -116,6 +174,12 @@ export default function KitFormPage() {
 
   function atualizarItem(i: number, campo: keyof ItemEdicao, valor: string) {
     setItens((atual) => atual.map((item, idx) => (idx === i ? { ...item, [campo]: valor } : item)));
+    setDuplicado(null);
+    setErro(null);
+  }
+
+  function atualizarEmbalagem(i: number, campo: keyof EmbalagemEdicao, valor: string) {
+    setEmbalagem((atual) => atual.map((linha, idx) => (idx === i ? { ...linha, [campo]: valor } : linha)));
     setDuplicado(null);
     setErro(null);
   }
@@ -188,10 +252,71 @@ export default function KitFormPage() {
             </div>
           ))}
 
+        </Card>
+
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Embalagem e esterilização do kit</h2>
+              <p className="text-xs text-[var(--cor-texto-suave)]">
+                Consumidos <strong>uma vez por kit</strong> — o envelope é um só e a caixa é uma só,
+                não importa quantos produtos o kit tenha. Somam ao CMV em cima da soma dos produtos.
+              </p>
+            </div>
+            <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", quantidade: "1" }])}>
+              Adicionar insumo
+            </Button>
+          </div>
+
+          {embalagem.length === 0 && (
+            <p className="text-sm text-[var(--cor-texto-suave)]">
+              Nenhum insumo de embalagem informado — o CMV do kit fica só com a soma dos produtos.
+            </p>
+          )}
+
+          {embalagem.map((linha, i) => (
+            <div key={i} className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label>Insumo</Label>
+                <select
+                  className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                  value={linha.insumoId}
+                  onChange={(e) => atualizarEmbalagem(i, "insumoId", e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {insumos.map((ins) => (
+                    <option key={ins.id} value={ins.id}>{ins.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Qtd. por kit</Label>
+                <Input
+                  className="w-28"
+                  value={linha.quantidade}
+                  onChange={(e) => atualizarEmbalagem(i, "quantidade", e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="pb-2 text-xs text-red-600 hover:underline"
+                onClick={() => setEmbalagem((a) => a.filter((_, idx) => idx !== i))}
+              >
+                Remover
+              </button>
+            </div>
+          ))}
+
           <div className="rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
             {previa ? (
               <>
                 <div className="text-lg font-semibold">CMV do kit: {previa.custo ? reais(previa.custo) : "— (produto sem custo vigente)"}</div>
+                {previa.custo && (
+                  <div className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+                    Produtos: {reais(previa.custoProdutos!)} · Embalagem e esterilização:{" "}
+                    <strong>{reais(previa.custoEmbalagem!)}</strong>
+                  </div>
+                )}
                 <div className="mt-1 break-all text-xs text-[var(--cor-texto-suave)]">Assinatura: {previa.assinatura}</div>
               </>
             ) : (

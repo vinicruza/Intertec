@@ -69,11 +69,7 @@ export default function SimuladorPage() {
         canal: vendedor.regras,
         uf: tabela,
       });
-      const semDespesa = escolhidas.some((l) => itemPorId.get(l.itemId)?.despesaUnitaria === null);
-      const avisos = semDespesa
-        ? [...s.avisos, "Item sem despesa rateada (nenhum período de alocação aberto o inclui) — resultado após rateio incompleto."]
-        : s.avisos;
-      return { estado: "ok" as const, ...s, avisos };
+      return { estado: "ok" as const, ...s };
     } catch (e) {
       if (e instanceof ErroCalculoBloqueante) return { estado: "bloqueado" as const, msg: e.message };
       return { estado: "bloqueado" as const, msg: "Não foi possível calcular." };
@@ -206,7 +202,7 @@ export default function SimuladorPage() {
               <div><Label>Preço de venda</Label><Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} /></div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {item && (item.cmvUnitario
-                  ? <>CMV un.: {reais(item.cmvUnitario)} · Despesa un.: {item.despesaUnitaria ? reais(item.despesaUnitaria) : "—"}</>
+                  ? <>CMV un.: {reais(item.cmvUnitario)}</>
                   : <span className="text-red-600">sem custo vigente (bloqueante)</span>)}
               </div>
               <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={() => setLinhas((a) => a.filter((_, idx) => idx !== i))}>
@@ -246,12 +242,6 @@ export default function SimuladorPage() {
                 valor={simulacao.resultado.margemContribuicao.toString()}
                 pct={percentual(simulacao.resultado.margemContribuicaoPct.toString())}
                 destaque
-              />
-              <LinhaCascata rotulo="(−) Despesa alocada (rateio)" valor={simulacao.resultado.despesaTotal.negated().toString()} />
-              <LinhaCascata
-                rotulo="= Resultado após rateio (informativo)"
-                valor={simulacao.resultado.resultadoAposRateio.toString()}
-                pct={percentual(simulacao.resultado.resultadoAposRateioPct.toString())}
               />
             </tbody>
           </table>

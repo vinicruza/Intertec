@@ -12,8 +12,6 @@ const InsumosPage = lazyComRetry(() => import("./pages/InsumosPage"));
 const InsumoFormPage = lazyComRetry(() => import("./pages/InsumoFormPage"));
 const ProdutosPage = lazyComRetry(() => import("./pages/ProdutosPage"));
 const ProdutoFormPage = lazyComRetry(() => import("./pages/ProdutoFormPage"));
-const AlocacaoPage = lazyComRetry(() => import("./pages/AlocacaoPage"));
-const AlocacaoPeriodoPage = lazyComRetry(() => import("./pages/AlocacaoPeriodoPage"));
 const KitsPage = lazyComRetry(() => import("./pages/KitsPage"));
 const KitFormPage = lazyComRetry(() => import("./pages/KitFormPage"));
 const SimuladorPage = lazyComRetry(() => import("./pages/SimuladorPage"));
@@ -65,14 +63,6 @@ export default function App() {
               <Route
                 path="/produtos/:id"
                 element={<ExigirAcesso caminho="/produtos"><ProdutoFormPage /></ExigirAcesso>}
-              />
-              <Route
-                path="/alocacao"
-                element={<ExigirAcesso caminho="/alocacao"><AlocacaoPage /></ExigirAcesso>}
-              />
-              <Route
-                path="/alocacao/:id"
-                element={<ExigirAcesso caminho="/alocacao"><AlocacaoPeriodoPage /></ExigirAcesso>}
               />
               <Route
                 path="/kits"

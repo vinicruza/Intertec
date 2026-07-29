@@ -26,7 +26,6 @@ export const MENU: ItemMenu[] = [
   { caminho: "/kits", rotulo: "Kits", icone: "◇", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/produtos", rotulo: "Produtos e fichas", icone: "□", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },
-  { caminho: "/alocacao", rotulo: "Alocação de despesas", icone: "%", perfis: ["admin", "financeiro"] },
   { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"] },
   { caminho: "/configuracoes", rotulo: "Configurações", icone: "⚙", perfis: ["admin", "financeiro"] },
   { caminho: "/integridade", rotulo: "Integridade dos dados", icone: "✓", perfis: ["admin", "financeiro"] },

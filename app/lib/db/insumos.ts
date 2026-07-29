@@ -17,6 +17,8 @@ export type InsumoLinha = {
   price_without_tax: string | null;
   price_updated_at: string | null;
   updated_at: string | null;
+  // Mão de obra (costureira): entra no CMV cheio e sai do CMV de competência.
+  is_labor: boolean;
 };
 
 // Dados que o formulário coleta (o preço com/sem imposto é derivado, não digitado).
@@ -29,6 +31,7 @@ export type InsumoFormulario = {
   consumption_unit: string;
   icms_rate: string; // fração (0,18)
   pis_cofins_rate: string;
+  is_labor: boolean;
 };
 
 // Converte texto do formulário (aceita vírgula) em Decimal.
@@ -73,6 +76,7 @@ function paraRegistro(form: InsumoFormulario) {
     pis_cofins_rate: paraDecimal(form.pis_cofins_rate).toString(),
     price_with_tax: comImposto.toString(),
     price_without_tax: semImposto.toString(),
+    is_labor: form.is_labor,
   };
 }
 

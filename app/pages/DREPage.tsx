@@ -99,7 +99,10 @@ export default function DREPage() {
               </tbody>
             </table>
 
-            {dre.variacaoAbsorcao !== null && (
+            {/* A alocação de despesas saiu do produto em 29/07/2026. A linha só
+                aparece para meses que ainda têm pedidos fechados com rateio
+                gravado no snapshot — histórico não se reescreve. */}
+            {dre.variacaoAbsorcao !== null && dre.somaRateios.gt(0) && (
               <p className="mt-3 rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
                 <strong>Variação de absorção</strong> (Σ rateios {reais(dre.somaRateios.toString())} − despesa real):{" "}
                 <span className={dre.variacaoAbsorcao.isNegative() ? "text-red-700" : "text-green-700"}>

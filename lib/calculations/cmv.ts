@@ -36,6 +36,12 @@ export type ComponenteFicha = {
   nome: string;
   custoUnitario: EntradaDecimal;
   quantidade: Quantidade;
+  // Marca o componente como MÃO DE OBRA (ex.: "Custo costureira avental M G").
+  // Reunião Intertech 16/07/2026: o custo de costureira fica dentro do CMV do
+  // produto, mas o DRE por competência precisa enxergar o CMV SEM ele, porque
+  // se paga costureira referente à produção passada — vendem-se 30 mil aventais
+  // no mês em que se pagou por 40 mil. O sistema entrega os dois números.
+  maoDeObra?: boolean;
 };
 
 export type LinhaCMV = {
@@ -43,10 +49,13 @@ export type LinhaCMV = {
   quantidade: Decimal;
   custo: Decimal;
   participacao: Decimal; // fração do CMV total (ex.: 0,28 = 28%)
+  maoDeObra: boolean;
 };
 
 export type ResultadoCMV = {
-  cmv: Decimal;
+  cmv: Decimal; // com mão de obra — é o CMV cheio, usado no pedido
+  cmvSemMaoDeObra: Decimal; // para o DRE por competência
+  custoMaoDeObra: Decimal; // a diferença, destacada
   componentes: LinhaCMV[];
 };
 
@@ -60,15 +69,28 @@ export type ResultadoCMV = {
 export function calcularCMV(componentes: ComponenteFicha[]): ResultadoCMV {
   const linhas = componentes.map((c) => {
     const quantidade = resolverQuantidade(c.quantidade);
-    return { nome: c.nome, quantidade, custo: dec(c.custoUnitario).times(quantidade) };
+    return {
+      nome: c.nome,
+      quantidade,
+      custo: dec(c.custoUnitario).times(quantidade),
+      maoDeObra: c.maoDeObra === true,
+    };
   });
 
   const cmv = linhas.reduce((soma, l) => soma.plus(l.custo), new Decimal(0));
+  const custoMaoDeObra = linhas.reduce(
+    (soma, l) => (l.maoDeObra ? soma.plus(l.custo) : soma),
+    new Decimal(0)
+  );
 
   return {
     cmv,
+    cmvSemMaoDeObra: cmv.minus(custoMaoDeObra),
+    custoMaoDeObra,
     componentes: linhas.map((l) => ({
       ...l,
+      // A participação continua sendo sobre o CMV cheio: é a leitura de
+      // "quanto este item pesa no custo", e a costureira pesa de verdade.
       participacao: cmv.isZero() ? new Decimal(0) : l.custo.div(cmv),
     })),
   };

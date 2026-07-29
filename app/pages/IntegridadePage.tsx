@@ -13,7 +13,6 @@ const ITENS = [
   ["orders_without_items", "Pedidos sem itens"],
   ["closed_orders_without_snapshot", "Pedidos fechados sem snapshot completo"],
   ["customers_without_uf", "Clientes ativos sem UF"],
-  ["active_products_without_open_allocation", "Produtos ativos sem alocação no período aberto"],
 ] as const;
 
 export default function IntegridadePage() {
@@ -30,9 +29,8 @@ export default function IntegridadePage() {
         <h1 className="text-2xl font-semibold">Integridade dos dados</h1>
         <p className="text-sm text-[var(--cor-texto-suave)]">Verificações automáticas que podem afetar CMV, fechamento e DRE.</p>
       </div>
-      {detalhesQuery.data && (detalhesQuery.data.products_without_components.length > 0 || detalhesQuery.data.products_without_allocation.length > 0) && <div className="grid gap-4 lg:grid-cols-2">
+      {detalhesQuery.data && detalhesQuery.data.products_without_components.length > 0 && <div className="grid gap-4 lg:grid-cols-2">
         <Pendencias titulo="Produtos sem ficha técnica" itens={detalhesQuery.data.products_without_components} destino={(id) => `/produtos/${id}`} />
-        <Pendencias titulo={`Sem alocação no período ${detalhesQuery.data.open_period ?? "aberto"}`} itens={detalhesQuery.data.products_without_allocation} destino={() => detalhesQuery.data!.open_period_id ? `/alocacao/${detalhesQuery.data!.open_period_id}` : "/alocacao"} />
       </div>}
       <Card className={total ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50"}>
         <strong>{total ? `${total} pendência(s) encontrada(s)` : "Nenhuma pendência encontrada"}</strong>

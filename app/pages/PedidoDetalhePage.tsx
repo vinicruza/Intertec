@@ -125,8 +125,14 @@ export default function PedidoDetalhePage() {
               <Linha rotulo="= Receita líquida" valor={t.receita_liquida} destaque />
               <Linha rotulo="(−) CMV" valor={t.cmv} />
               <Linha rotulo="= MARGEM DE CONTRIBUIÇÃO" valor={t.margem_contribuicao} destaque />
-              <Linha rotulo="(−) Despesa alocada (rateio)" valor={t.despesa_alocada} />
-              <Linha rotulo="= Resultado após rateio (informativo)" valor={t.resultado_apos_rateio} />
+              {/* Pedidos fechados antes de 29/07/2026 têm rateio no snapshot;
+                  os novos não. O snapshot nunca é reescrito. */}
+              {Number(t.despesa_alocada) > 0 && (
+                <>
+                  <Linha rotulo="(−) Despesa alocada (rateio)" valor={t.despesa_alocada} />
+                  <Linha rotulo="= Resultado após rateio (informativo)" valor={t.resultado_apos_rateio} />
+                </>
+              )}
             </tbody>
           </table>
         </Card>

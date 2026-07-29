@@ -94,9 +94,50 @@ Insumo "Produto Avental"  →  preço = CMV do produto Avental (referência viva
 
 **Implicação para o sistema:** a ficha técnica deve aceitar dois tipos de componente — insumo ou produto — com recálculo em cascata (mudou a bobina → muda o CMV do avental → muda o CMV do kit). Proibir referência circular (produto A contém B que contém A).
 
+### 4.1 Embalagem e esterilização do kit (reunião Intertech 16/07/2026)
+
+O envelope é **um só** e a caixa de esterilização é **uma só por kit** — não por produto dentro dele. Somar esses custos produto a produto multiplica uma despesa que na prática ocorre uma vez.
+
+Até esta decisão, a rentabilidade usava um valor aproximado (o "kit aleatório"), que a própria empresa apontou como errado: *"pra ter o CMV correto, 100%, a gente só precisa adicionar isso e aí mata"*.
+
+```
+CMV_kit = Σ (CMV_produto × qtd)  +  Σ (preco_sem_imposto_insumo × qtd_por_kit)
+               produtos                      embalagem/esterilização
+```
+
+A parcela de embalagem deve ser exibida **destacada**, não diluída no total — pedido explícito na reunião.
+
+**Identidade do kit:** a embalagem entra na assinatura. Dois kits com os mesmos produtos mas com 1 ou 2 caixas de esterilização têm CMV diferente; se compartilhassem assinatura, colidiriam no índice único e o segundo herdaria o custo do primeiro. Kits sem embalagem mantêm a assinatura anterior, então o catálogo já cadastrado continua válido. Golden test T11.
+
+### 4.2 CMV com e sem mão de obra (reunião Intertech 16/07/2026)
+
+O custo de costureira fica **dentro** do CMV do produto — é o CMV cheio, usado no pedido e na margem de contribuição. Mas o DRE por competência precisa enxergar o CMV **sem** ele, porque se paga costureira referente à produção passada: paga-se por 40 mil aventais no mês em que se vendem 30 mil.
+
+```
+CMV_cheio          = Σ custo_componente                       ← usado no pedido
+custo_mao_de_obra  = Σ custo_componente onde insumo.mao_de_obra
+CMV_sem_mao_obra   = CMV_cheio − custo_mao_de_obra            ← usado no DRE de competência
+```
+
+A mão de obra **propaga em cascata**: se um kit leva um avental que tem costureira na ficha, o "sem mão de obra" do kit também a exclui, na proporção da quantidade. Golden test T12.
+
+O insumo é marcado com a flag `is_labor`. A participação percentual de cada componente continua sendo calculada sobre o CMV cheio — a costureira pesa de verdade no custo.
+
 ---
 
-## 5. Camada 3 — Despesa alocada
+## 5. Camada 3 — Despesa alocada — **DESCONTINUADA (29/07/2026)**
+
+> **Este módulo saiu do produto por decisão do cliente em 29/07/2026.**
+>
+> Motivo: a empresa passou a raciocinar por margem de contribuição, e o rateio só alimentava uma linha informativa depois dela. Na reunião: *"esse item de alocação de despesas é quando a gente não utilizar a margem de contribuição — não sei se tem sentido a gente ter esse armário"*.
+>
+> A decisão também elimina três problemas que esta própria seção já registrava: o fator de complexidade é um número subjetivo sem documentação, a despesa unitária do Campo Catarata (3,12) supera o próprio CMV (2,94), e nunca se soube se os R$ 450.000 eram mensais ou anuais.
+>
+> **O que saiu:** as telas de alocação, a linha `(−) Despesa alocada` da cascata do pedido e a linha de variação de absorção do DRE.
+>
+> **O que ficou, e por quê:** as funções puras (`lib/calculations/allocation.ts`) e os golden tests T4 e T5 continuam no repositório — a regra do projeto proíbe remover golden tests, e mantê-los não custa nada nem aparece em tela. Os snapshots `expense_unit_snapshot` de pedidos já fechados também ficam: são dado histórico congelado, e reescrever o passado é exatamente o que o sistema existe para impedir. O DRE segue fechando porque a despesa que entra nele é a **despesa fixa real do mês**, digitada pelo Financeiro, que nunca veio do rateio.
+>
+> A especificação abaixo fica preservada como memória do que foi construído.
 
 Distribui um valor total de despesa operacional (hoje **R$ 450.000, hardcoded**) entre os 322 produtos, ponderando volume × complexidade:
 
@@ -262,7 +303,9 @@ A margem de contribuição coincide numericamente com a margem que a planilha j�
 
 ## 11. Golden tests (suíte mínima antes de qualquer tela)
 
-Toda implementação das funções de cálculo deve passar, com tolerância de 0,01 centavo:
+Toda implementação das funções de cálculo deve passar, com tolerância de 0,01 centavo.
+
+**T4 e T5 seguem obrigatórios** mesmo com a Camada 3 descontinuada (§5): a regra do projeto proíbe remover golden tests, e as funções que eles cobrem continuam no repositório, apenas sem uso em tela.
 
 | # | Função | Input | Output esperado |
 |---|---|---|---|
@@ -276,5 +319,7 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T8 | kit em cascata | alterar preço da Bobina SMS e recalcular kit que contém Avental | CMV do kit reflete a mudança |
 | T9 | validação | produto sem ficha ou CMV=0 em pedido | erro bloqueante (não zero silencioso) |
 | T10 | assinatura de kit | mesma composição em ordem diferente | mesma assinatura |
+| T11 | cmv_kit com embalagem | 2 aventais + 3 campos; 1 envelope + 2 caixas | produtos 16,892502 + embalagem 0,651104 = 17,543606 |
+| T12 | cmv com/sem mão de obra | ficha com costureira 0,85 marcada como `mao_de_obra` | cheio 1,973848; sem MO 1,123848; propaga ao kit |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
