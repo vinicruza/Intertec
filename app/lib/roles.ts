@@ -29,7 +29,9 @@ export const MENU: ItemMenu[] = [
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },
   { caminho: "/vendas-consumo", rotulo: "Vendas do ERP e consumo", icone: "⇄", perfis: ["admin", "financeiro"] },
   { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"] },
+  { caminho: "/cadastros", rotulo: "Cadastros", icone: "☰", perfis: ["admin", "financeiro"] },
   { caminho: "/configuracoes", rotulo: "Configurações", icone: "⚙", perfis: ["admin", "financeiro"] },
+  { caminho: "/usuarios", rotulo: "Usuários", icone: "◍", perfis: ["admin"] },
   { caminho: "/integridade", rotulo: "Integridade dos dados", icone: "✓", perfis: ["admin", "financeiro"] },
   { caminho: "/perfil", rotulo: "Meu perfil", icone: "●", perfis: ["admin", "financeiro", "comercial", "producao"] },
 ];

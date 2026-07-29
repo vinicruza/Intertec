@@ -22,10 +22,15 @@ const AuthContext = createContext<EstadoAuth | null>(null);
 
 async function carregarPerfil(userId: string): Promise<PerfilUsuario | null> {
   // RLS (profiles_select_own) garante que cada um só lê o próprio perfil.
+  // O filtro por `active` espelha current_user_role() no banco: perfil inativo
+  // não tem papel nem tenant, então não enxergaria dado nenhum de qualquer
+  // forma. Filtrando aqui, a tela consegue dizer isso com clareza em vez de
+  // parecer quebrada.
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, role, tenant_id")
     .eq("id", userId)
+    .eq("active", true)
     .maybeSingle();
   if (error || !data) return null;
   return { id: data.id, nome: data.full_name, perfil: data.role as Perfil, tenantId: data.tenant_id };

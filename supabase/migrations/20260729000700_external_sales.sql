@@ -76,7 +76,7 @@ declare
   v_conciliados integer;
 begin
   if v_tenant_id is null then raise exception 'Usuário sem tenant ativo'; end if;
-  if public.current_user_role() not in ('admin', 'financeiro') then
+  if not public.has_role('admin','financeiro') then
     raise exception 'Apenas Administrador ou Financeiro importam vendas';
   end if;
   if jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) = 0 then

@@ -22,7 +22,7 @@ declare
   v_after integer := 0;
   v_total integer;
 begin
-  if public.current_user_role() not in ('admin','financeiro') then
+  if not public.has_role('admin','financeiro') then
     raise exception 'Sem permissão para recalcular CMV';
   end if;
   create temporary table if not exists tmp_product_costs(

@@ -120,7 +120,7 @@ declare
 begin
   select * into v_cfg from public.approval_settings where tenant_id = v_tenant_id;
   if not found then raise exception 'Parâmetros de aprovação não configurados'; end if;
-  if not (v_role = any(v_cfg.approver_roles)) then
+  if v_role is null or not (v_role = any(v_cfg.approver_roles)) then
     raise exception 'Seu perfil não tem permissão para aprovar pedidos';
   end if;
 
@@ -199,7 +199,7 @@ returns void language plpgsql security invoker set search_path = public, pg_temp
 declare v_tenant_id uuid := public.current_tenant_id();
 begin
   if v_tenant_id is null then raise exception 'Usuário sem tenant ativo'; end if;
-  if public.current_user_role() <> 'admin' then
+  if not public.has_role('admin') then
     raise exception 'Apenas o Administrador altera os parâmetros de aprovação';
   end if;
   if p_approver_roles is null or array_length(p_approver_roles, 1) is null then

@@ -118,7 +118,7 @@ declare
   v_codigo text;
 begin
   if v_tenant_id is null then raise exception 'Usuário sem tenant ativo'; end if;
-  if public.current_user_role() <> 'admin' then
+  if not public.has_role('admin') then
     raise exception 'Apenas o Administrador gera códigos de ERP';
   end if;
 
@@ -184,7 +184,7 @@ returns void language plpgsql security invoker set search_path = public, pg_temp
 declare v_tenant_id uuid := public.current_tenant_id();
 begin
   if v_tenant_id is null then raise exception 'Usuário sem tenant ativo'; end if;
-  if public.current_user_role() <> 'admin' then
+  if not public.has_role('admin') then
     raise exception 'Apenas o Administrador altera o formato do código de ERP';
   end if;
 
