@@ -419,3 +419,34 @@ Pequeno: é remoção de tela e de uma linha de cascata, não reescrita de cálc
 Saíram do backlog: **R4** (virou conferência de tela, ver 10.1) e **R8** (decidido, ver Seção 11).
 
 Com as respostas recebidas, as sprints A, B e C — que são o núcleo do que a reunião pediu — estão desbloqueadas.
+
+---
+
+## 13. O que foi entregue (29/07/2026)
+
+Com autorização para seguir sem aprovação sprint a sprint, as seis foram implementadas. Resumo do que está no sistema:
+
+| Sprint | Estado | Observação |
+|---|---|---|
+| A — Correções de CMV | ✅ Completa | Embalagem/esterilização por kit (T11) e CMV com/sem mão de obra (T12). Alocação removida do produto, preservando T4/T5, o módulo puro e os snapshots antigos. |
+| B — Ciclo comercial | ✅ Completa | Número de orçamento, versões, perda com motivo, kit montado dentro do pedido com aviso de duplicidade. |
+| C — Aprovação e visibilidade | ✅ Completa | Aprovação por perfil, margem só-cor para o Comercial, ficha impressa do pedido. |
+| D — Clientes | ✅ Completa com ressalva | Estrutura pronta e tela de categorização criada. **As categorias em uso são partida sugerida, não a lista da Intertech** (pergunta 3 segue aberta). |
+| E — Código de ERP | ⚠️ Parcial por decisão | Capacidade pronta e **desligada**. O catálogo **não** foi recodificado, porque o limite do ERP segue sem confirmação (pergunta 1). |
+| F — Vendas e consumo | ✅ Completa com ressalva | Importação e explosão de consumo prontas. O **formato do relatório** ainda não foi confirmado (pergunta 7), então o leitor foi feito tolerante a variações. |
+
+### 13.1 Onde parei de propósito
+
+Três pontos onde avançar exigiria adivinhar uma decisão que é da Intertech:
+
+1. **Não recodifiquei o catálogo de produtos.** Trocar o código de 325 produtos com base num "seis dígitos" não confirmado seria a mudança mais difícil de desfazer do pacote. O `erp_code` entra em paralelo, o código semântico continua sendo a identidade interna, e quando o limite for confirmado basta ajustar os parâmetros na tela e gerar.
+2. **Não inventei a lista de categorias de cliente.** Elas são tabela editável, com uma partida montada a partir dos segmentos citados na reunião (hospital, clínica, veterinário, oftalmologia). Trocar a lista não exige migração.
+3. **Não apaguei nada da Alocação de Despesas além das telas.** Os golden tests T4/T5, o módulo puro e os snapshots de pedidos fechados continuam — apagar contrariaria a regra do projeto e reescreveria o passado. Se a Intertech quiser remover as tabelas do banco, é uma migração destrutiva separada e peço confirmação antes.
+
+### 13.2 Parâmetros que nasceram desligados
+
+Por orientação da própria reunião, e não por omissão:
+
+- **Trava de margem na aprovação:** nula. *"Eu deixaria nulo para o começo, só para ver o que elas estão fazendo."*
+- **Geração de código de ERP:** desligada, até o formato ser confirmado.
+- **Faixa verde de margem:** segue nos 40% da carga inicial. Se a régua real for 52%, é alterar em Configurações — não é mudança de código.
