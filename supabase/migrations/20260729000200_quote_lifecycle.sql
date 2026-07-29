@@ -108,6 +108,14 @@ create trigger trg_orders_quote_number before insert on public.orders
 
 -- Numera as cotações já existentes, em ordem de criação, reiniciando a
 -- sequência a cada tenant e a cada ano (mesmo formato de next_quote_number).
+--
+-- A trava de imutabilidade precisa sair durante o backfill: ela impede
+-- qualquer UPDATE em pedido fechado, e aqui estamos só atribuindo o número de
+-- orçamento que passou a existir agora — nenhum dado financeiro é tocado. A
+-- trava volta logo em seguida e, se algo falhar no meio, a transação desfaz
+-- tudo, inclusive o disable.
+alter table public.orders disable trigger trg_orders_immutable;
+
 with numeradas as (
   select id,
          'ORC-' || to_char(created_at, 'YYYY') || '-' ||
@@ -122,6 +130,8 @@ update public.orders o
    set quote_number = n.numero
   from numeradas n
  where n.id = o.id;
+
+alter table public.orders enable trigger trg_orders_immutable;
 
 -- ------------------------------------------------------------------
 -- 4. Versões da cotação

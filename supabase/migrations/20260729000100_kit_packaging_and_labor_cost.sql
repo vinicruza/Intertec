@@ -84,6 +84,14 @@ create trigger trg_kit_packaging_updated_at
 -- A assinatura passa a incluir a embalagem (calculada no motor, em
 -- assinaturaKitCompleta). Kits sem embalagem mantêm a assinatura anterior,
 -- então o catálogo já cadastrado continua válido.
+--
+-- A versão antiga precisa ser REMOVIDA, não substituída: no Postgres a
+-- identidade da função inclui os tipos dos argumentos, então um "create or
+-- replace" com um parâmetro a mais criaria uma SEGUNDA função. Com o novo
+-- parâmetro tendo valor padrão, toda chamada com seis argumentos ficaria
+-- ambígua e falharia em tempo de execução.
+drop function if exists public.save_kit_with_items(uuid, text, text, text, text, jsonb);
+
 create or replace function public.save_kit_with_items(
   p_kit_id uuid,
   p_code text,

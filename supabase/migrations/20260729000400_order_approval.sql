@@ -71,10 +71,19 @@ create index if not exists orders_approval_status_idx
 
 -- Pedidos já fechados antes desta migração são considerados aprovados: o
 -- controle não existia, e marcá-los como pendentes seria reescrever o passado.
+--
+-- Como no backfill do número de orçamento, a trava de imutabilidade sai
+-- durante a operação: ela barra qualquer UPDATE em pedido fechado, e aqui só
+-- se preenche um campo de controle que passou a existir agora. Nenhum valor
+-- financeiro é tocado, e a trava volta na sequência.
+alter table public.orders disable trigger trg_orders_immutable;
+
 update public.orders
    set approval_status = 'aprovado',
        approved_at = coalesce(approved_at, closed_at)
  where status = 'closed' and approval_status = 'rascunho';
+
+alter table public.orders enable trigger trg_orders_immutable;
 
 -- ------------------------------------------------------------------
 -- 3. Enviar para aprovação / aprovar / recusar
