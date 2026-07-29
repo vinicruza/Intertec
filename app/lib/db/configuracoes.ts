@@ -91,3 +91,52 @@ export async function atualizarPortal(id: string, freight_percent: string): Prom
   const { error } = await supabase.from("portal_freight_rates").update({ freight_percent }).eq("id", id);
   if (error) throw error;
 }
+
+// ---------- Código de ERP dos produtos (Sprint E) ----------
+//
+// A reunião de 16/07/2026 pediu código numérico para o sistema de faturamento,
+// mas o limite real dele não foi confirmado ("a gente não sabe qual é a
+// limitação dele ainda"). Por isso o formato é PARÂMETRO e a geração é manual:
+// o código semântico continua sendo a identidade interna, e o de ERP entra em
+// paralelo quando a Intertech confirmar o formato.
+
+export type ParametrosCodigoErp = {
+  enabled: boolean;
+  total_digits: number;
+  category_digits: number;
+  target_system: string;
+};
+
+export async function obterParametrosCodigoErp(): Promise<ParametrosCodigoErp> {
+  const { data, error } = await supabase
+    .from("erp_code_settings")
+    .select("enabled, total_digits, category_digits, target_system")
+    .maybeSingle();
+  if (error) throw error;
+  return (
+    (data as ParametrosCodigoErp | null) ?? {
+      enabled: false,
+      total_digits: 6,
+      category_digits: 1,
+      target_system: "Simples",
+    }
+  );
+}
+
+export async function salvarParametrosCodigoErp(p: ParametrosCodigoErp): Promise<void> {
+  const { error } = await supabase.rpc("save_erp_code_settings", {
+    p_enabled: p.enabled,
+    p_total_digits: p.total_digits,
+    p_category_digits: p.category_digits,
+    p_target_system: p.target_system,
+  });
+  if (error) throw error;
+}
+
+// Gera os códigos que ainda faltam. Não mexe em quem já tem código: um código
+// que já foi para o ERP não pode mudar.
+export async function gerarCodigosErp(): Promise<number> {
+  const { data, error } = await supabase.rpc("generate_erp_codes");
+  if (error) throw error;
+  return Number(data ?? 0);
+}

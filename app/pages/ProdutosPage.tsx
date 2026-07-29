@@ -40,7 +40,7 @@ export default function ProdutosPage() {
     <Card className="hidden overflow-x-auto p-0 md:block"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
       <th className="px-5 py-3 font-medium">Código</th><th className="px-5 py-3 font-medium">Nome</th><th className="px-5 py-3 font-medium">Categoria</th><th className="px-5 py-3 font-medium">CMV</th></tr></thead><tbody>
       {filtrados.map((p) => <tr key={p.id} className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/produtos/${p.id}`)}>
-        <td className="px-5 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{p.code}</strong>{p.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {p.legacy_code}</div>}</td><td className="px-5 py-3 font-medium">{p.name}</td><td className="px-5 py-3"><Badge>{p.category ?? "—"}</Badge></td><td className="px-5 py-3">{reais(p.cmv)}</td>
+        <td className="px-5 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{p.code}</strong>{p.erp_code && <div className="text-xs text-[var(--cor-texto-suave)]">ERP {p.erp_code}</div>}{p.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {p.legacy_code}</div>}</td><td className="px-5 py-3 font-medium">{p.name}</td><td className="px-5 py-3"><Badge>{p.category ?? "—"}</Badge></td><td className="px-5 py-3">{reais(p.cmv)}</td>
       </tr>)}</tbody></table></Card>
   </div>;
 }

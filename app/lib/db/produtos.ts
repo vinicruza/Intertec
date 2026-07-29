@@ -4,6 +4,7 @@ import { supabase } from "../supabase";
 export type ProdutoLinha = {
   id: string;
   code: string;
+  erp_code: string | null;
   legacy_code: string | null;
   name: string;
   category: string | null;
@@ -105,7 +106,7 @@ export async function carregarBaseCascata(
 export async function listarProdutos(): Promise<ProdutoLinha[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv)")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
@@ -134,7 +135,7 @@ export type ProdutoCompleto = {
 export async function obterProduto(id: string): Promise<ProdutoCompleto | null> {
   const { data: produto, error } = await supabase
     .from("products")
-    .select("id, code, legacy_code, name, category, category_id, type, sterile, size, grammage, status")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;

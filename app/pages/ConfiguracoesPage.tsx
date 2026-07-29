@@ -11,6 +11,10 @@ import {
   listarIcsm,
   listarPortal,
   listarRegrasMargem,
+  gerarCodigosErp,
+  obterParametrosCodigoErp,
+  salvarParametrosCodigoErp,
+  type ParametrosCodigoErp,
   type CanalLinha,
   type DifalLinha,
   type IcsmLinha,
@@ -25,12 +29,13 @@ import {
 import type { Perfil } from "../lib/roles";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
-type Aba = "canais" | "margem" | "aprovacao" | "icsm" | "difal" | "portal";
+type Aba = "canais" | "margem" | "aprovacao" | "codigoErp" | "icsm" | "difal" | "portal";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "canais", rotulo: "Canais" },
   { id: "margem", rotulo: "Faixas de margem" },
   { id: "aprovacao", rotulo: "Aprovação de pedidos" },
+  { id: "codigoErp", rotulo: "Código para o ERP" },
   { id: "icsm", rotulo: "ICSM por UF" },
   { id: "difal", rotulo: "DIFAL por UF" },
   { id: "portal", rotulo: "Frete Portal (Marketplace)" },
@@ -66,6 +71,7 @@ export default function ConfiguracoesPage() {
       {aba === "canais" && <AbaCanais />}
       {aba === "margem" && <AbaMargem />}
       {aba === "aprovacao" && <AbaAprovacao />}
+      {aba === "codigoErp" && <AbaCodigoErp />}
       {aba === "icsm" && <AbaIcsm />}
       {aba === "difal" && <AbaDifal />}
       {aba === "portal" && <AbaPortal />}
@@ -255,6 +261,117 @@ function AbaAprovacao() {
         )}
         {salvar.isSuccess && !form && <span className="text-sm text-green-700">Salvo ✓</span>}
       </div>
+    </Card>
+  );
+}
+
+// ---------- Código de produto para o ERP ----------
+
+function AbaCodigoErp() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["paramsCodigoErp"], queryFn: obterParametrosCodigoErp });
+  const [form, setForm] = useState<ParametrosCodigoErp | null>(null);
+  const [resultado, setResultado] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const atual = form ?? data ?? null;
+
+  const salvar = useMutation({
+    mutationFn: (p: ParametrosCodigoErp) => salvarParametrosCodigoErp(p),
+    onSuccess: () => { setErro(null); queryClient.invalidateQueries({ queryKey: ["paramsCodigoErp"] }); },
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar."),
+  });
+  const gerar = useMutation({
+    mutationFn: gerarCodigosErp,
+    onSuccess: (n) => { setErro(null); setResultado(`${n} código(s) gerado(s).`); },
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao gerar códigos."),
+  });
+
+  if (isLoading || !atual) return <Carregando />;
+
+  function mudar(campos: Partial<ParametrosCodigoErp>) {
+    setForm({ ...(atual as ParametrosCodigoErp), ...campos });
+  }
+
+  const sequenciais = atual.total_digits - atual.category_digits;
+
+  return (
+    <Card className="max-w-2xl space-y-4">
+      <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+        <strong>Aguardando confirmação do formato.</strong> A reunião pediu um código numérico para
+        o sistema de faturamento, mas o limite real dele não foi confirmado — e foi levantado que os
+        atributos do produto podem não caber no código. Por isso este código é{" "}
+        <strong>paralelo</strong>: o código semântico atual (PC-0001) continua sendo a identidade
+        interna, e nada do catálogo é recodificado. Confirme o formato com o {atual.target_system} e
+        só então ligue a geração.
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Sistema de destino</Label>
+          <Input value={atual.target_system} onChange={(e) => mudar({ target_system: e.target.value })} />
+        </div>
+        <div>
+          <Label>Total de dígitos</Label>
+          <Input
+            className="w-28"
+            value={String(atual.total_digits)}
+            onChange={(e) => mudar({ total_digits: Number(e.target.value) || 0 })}
+          />
+        </div>
+        <div>
+          <Label>Dígitos da categoria</Label>
+          <Input
+            className="w-28"
+            value={String(atual.category_digits)}
+            onChange={(e) => mudar({ category_digits: Number(e.target.value) || 0 })}
+          />
+        </div>
+        <div className="self-end pb-2 text-sm text-[var(--cor-texto-suave)]">
+          Sobram <strong>{sequenciais > 0 ? sequenciais : 0}</strong> dígito(s) de sequência —
+          até {sequenciais > 0 ? Math.pow(10, sequenciais) - 1 : 0} produtos por categoria.
+        </div>
+      </div>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={atual.enabled}
+          onChange={(e) => mudar({ enabled: e.target.checked })}
+        />
+        <span>
+          <strong>Ligar a geração de código de ERP</strong>
+          <span className="block text-xs text-[var(--cor-texto-suave)]">
+            Marque só depois de confirmar o formato aceito. O prefixo numérico de cada categoria é
+            editado no cadastro de categorias.
+          </span>
+        </span>
+      </label>
+
+      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+      {resultado && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">{resultado}</p>}
+
+      <div className="flex items-center gap-3">
+        <Button disabled={salvar.isPending} onClick={() => salvar.mutate(atual)}>
+          {salvar.isPending ? "Salvando…" : "Salvar formato"}
+        </Button>
+        <Button
+          className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
+          disabled={!atual.enabled || gerar.isPending}
+          onClick={() => {
+            setResultado(null);
+            if (window.confirm("Gerar os códigos de ERP que ainda faltam? Produtos que já têm código não são alterados.")) {
+              gerar.mutate();
+            }
+          }}
+        >
+          {gerar.isPending ? "Gerando…" : "Gerar códigos pendentes"}
+        </Button>
+      </div>
+      <p className="text-xs text-[var(--cor-texto-suave)]">
+        A geração nunca altera um código já existente: se ele já foi para o ERP, mudar quebraria a
+        referência lá.
+      </p>
     </Card>
   );
 }
