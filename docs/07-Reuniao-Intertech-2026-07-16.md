@@ -3,6 +3,7 @@
 > **Fonte:** transcrição "Padronização de kits, custos e categorização clientes" (1h10, 42 páginas, HiNoter).
 > **Objetivo deste documento:** organizar tudo que foi falado, separar o que já está pronto do que muda e do que é novo, e propor a ordem de trabalho.
 > **Status:** análise para aprovação. Nada foi implementado a partir daqui.
+> **Atualização 29/07/2026:** respostas do cliente registradas na Seção 10. A decisão de retirar a Alocação de Despesas está detalhada na Seção 11.
 
 Referências de tempo (`[mm:ss]`) apontam para o trecho da transcrição que sustenta cada ponto.
 
@@ -167,7 +168,9 @@ Solução paliativa aceita: hoje os atributos estão no **nome** do produto (gra
 
 Consequência prática: foi dito que **todos os produtos terão cadastro novo, começando do zero**. `[48:56]` `[49:01]`
 
-### 4.2 O módulo de Alocação de Despesas ainda faz sentido? `[48:03]`
+### 4.2 O módulo de Alocação de Despesas ainda faz sentido? `[48:03]` — **RESPONDIDO: sai**
+
+> **Decisão do cliente em 29/07/2026: o módulo sai.** O detalhamento do que "sai" significa em cada camada está na Seção 11. O registro do debate original fica abaixo para memória.
 
 Comentário direto na reunião: *"tem o item de alocação de despesas, mas esse item de alocação de despesas é quando a gente não utilizar a margem de contribuição. Eu não sei se tem sentido a gente ter esse armário."* `[48:16]`
 
@@ -218,11 +221,11 @@ Ficou indefinido se a validação é da Cris, da Michelle, ou se o comercial fec
 | R1 | Envelope e caixa de esterilização como custo **do kit** | `Calculations.md` §4, `lib/calculations/kits.ts`, tabela `kits` | **Alta — cálculo** |
 | R2 | CMV com e sem mão de obra (costureira) | `Calculations.md` §3, `lib/calculations/cmv.ts`, marcação no insumo | **Alta — cálculo** |
 | R3 | Código de produto numérico compatível com o Simples | Migração `20260715060200`, formato atual `PC-0001` **não serve** | **Alta — conflito** |
-| R4 | Faixa "boa" de margem: 40% (sistema) x 52% (reunião) | `margin_rules` | Média — confirmar |
+| ~~R4~~ | ~~Faixa "boa" de margem: 40% x 52%~~ | Resolvido — já é editável na tela (ver 10.1) | — |
 | R5 | Kit criado dentro do simulador; tela de Kits vira consulta | `SimuladorPage`, `KitFormPage` | Média — fluxo |
 | R6 | Aviso de kit já existente durante a digitação | `SimuladorPage` + `salvarKit` | Média |
 | R7 | Nome do kit oculto, código em destaque | `KitsPage`, `SimuladorPage` | Baixa |
-| R8 | Rever necessidade do módulo de Alocação de Despesas | `AlocacaoPage`, `lib/calculations/allocation.ts` | **Decisão de escopo** |
+| ~~R8~~ | ~~Rever o módulo de Alocação de Despesas~~ | Decidido — **sai** (ver Seção 11) | — |
 
 ### 5.3 O que é novo (não existe hoje)
 
@@ -272,18 +275,22 @@ Importação das vendas por código e relatórios de consumo por insumo.
 
 **Fora da fila até decisão:** R8 (Alocação de Despesas).
 
+> **Superado em 29/07/2026** — a fila válida é a da Seção 12, que já incorpora as respostas do cliente.
+
 ---
 
 ## 7. O que precisamos da Intertech para destravar
 
-1. **Qual o limite real de código de produto no Simples?** Seis dígitos numéricos, ou aceita alfanumérico? Sem isso a Sprint E não começa, e ela impacta todo o catálogo.
-2. **A faixa verde de margem é 40% ou 52%?** O sistema está com 40%.
-3. **Lista de categorias de cliente** e de áreas (oftalmológico, ginecológico...).
-4. **O módulo de Alocação de Despesas continua ou sai?**
-5. **Quem aprova o pedido** — Cris, Michelle, ou perfil configurável?
-6. **Envelope e caixa de esterilização:** são insumos já cadastrados? Qual a regra de quantas caixas por kit?
-7. **Formato do relatório de vendas do Simples** (colunas e forma de exportar).
-8. **Lista de kits padrão publicados no site.**
+> Respostas recebidas em 29/07/2026 estão na Seção 10. Segue o estado de cada uma.
+
+1. ⏳ **Qual o limite real de código de produto no Simples?** Seis dígitos numéricos, ou aceita alfanumérico? Sem isso a Sprint E não começa, e ela impacta todo o catálogo. — *"Vamos verificar"*
+2. ✅ **A faixa verde de margem é 40% ou 52%?** — *Deixar editável.* Já é (ver 10.1).
+3. ⏳ **Lista de categorias de cliente** e de áreas (oftalmológico, ginecológico...).
+4. ✅ **O módulo de Alocação de Despesas continua ou sai?** — *Sai* (ver Seção 11).
+5. ✅ **Quem aprova o pedido?** — *Configurável por perfil* (ver 10.2).
+6. ⏳ **Envelope e caixa de esterilização:** são insumos já cadastrados? Qual a regra de quantas caixas por kit? — não bloqueia a Sprint A.
+7. ⏳ **Formato do relatório de vendas do Simples** (colunas e forma de exportar).
+8. ⏳ **Lista de kits padrão publicados no site.**
 
 ---
 
@@ -294,7 +301,7 @@ Importação das vendas por código e relatórios de consumo por insumo.
 | Recodificação do catálogo | Trocar o código de todos os produtos quebra referência com histórico e com o Simples | Já existe `catalog_code_history` e `legacy_code`; usar como ponte |
 | Explosão de códigos de kit | Cliente que pede 15 variações | Já resolvido pela decisão 3.6 — código só no fechamento |
 | Comercial "jogar" com a cor | Descontar até chegar rente ao verde | Reconhecido em reunião; a cor sem número já reduz, e a aprovação fecha |
-| Alocação de Despesas construída e possivelmente descartada | Sprint 8 já entregue | Decidir antes de investir mais |
+| ~~Alocação de Despesas construída e possivelmente descartada~~ | Decidido: sai | Desativar sem apagar cálculo, testes e snapshots (11.4) |
 | 13 mil clientes sem categoria | Trabalho manual grande | Categorizar por lote, priorizando quem tem pedido recente |
 
 ---
@@ -302,3 +309,113 @@ Importação das vendas por código e relatórios de consumo por insumo.
 ## 9. Próximo passo
 
 Este documento é para leitura e aprovação. Assim que a ordem das sprints for validada e as perguntas da Seção 7 forem respondidas — ao menos as de 1 a 4 — começamos pela **Sprint A**, que é a que corrige o CMV.
+
+---
+
+## 10. Decisões recebidas em 29/07/2026
+
+| # | Pergunta | Resposta | Efeito |
+|---|---|---|---|
+| 1 | Limite do código de produto no Simples | **Vamos verificar** | Sprint E continua bloqueada |
+| 2 | Faixa verde: 40% ou 52%? | **Deixar editável** | Já atendido — ver 10.1 |
+| 3 | Lista de categorias de cliente | Ainda não | Sprint D continua bloqueada |
+| 4 | Alocação de Despesas continua ou sai? | **Sai** | Ver Seção 11 |
+| 5 | Quem aprova o pedido | **Configurável por perfil** | Ver 10.2 |
+| 6 a 8 | Envelope/caixa, relatório do Simples, kits padrão | Ainda não | Ver 10.3 |
+
+### 10.1 Faixa de margem editável — já está pronto
+
+Não há nada a construir. As faixas já são editáveis pelo Administrador em **Configurações → Faixas de margem** (`margin_rules`), com faixa, cor e ordem.
+
+O que existe hoje é apenas o **valor inicial da carga**: Boa ≥ 40%, Atenção 25–40%, Crítica 10–25%, Negativa < 10%. Se a régua real da Intertech for 52%, basta alterar na tela — não é mudança de código.
+
+Consequência: **o item R4 sai do backlog**. Vira uma linha de conferência com o cliente na hora do treinamento.
+
+### 10.2 Aprovação configurável por perfil
+
+Refina o item N5. O sistema não vai amarrar a aprovação a uma pessoa (Cris ou Michelle), e sim a **perfis**, configuráveis pelo Administrador.
+
+Hoje já existem quatro perfis (`admin`, `financeiro`, `comercial`, `producao`) e o acesso às telas é filtrado por perfil em `app/lib/roles.ts`, com RLS no banco como garantia real. O que falta construir:
+
+- uma configuração de **quais perfis podem aprovar pedido**, editável em Configurações;
+- o estado de aprovação no pedido (pendente → aprovado / recusado) com registro de quem aprovou e quando;
+- a regra de que quem monta não é necessariamente quem aprova.
+
+Fica em aberto, para quando a Intertech definir o operacional `[18:12]`: se a aprovação será exigida em **todo** pedido ou só abaixo de uma margem — e, nesse caso, qual o limite. Recomendo construir com o limite configurável e começar exigindo aprovação em tudo, porque é o que mais se aproxima do papel que já vai para a mesa da Cris hoje.
+
+### 10.3 Ainda pendentes
+
+As perguntas 1, 3, 6, 7 e 8 da Seção 7 seguem sem resposta. Impacto na fila:
+
+- **Sprint E (códigos de produto)** — bloqueada pela pergunta 1. É a de maior risco e não deve ser iniciada por palpite.
+- **Sprint D (clientes)** — bloqueada pela pergunta 3.
+- **Sprint A (CMV)** — a pergunta 6 (envelope e caixa) afeta o *preenchimento*, não a *estrutura*. Dá para construir o cálculo e a tela agora e cadastrar os valores reais depois. **Não bloqueia.**
+- **Sprint F (DRE e consumo)** — depende da pergunta 7, mas é a última da fila.
+
+---
+
+## 11. Retirada da Alocação de Despesas — o que muda
+
+O cliente decidiu que o módulo sai. Ele foi construído na Sprint 8, então vale ser preciso sobre o que "sair" significa em cada camada — algumas partes podem ser removidas sem consequência, outras não devem ser apagadas.
+
+### 11.1 Por que a decisão faz sentido
+
+Além do argumento da reunião (a empresa passou a raciocinar por margem de contribuição `[48:16]`), o próprio `Calculations.md` §5 já registrava dois problemas do módulo:
+
+- o **fator de complexidade** é *"um número subjetivo sem documentação"*;
+- no Campo Catarata, a despesa unitária rateada (R$ 3,12) fica **maior que o próprio CMV** (R$ 2,94), o que torna o custo total muito sensível a um número que ninguém sabe explicar.
+
+Havia ainda perguntas em aberto que nunca foram respondidas: se os R$ 450.000 são mensais ou anuais, e quem revisa os fatores. Retirar o módulo **elimina essas três dúvidas de uma vez**.
+
+### 11.2 O que sai (sem consequência)
+
+| Camada | O que sai |
+|---|---|
+| Telas | `AlocacaoPage`, `AlocacaoPeriodoPage`, rota `/alocacao`, item de menu |
+| Cascata do pedido | A última linha, `(−) Despesa alocada = Resultado após rateio` (PRD §5.4) |
+| DRE | A linha informativa **Variação de absorção** (Σ rateios − despesa real) |
+| Docs | PRD §5.2, §6.4 e Sprint 8 do roadmap; `Calculations.md` §5 marcado como descontinuado |
+
+### 11.3 O que **não** muda — e é a melhor notícia
+
+**Nenhum número que a Intertech usa para decidir muda.**
+
+A margem de contribuição é calculada **antes** do rateio na cascata. A despesa alocada só entrava na linha seguinte, que era explicitamente informativa. Ou seja:
+
+- a margem de contribuição de todo pedido continua idêntica;
+- as faixas de cor (boa/atenção/crítica) continuam idênticas;
+- o **DRE continua fechando**, porque a despesa que entra nele é a **despesa fixa REAL do mês**, digitada pelo Financeiro — ela nunca veio do rateio. O DRE perde só a linha de absorção;
+- os golden tests T6 e T7 (pedido completo) continuam válidos: o valor testado é a margem de contribuição de 39,82%, que não depende do rateio.
+
+### 11.4 O que **não** deve ser apagado
+
+Três pontos onde apagar causa dano. Recomendo desativar, não deletar:
+
+**a) Os golden tests T4 e T5.** Eles testam exatamente `despesa_unitaria`. A regra do projeto (`CLAUDE.md`) diz que os golden tests da Seção 11 *"são obrigatórios e nunca podem ser removidos"*. Removê-los contraria uma regra que existe justamente para impedir que cálculo suma sem rastro. Como são funções puras que não aparecem em tela nenhuma, mantê-los **não custa nada** e preserva a reversibilidade caso a decisão mude.
+
+**b) `lib/calculations/allocation.ts`.** Mesmo raciocínio: módulo puro, isolado, sem dependência de tela ou banco. Deixa de ser chamado, mas continua testado.
+
+**c) `order_items.expense_unit_snapshot` nos pedidos já fechados.** Isso é **dado histórico congelado** de vendas que já aconteceram. Apagar reescreveria o passado, que é exatamente o que o sistema foi feito para impedir (Decisão D7). O campo para de ser preenchido em pedidos novos; os antigos ficam como estão.
+
+Sobre as tabelas `expense_allocation_periods` e `expense_allocations`: sugiro **manter no banco sem tela**, pelo mesmo motivo do item (c) — elas sustentam a leitura dos pedidos antigos. Se a Intertech quiser mesmo apagar, isso é uma migração destrutiva e separada, e eu peço confirmação explícita antes.
+
+### 11.5 Esforço
+
+Pequeno: é remoção de tela e de uma linha de cascata, não reescrita de cálculo. Estimo **um único commit dentro da Sprint A**, feito antes das correções de CMV — porque simplifica a cascata que as sprints B e C vão mexer depois.
+
+---
+
+## 12. Fila de trabalho atualizada
+
+| Ordem | Sprint | Situação |
+|---|---|---|
+| 1 | **A — Correções de CMV** (R1 envelope/caixa, R2 costureira) + retirada da Alocação (Seção 11) | **Liberada para começar** |
+| 2 | B — Ciclo comercial (N3, N4, R5, R6, R7) | Liberada |
+| 3 | C — Aprovação e visibilidade (N5 por perfil, N6 cor, N7 ficha impressa) | Liberada |
+| 4 | D — Clientes (N1, N2) | Bloqueada — falta a lista de categorias |
+| 5 | E — Códigos de produto (R3) | Bloqueada — falta o limite do Simples |
+| 6 | F — DRE e consumo (N9, N10) | Depende do formato do relatório do Simples |
+
+Saíram do backlog: **R4** (virou conferência de tela, ver 10.1) e **R8** (decidido, ver Seção 11).
+
+Com as respostas recebidas, as sprints A, B e C — que são o núcleo do que a reunião pediu — estão desbloqueadas.
