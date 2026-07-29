@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { cancelarPedido, duplicarPedido, fecharPedido, obterPedidoCompleto, reabrirPedido } from "../lib/db/fechamento";
+import { listarMotivosPerda, listarVersoes, marcarCotacaoPerdida, reabrirCotacaoPerdida } from "../lib/db/pedidos";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
@@ -16,6 +17,9 @@ export default function PedidoDetalhePage() {
   const [erro, setErro] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [perdendo, setPerdendo] = useState(false);
+  const [motivoPerdaId, setMotivoPerdaId] = useState("");
+  const [observacaoPerda, setObservacaoPerda] = useState("");
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ["pedido", id],
@@ -50,10 +54,26 @@ export default function PedidoDetalhePage() {
     onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao cancelar."),
   });
 
+  // Desfecho da cotação: nem toda cotação vira pedido, e a empresa quer saber
+  // por quê (reunião 16/07/2026).
+  const motivosQuery = useQuery({ queryKey: ["motivosPerda"], queryFn: listarMotivosPerda });
+  const versoesQuery = useQuery({ queryKey: ["versoes", id], queryFn: () => listarVersoes(id!) });
+  const perder = useMutation({
+    mutationFn: () => marcarCotacaoPerdida(id!, motivoPerdaId, observacaoPerda),
+    onSuccess: () => { setPerdendo(false); setMotivoPerdaId(""); setObservacaoPerda(""); recarregar(); },
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao registrar a perda."),
+  });
+  const reabrirPerdida = useMutation({
+    mutationFn: () => reabrirCotacaoPerdida(id!),
+    onSuccess: recarregar,
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao reabrir a cotação."),
+  });
+
   if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
   if (!pedido) return <p className="text-red-600">Pedido não encontrado.</p>;
 
   const fechado = pedido.status === "closed";
+  const perdida = pedido.status === "lost";
   const cancelado = Boolean(pedido.cancelled_at);
   const t = pedido.totals_display;
 
@@ -62,7 +82,7 @@ export default function PedidoDetalhePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">Pedido — {pedido.customers?.name ?? "sem cliente"}</h1>
-          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Fechado em ${dataCurta(pedido.closed_at)}` : "Simulação"}</Badge>
+          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Ganho em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : "Em cotação"}</Badge>
         </div>
         <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate("/pedidos")}>
           Voltar
@@ -141,7 +161,7 @@ export default function PedidoDetalhePage() {
       {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
       <div className="flex gap-2">
-        {!fechado && !cancelado && (
+        {!fechado && !cancelado && !perdida && (
           <Button
             disabled={fechar.isPending}
             onClick={() => {
@@ -168,6 +188,16 @@ export default function PedidoDetalhePage() {
             Criar revisão (Admin)
           </Button>
         )}
+        {!fechado && !cancelado && !perdida && (
+          <Button className="bg-amber-700" onClick={() => { setErro(null); setPerdendo(true); }}>
+            Marcar como perdida
+          </Button>
+        )}
+        {perdida && !cancelado && (
+          <Button className="bg-amber-600" disabled={reabrirPerdida.isPending} onClick={() => reabrirPerdida.mutate()}>
+            Reabrir cotação
+          </Button>
+        )}
         <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" disabled={duplicar.isPending} onClick={() => duplicar.mutate()}>
           Duplicar como nova simulação
         </Button>
@@ -183,6 +213,55 @@ export default function PedidoDetalhePage() {
           if (window.confirm("Confirma o cancelamento deste pedido?")) cancelar.mutate();
         }}>{cancelar.isPending ? "Cancelando…" : "Confirmar cancelamento"}</Button>
         <Button className="bg-transparent text-[var(--cor-texto-suave)]" onClick={() => setCancelando(false)}>Voltar</Button></div>
+      </Card>}
+
+      {perdendo && <Card className="space-y-3 border-amber-200">
+        <h2 className="font-semibold">Registrar perda da cotação</h2>
+        <p className="text-sm text-[var(--cor-texto-suave)]">
+          Sem o motivo registrado não há como responder depois “por que a gente não vendeu?”.
+          O preço de venda e o custo desta cotação ficam guardados junto.
+        </p>
+        <select
+          className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+          value={motivoPerdaId}
+          onChange={(e) => setMotivoPerdaId(e.target.value)}
+        >
+          <option value="">Selecione o motivo…</option>
+          {(motivosQuery.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <Input value={observacaoPerda} onChange={(e) => setObservacaoPerda(e.target.value)} placeholder="Observação (opcional)" />
+        <div className="flex gap-2">
+          <Button className="bg-amber-700" disabled={perder.isPending || !motivoPerdaId} onClick={() => perder.mutate()}>
+            {perder.isPending ? "Registrando…" : "Confirmar perda"}
+          </Button>
+          <Button className="bg-transparent text-[var(--cor-texto-suave)]" onClick={() => setPerdendo(false)}>Voltar</Button>
+        </div>
+      </Card>}
+
+      {(versoesQuery.data ?? []).length > 1 && <Card className="space-y-2">
+        <h2 className="font-semibold">Versões da cotação</h2>
+        <p className="text-sm text-[var(--cor-texto-suave)]">
+          Cada alteração pedida pelo cliente ficou registrada. A versão mais alta é a atual.
+        </p>
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-[var(--cor-texto-suave)]">
+            <th className="py-1 font-medium">Versão</th><th className="py-1 font-medium">Quando</th>
+            <th className="py-1 text-right font-medium">Receita</th><th className="py-1 text-right font-medium">Margem contrib.</th>
+          </tr></thead>
+          <tbody>
+            {(versoesQuery.data ?? []).map((v) => {
+              const foto = v.snapshot as Record<string, string | undefined>;
+              return (
+                <tr key={v.version} className="border-t border-[var(--cor-borda)]">
+                  <td className="py-1">v{v.version}</td>
+                  <td className="py-1 text-[var(--cor-texto-suave)]">{dataCurta(v.created_at)}</td>
+                  <td className="py-1 text-right">{reais(foto.receita_bruta)}</td>
+                  <td className="py-1 text-right">{reais(foto.margem_contribuicao)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </Card>}
     </div>
   );

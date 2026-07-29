@@ -21,6 +21,14 @@ export type ItemVendavel = {
   despesaUnitaria: string | null;
 };
 
+// Insumo disponível como embalagem/esterilização do kit montado no simulador.
+export type InsumoEmbalagem = {
+  id: string;
+  nome: string;
+  precoSemImposto: string | null;
+  maoDeObra: boolean;
+};
+
 export type ContextoSimulador = {
   vendedores: VendedorOpcao[];
   clientes: Array<{ id: string; name: string; uf: string | null }>;
@@ -28,10 +36,15 @@ export type ContextoSimulador = {
   tabelaPorUF: Map<string, TabelasUF>;
   itens: ItemVendavel[];
   regrasMargem: RegraMargem[];
+  // Para montar kit dentro do pedido (reunião 16/07/2026):
+  produtos: Array<{ id: string; nome: string; codigo: string; cmv: string | null }>;
+  insumosEmbalagem: InsumoEmbalagem[];
+  // Assinatura → kit existente, para avisar na hora que a composição já existe.
+  kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string }>;
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits] = await Promise.all([
+  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("customers").select("id, name, uf").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
@@ -42,11 +55,12 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("product_costs").select("product_id, cmv, cmv_without_labor"),
     supabase
       .from("kits")
-      .select("id, code, name, kit_items(product_id, quantity), kit_packaging(quantity, inputs(name, price_without_tax, is_labor))")
+      .select("id, code, name, signature, kit_items(product_id, quantity), kit_packaging(quantity, inputs(name, price_without_tax, is_labor))")
       .eq("status", "active")
       .order("name"),
+    supabase.from("inputs").select("id, name, price_without_tax, is_labor").eq("status", "active").order("name"),
   ]);
-  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits]) {
+  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos]) {
     if (r.error) throw r.error;
   }
 
@@ -109,6 +123,20 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     };
   });
 
+  // Assinatura → kit já cadastrado. Serve para o simulador avisar, enquanto a
+  // pessoa monta, que aquela composição já existe e tem código.
+  const kitPorAssinatura = new Map<string, { id: string; codigo: string; nome: string }>();
+  for (const k of kits.data ?? []) {
+    const assinatura = k.signature as string | null;
+    if (assinatura) {
+      kitPorAssinatura.set(assinatura, {
+        id: k.id as string,
+        codigo: (k.code as string | null) ?? "—",
+        nome: k.name as string,
+      });
+    }
+  }
+
   const tabelaPorUF = new Map<string, TabelasUF>();
   const difalPorUF = new Map((difal.data ?? []).map((d) => [d.uf as string, d.final_rate as string]));
   const portalPorUF = new Map((portal.data ?? []).map((p) => [p.uf as string, p.freight_percent as string]));
@@ -142,16 +170,37 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     tabelaPorUF,
     itens: [...itensProdutos, ...itensKits],
     regrasMargem: (regras.data ?? []) as RegraMargem[],
+    produtos: (prods.data ?? []).map((p) => ({
+      id: p.id as string,
+      nome: p.name as string,
+      codigo: p.code as string,
+      cmv: custoPorProduto.get(p.id as string)?.cmv.toString() ?? null,
+    })),
+    insumosEmbalagem: (insumos.data ?? []).map((i) => ({
+      id: i.id as string,
+      nome: i.name as string,
+      precoSemImposto: (i.price_without_tax as string | null) ?? null,
+      maoDeObra: (i.is_labor as boolean | null) ?? false,
+    })),
+    kitPorAssinatura,
   };
 }
 
 // ---------- Gravação da simulação ----------
 
 export type ItemSimulacao = {
-  tipo: "produto" | "kit";
-  refId: string;
+  // "kitNovo" = kit montado dentro do pedido, ainda sem código oficial. Ele só
+  // vira kit de catálogo quando o pedido é ganho (reunião 16/07/2026).
+  tipo: "produto" | "kit" | "kitNovo";
+  refId: string; // vazio quando tipo = kitNovo
   quantidade: string;
   precoVenda: string;
+  kitNovo?: {
+    assinatura: string;
+    composicao: Array<{ produtoId: string; quantidade: string }>;
+    embalagem: Array<{ insumoId: string; quantidade: string }>;
+    rotulo: string;
+  };
 };
 
 export type DadosSimulacao = {
@@ -166,10 +215,20 @@ export type DadosSimulacao = {
   itens: ItemSimulacao[];
 };
 
-// Salva a simulação (status = simulation). Snapshots NÃO são gravados aqui —
-// o congelamento acontece só no fechamento do pedido (D7, Sprint 11).
-export async function salvarSimulacao(d: DadosSimulacao): Promise<string> {
-  const { data, error } = await supabase.rpc("create_order_with_items", {
+// Salva a cotação e EMPILHA UMA VERSÃO (reunião 16/07/2026: "se ele faz 10
+// alterações, vamos registrar as 10"). Snapshots financeiros continuam sendo
+// gravados só no fechamento (D7).
+//
+// Passe `orderId` para revisar uma cotação existente; null cria uma nova.
+export type ResultadoCotacao = { id: string; version: number; quote_number: string };
+
+export async function salvarCotacao(
+  orderId: string | null,
+  d: DadosSimulacao,
+  fotoDaCotacao: unknown = {}
+): Promise<ResultadoCotacao> {
+  const { data, error } = await supabase.rpc("save_quote_revision", {
+    p_order_id: orderId,
     p_order: {
       customer_id: d.clienteId,
       customer_name: d.clienteNovoNome?.trim() || null,
@@ -185,8 +244,69 @@ export async function salvarSimulacao(d: DadosSimulacao): Promise<string> {
       kit_id: i.tipo === "kit" ? i.refId : null,
       quantity: i.quantidade.trim().replace(",", "."),
       unit_price: i.precoVenda.trim().replace(",", "."),
+      ad_hoc_kit_signature: i.kitNovo?.assinatura ?? null,
+      ad_hoc_kit_composition: i.kitNovo
+        ? i.kitNovo.composicao.map((c) => ({ product_id: c.produtoId, quantity: c.quantidade }))
+        : null,
+      ad_hoc_kit_packaging: i.kitNovo
+        ? i.kitNovo.embalagem.map((e) => ({ input_id: e.insumoId, quantity: e.quantidade }))
+        : null,
+      ad_hoc_kit_label: i.kitNovo?.rotulo ?? null,
     })),
+    p_snapshot: fotoDaCotacao,
   });
   if (error) throw error;
-  return data as string;
+  return data as ResultadoCotacao;
+}
+
+// ---------- Desfecho da cotação ----------
+
+export type MotivoPerda = { id: string; label: string; sort_order: number };
+
+export async function listarMotivosPerda(): Promise<MotivoPerda[]> {
+  const { data, error } = await supabase
+    .from("loss_reasons")
+    .select("id, label, sort_order")
+    .eq("active", true)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as MotivoPerda[];
+}
+
+// Nem toda cotação vira pedido. Sem o motivo registrado, não há como responder
+// depois "por que a gente não vendeu?".
+export async function marcarCotacaoPerdida(
+  orderId: string,
+  motivoId: string,
+  observacao: string
+): Promise<void> {
+  const { error } = await supabase.rpc("mark_order_lost", {
+    p_order_id: orderId,
+    p_loss_reason_id: motivoId,
+    p_notes: observacao.trim() || null,
+  });
+  if (error) throw error;
+}
+
+export async function reabrirCotacaoPerdida(orderId: string): Promise<void> {
+  const { error } = await supabase.rpc("reopen_lost_order", { p_order_id: orderId });
+  if (error) throw error;
+}
+
+// ---------- Histórico de versões da cotação ----------
+
+export type VersaoCotacao = {
+  version: number;
+  snapshot: Record<string, unknown>;
+  created_at: string;
+};
+
+export async function listarVersoes(orderId: string): Promise<VersaoCotacao[]> {
+  const { data, error } = await supabase
+    .from("order_versions")
+    .select("version, snapshot, created_at")
+    .eq("order_id", orderId)
+    .order("version", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as VersaoCotacao[];
 }

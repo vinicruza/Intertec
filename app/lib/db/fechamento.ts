@@ -8,10 +8,14 @@ import { carregarContextoSimulador } from "./pedidos";
 
 export type PedidoResumo = {
   id: string;
-  status: "simulation" | "closed";
+  status: "simulation" | "closed" | "lost";
+  quote_number: string | null;
   uf: string | null;
   created_at: string;
   closed_at: string | null;
+  lost_at: string | null;
+  loss_notes: string | null;
+  loss_reasons: { id: string; label: string } | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
   revised_from_order_id: string | null;
@@ -34,7 +38,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, uf, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name), sellers(id, name), channels(id, name), order_items(item_name_snapshot, item_code_snapshot, products(name,code), kits(name,code))"
+      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -44,7 +48,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
 
 export type PedidoCompleto = {
   id: string;
-  status: "simulation" | "closed";
+  status: "simulation" | "closed" | "lost";
   uf: string | null;
   freight: string | null;
   freight_paid_by_customer: boolean;
@@ -119,9 +123,17 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
 // e no pedido e muda o status. A partir daí o banco impede qualquer alteração
 // (trigger da Sprint 2). Reabrir: só Admin, gera trilha de auditoria.
 export async function fecharPedido(orderId: string): Promise<void> {
+  // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
+  // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
+  // código quando a mesma composição já existe. Precisa vir ANTES de ler o
+  // pedido, porque a materialização preenche o kit_id dos itens.
+  const { error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", { p_order_id: orderId });
+  if (erroKits) throw erroKits;
+
   const pedido = await obterPedidoCompleto(orderId);
   if (!pedido) throw new Error("Pedido não encontrado.");
   if (pedido.status === "closed") throw new Error("Pedido já está fechado.");
+  if (pedido.status === "lost") throw new Error("Cotação marcada como perdida — reabra antes de fechar.");
   if (pedido.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
   if (!pedido.uf) throw new Error("Fechamento exige UF definida.");
 

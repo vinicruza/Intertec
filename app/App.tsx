@@ -69,10 +69,6 @@ export default function App() {
                 element={<ExigirAcesso caminho="/kits"><KitsPage /></ExigirAcesso>}
               />
               <Route
-                path="/kits/novo"
-                element={<ExigirAcesso caminho="/kits"><KitFormPage /></ExigirAcesso>}
-              />
-              <Route
                 path="/kits/:id"
                 element={<ExigirAcesso caminho="/kits"><KitFormPage /></ExigirAcesso>}
               />

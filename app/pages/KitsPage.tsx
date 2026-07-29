@@ -4,7 +4,7 @@ import { custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc
 import { listarKits, type KitLinha } from "../lib/db/kits";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais } from "../lib/format";
-import { Button, Card } from "@components/ui/primitives";
+import { Card } from "@components/ui/primitives";
 
 export default function KitsPage() {
   const navigate = useNavigate();
@@ -43,11 +43,15 @@ export default function KitsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-2xl font-semibold">Kits</h1>
-        <Link to="/kits/novo">
-          <Button>Novo kit</Button>
-        </Link>
+        {/* Reunião 16/07/2026: o kit passa a nascer dentro do pedido; esta tela
+            vira o registro de consulta do que já foi criado. */}
+        <p className="text-sm text-[var(--cor-texto-suave)]">
+          Registro dos kits já criados. Kits novos são montados dentro do{" "}
+          <Link className="font-medium underline" to="/simulador">simulador de pedido</Link>, e o
+          código oficial nasce quando o pedido é ganho.
+        </p>
       </div>
 
       {kitsQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
@@ -55,8 +59,8 @@ export default function KitsPage() {
       {kits.length === 0 && !kitsQuery.isLoading && (
         <Card>
           <p className="text-sm text-[var(--cor-texto-suave)]">
-            Nenhum kit ainda. Um kit é uma composição de produtos; a assinatura única impede
-            cadastrar duas vezes a mesma composição.
+            Nenhum kit ainda. Monte o primeiro dentro do simulador de pedido — a assinatura única
+            impede que a mesma composição receba dois códigos diferentes.
           </p>
         </Card>
       )}
@@ -67,7 +71,6 @@ export default function KitsPage() {
             <thead>
               <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
                 <th className="px-4 py-3 font-medium">Código</th>
-                <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Composição</th>
                 <th className="px-4 py-3 font-medium">CMV do kit</th>
               </tr>
@@ -79,10 +82,18 @@ export default function KitsPage() {
                   className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]"
                   onClick={() => navigate(`/kits/${k.id}`)}
                 >
-                  <td className="px-4 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{k.code}</strong>{k.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {k.legacy_code}</div>}</td>
-                  <td className="px-4 py-3 font-medium">{k.name}</td>
+                  <td className="px-4 py-3">
+                    <strong className="font-mono text-base text-[var(--cor-primaria)]">{k.code}</strong>
+                    <div className="text-xs text-[var(--cor-texto-suave)]">{k.name}</div>
+                    {k.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {k.legacy_code}</div>}
+                  </td>
                   <td className="px-4 py-3 text-[var(--cor-texto-suave)]">
                     {k.kit_items.map((i) => `${i.quantity}× ${i.products?.name ?? "?"}`).join(" · ")}
+                    {k.kit_packaging.length > 0 && (
+                      <div className="mt-1 text-xs">
+                        Embalagem: {k.kit_packaging.map((e) => `${e.quantity}× ${e.inputs?.name ?? "?"}`).join(" · ")}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">{reais(cmvDoKit(k))}</td>
                 </tr>
