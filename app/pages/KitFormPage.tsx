@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import {
-  assinaturaKitCompleta,
-  custoKitCompleto,
-  type CustoProdutoKit,
-  type EmbalagemKit,
-  type ItemEmbalagem,
-  type ItemKit,
-} from "@calc";
+import type { CustoProdutoKit, ItemKit } from "@calc";
 import { obterKit, salvarKit, type ResultadoSalvarKit } from "../lib/db/kits";
 import { listarInsumos } from "../lib/db/insumos";
+import { resolverKitDoPedido, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
@@ -18,7 +12,7 @@ import { Button, Card, Input, Label } from "@components/ui/primitives";
 type ItemEdicao = { produtoId: string; quantidade: string };
 // Envelope e caixas de esterilização: consumidos UMA vez por kit montado
 // (reunião Intertech 16/07/2026 — antes disso o custo era aproximado).
-type EmbalagemEdicao = { insumoId: string; quantidade: string };
+type EmbalagemEdicao = { insumoId: string; modo: ModoEmbalagem; quantidade: string };
 
 export default function KitFormPage() {
   const { id } = useParams();
@@ -48,7 +42,11 @@ export default function KitFormPage() {
       ? k.kit_items.map((i) => ({ produtoId: i.product_id, quantidade: i.quantity }))
       : [{ produtoId: "", quantidade: "1" }]
     );
-    setEmbalagem(k.kit_packaging.map((e) => ({ insumoId: e.input_id, quantidade: e.quantity })));
+    setEmbalagem(k.kit_packaging.map((e) => ({
+      insumoId: e.input_id,
+      modo: e.quantity_type === "lot" ? ("itensPorCaixa" as const) : ("porKit" as const),
+      quantidade: (e.quantity_type === "lot" ? e.lot_size : e.quantity) ?? "1",
+    })));
   }, [kitQuery.data]);
 
   const custoPorProduto = useMemo(
@@ -62,35 +60,6 @@ export default function KitFormPage() {
   );
 
   const insumos = insumosQuery.data ?? [];
-  const insumoPorId = useMemo(() => new Map(insumos.map((i) => [i.id, i])), [insumos]);
-
-  const embalagemValida: EmbalagemEdicao[] = useMemo(
-    () =>
-      embalagem
-        .filter((e) => e.insumoId && e.quantidade.trim() !== "")
-        .map((e) => ({ insumoId: e.insumoId, quantidade: e.quantidade.trim().replace(",", ".") })),
-    [embalagem]
-  );
-
-  const embalagemParaAssinatura: ItemEmbalagem[] = useMemo(
-    () => embalagemValida.map((e) => ({ insumoId: e.insumoId, quantidade: e.quantidade })),
-    [embalagemValida]
-  );
-
-  const embalagemParaCusto: EmbalagemKit[] = useMemo(
-    () =>
-      embalagemValida.flatMap((e) => {
-        const insumo = insumoPorId.get(e.insumoId);
-        if (!insumo?.price_without_tax) return [];
-        return [{
-          nome: insumo.name,
-          custoUnitario: insumo.price_without_tax,
-          quantidade: e.quantidade,
-          maoDeObra: insumo.is_labor,
-        }];
-      }),
-    [embalagemValida, insumoPorId]
-  );
 
   const itensValidos: ItemKit[] = useMemo(
     () =>
@@ -100,27 +69,36 @@ export default function KitFormPage() {
     [itens]
   );
 
+  const embalagemValida: EmbalagemEdicao[] = useMemo(
+    () =>
+      embalagem
+        .filter((e) => e.insumoId && e.quantidade.trim() !== "")
+        .map((e) => ({ ...e, quantidade: e.quantidade.trim().replace(",", ".") })),
+    [embalagem]
+  );
+
   // Prévia ao vivo: assinatura canônica e custo do kit (motor, fora da tela).
   const previa = useMemo(() => {
     if (itensValidos.length === 0) return null;
-    try {
-      const assinatura = assinaturaKitCompleta(itensValidos, embalagemParaAssinatura);
-      try {
-        const r = custoKitCompleto(itensValidos, custoPorProduto, embalagemParaCusto);
-        return {
-          assinatura,
-          custo: r.custoTotal.toString(),
-          custoProdutos: r.custoProdutos.toString(),
-          custoEmbalagem: r.custoEmbalagem.toString(),
-        };
-      } catch {
-        // algum produto ainda sem custo vigente
-        return { assinatura, custo: null, custoProdutos: null, custoEmbalagem: null };
+    const r = resolverKitDoPedido(
+      itensValidos.map((i) => ({ produtoId: i.produtoId, quantidade: String(i.quantidade) })),
+      embalagemValida,
+      {
+        custoPorProduto,
+        insumoPorId: new Map(
+          insumos.map((i) => [i.id, { nome: i.name, precoSemImposto: i.price_without_tax, maoDeObra: i.is_labor }])
+        ),
+        kitPorAssinatura: new Map(),
       }
-    } catch {
-      return null;
-    }
-  }, [itensValidos, custoPorProduto, embalagemParaAssinatura, embalagemParaCusto]);
+    );
+    if (r.erro) return null;
+    return {
+      assinatura: r.assinatura,
+      custo: r.cmvUnitario,
+      custoProdutos: r.custoProdutos,
+      custoEmbalagem: r.custoEmbalagem,
+    };
+  }, [itensValidos, embalagemValida, custoPorProduto, insumos]);
 
   const salvar = useMutation({
     mutationFn: () =>
@@ -129,7 +107,13 @@ export default function KitFormPage() {
         name: nome,
         description: descricao,
         itens: itensValidos,
-        embalagem: embalagemParaAssinatura,
+        embalagem: embalagemValida.map((e) => ({
+          insumoId: e.insumoId,
+          quantidade:
+            e.modo === "itensPorCaixa"
+              ? ({ tipo: "lote", tamanhoLote: e.quantidade } as const)
+              : ({ tipo: "direta", quantidade: e.quantidade } as const),
+        })),
       }),
     onSuccess: (r: ResultadoSalvarKit) => {
       if (r.tipo === "duplicado") {
@@ -259,11 +243,12 @@ export default function KitFormPage() {
             <div>
               <h2 className="text-lg font-semibold">Embalagem e esterilização do kit</h2>
               <p className="text-xs text-[var(--cor-texto-suave)]">
-                Consumidos <strong>uma vez por kit</strong> — o envelope é um só e a caixa é uma só,
-                não importa quantos produtos o kit tenha. Somam ao CMV em cima da soma dos produtos.
+                O envelope é <strong>um por kit</strong>. Já a caixa de esterilização atende
+                vários kits: informe <strong>quantos itens cabem nela</strong> e o custo é rateado.
+                Lançar a caixa como "1 por kit" cobraria a caixa inteira de cada um.
               </p>
             </div>
-            <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", quantidade: "1" }])}>
+            <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", modo: "porKit", quantidade: "1" }])}>
               Adicionar insumo
             </Button>
           </div>
@@ -290,7 +275,18 @@ export default function KitFormPage() {
                 </select>
               </div>
               <div>
-                <Label>Qtd. por kit</Label>
+                <Label>Como é consumido</Label>
+                <select
+                  className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                  value={linha.modo}
+                  onChange={(e) => atualizarEmbalagem(i, "modo", e.target.value)}
+                >
+                  <option value="porKit">Unidades por kit</option>
+                  <option value="itensPorCaixa">Itens por caixa (rateia)</option>
+                </select>
+              </div>
+              <div>
+                <Label>{linha.modo === "itensPorCaixa" ? "Itens por caixa" : "Qtd. por kit"}</Label>
                 <Input
                   className="w-28"
                   value={linha.quantidade}

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
-import { resolverKitDoPedido, type CatalogoParaKit } from "../lib/sim/kitNoPedido";
+import { resolverKitDoPedido, type CatalogoParaKit, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   carregarContextoSimulador,
   salvarCotacao,
@@ -21,7 +21,7 @@ const KIT_NOVO = "__kit_novo__";
 type KitNovoEdicao = {
   rotulo: string;
   produtos: Array<{ produtoId: string; quantidade: string }>;
-  embalagem: Array<{ insumoId: string; quantidade: string }>;
+  embalagem: Array<{ insumoId: string; modo: ModoEmbalagem; quantidade: string }>;
 };
 
 type LinhaItem = {
@@ -185,7 +185,7 @@ export default function SimuladorPage() {
                 .map((p) => ({ produtoId: p.produtoId, quantidade: p.quantidade.trim().replace(",", ".") })),
               embalagem: l.kitNovo.embalagem
                 .filter((e) => e.insumoId && e.quantidade.trim() !== "")
-                .map((e) => ({ insumoId: e.insumoId, quantidade: e.quantidade.trim().replace(",", ".") })),
+                .map((e) => ({ insumoId: e.insumoId, modo: e.modo, quantidade: e.quantidade.trim().replace(",", ".") })),
             },
           }];
         }
@@ -533,13 +533,14 @@ function MontadorKit({
           <div>
             <Label>Embalagem e esterilização</Label>
             <p className="text-xs text-[var(--cor-texto-suave)]">
-              Envelope e caixas são consumidos <strong>uma vez por kit</strong>, não por produto.
+              O envelope é <strong>um por kit</strong>. A caixa de esterilização atende vários
+              kits: escolha "itens por caixa" e o custo é rateado.
             </p>
           </div>
           <button
             type="button"
             className="text-xs font-medium text-[var(--cor-primaria)] hover:underline"
-            onClick={() => aoMudar((k) => ({ ...k, embalagem: [...k.embalagem, { insumoId: "", quantidade: "1" }] }))}
+            onClick={() => aoMudar((k) => ({ ...k, embalagem: [...k.embalagem, { insumoId: "", modo: "porKit", quantidade: "1" }] }))}
           >
             + Adicionar insumo
           </button>
@@ -560,6 +561,21 @@ function MontadorKit({
               {ctx.insumosEmbalagem.map((ins) => (
                 <option key={ins.id} value={ins.id}>{ins.nome}</option>
               ))}
+            </select>
+            <select
+              className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={e.modo}
+              onChange={(ev) =>
+                aoMudar((k) => ({
+                  ...k,
+                  embalagem: k.embalagem.map((x, idx) =>
+                    idx === j ? { ...x, modo: ev.target.value as ModoEmbalagem } : x
+                  ),
+                }))
+              }
+            >
+              <option value="porKit">un. por kit</option>
+              <option value="itensPorCaixa">itens por caixa</option>
             </select>
             <Input
               className="w-24"

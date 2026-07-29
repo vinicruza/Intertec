@@ -18,7 +18,11 @@ export type KitLinha = {
   // (reunião Intertech 16/07/2026).
   kit_packaging: Array<{
     input_id: string;
-    quantity: string;
+    // 'direct' = N por kit (envelope). 'lot' = 1 ÷ itens por caixa (caixa de
+    // esterilização, que atende vários kits).
+    quantity_type: "direct" | "lot";
+    quantity: string | null;
+    lot_size: string | null;
     inputs: { name: string; price_without_tax: string | null; is_labor: boolean } | null;
   }>;
 };
@@ -33,7 +37,9 @@ type KitLinhaBruta = Omit<KitLinha, "kit_items" | "kit_packaging"> & {
   }> | null;
   kit_packaging?: Array<{
     input_id: string;
-    quantity: string;
+    quantity_type: "direct" | "lot";
+    quantity: string | null;
+    lot_size: string | null;
     inputs?: RelacaoInsumo | RelacaoInsumo[] | null;
   }> | null;
 };
@@ -54,7 +60,9 @@ function normalizarKit(kit: KitLinhaBruta): KitLinha {
     })),
     kit_packaging: (kit.kit_packaging ?? []).map((emb) => ({
       input_id: emb.input_id,
-      quantity: String(emb.quantity),
+      quantity_type: emb.quantity_type ?? "direct",
+      quantity: emb.quantity == null ? null : String(emb.quantity),
+      lot_size: emb.lot_size == null ? null : String(emb.lot_size),
       inputs: primeiro(emb.inputs),
     })),
   };
@@ -63,7 +71,7 @@ function normalizarKit(kit: KitLinhaBruta): KitLinha {
 const SELECT_KIT =
   "id, code, legacy_code, name, description, signature, status, " +
   "kit_items(product_id, quantity, products(name)), " +
-  "kit_packaging(input_id, quantity, inputs(name, price_without_tax, is_labor))";
+  "kit_packaging(input_id, quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))";
 
 export async function listarKits(): Promise<KitLinha[]> {
   const { data, error } = await supabase.from("kits").select(SELECT_KIT).order("name");
@@ -103,7 +111,12 @@ export async function salvarKit(id: string | null, form: KitForm): Promise<Resul
     p_description: form.description.trim() || null,
     p_signature: signature,
     p_items: form.itens.map((i) => ({ product_id: i.produtoId, quantity: String(i.quantidade) })),
-    p_packaging: embalagem.map((e) => ({ input_id: e.insumoId, quantity: String(e.quantidade) })),
+    p_packaging: embalagem.map((e) => ({
+      input_id: e.insumoId,
+      quantity_type: e.quantidade.tipo === "lote" ? "lot" : "direct",
+      quantity: e.quantidade.tipo === "direta" ? String(e.quantidade.quantidade) : null,
+      lot_size: e.quantidade.tipo === "lote" ? String(e.quantidade.tamanhoLote) : null,
+    })),
   });
   if (error) throw error;
   return data as ResultadoSalvarKit;

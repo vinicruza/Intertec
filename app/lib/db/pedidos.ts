@@ -55,7 +55,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("product_costs").select("product_id, cmv, cmv_without_labor"),
     supabase
       .from("kits")
-      .select("id, code, name, signature, kit_items(product_id, quantity), kit_packaging(quantity, inputs(name, price_without_tax, is_labor))")
+      .select("id, code, name, signature, kit_items(product_id, quantity), kit_packaging(quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
       .eq("status", "active")
       .order("name"),
     supabase.from("inputs").select("id, name, price_without_tax, is_labor").eq("status", "active").order("name"),
@@ -82,7 +82,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
   }));
 
   type EmbalagemBruta = {
-    quantity: string;
+    quantity_type: "direct" | "lot";
+    quantity: string | null;
+    lot_size: string | null;
     inputs?:
       | { name: string; price_without_tax: string | null; is_labor: boolean }
       | Array<{ name: string; price_without_tax: string | null; is_labor: boolean }>
@@ -102,7 +104,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       return [{
         nome: insumo.name,
         custoUnitario: insumo.price_without_tax,
-        quantidade: String(e.quantity),
+        quantidade: e.quantity_type === "lot"
+          ? { tipo: "lote" as const, tamanhoLote: String(e.lot_size) }
+          : { tipo: "direta" as const, quantidade: String(e.quantity) },
         maoDeObra: insumo.is_labor,
       }];
     });
@@ -198,7 +202,7 @@ export type ItemSimulacao = {
   kitNovo?: {
     assinatura: string;
     composicao: Array<{ produtoId: string; quantidade: string }>;
-    embalagem: Array<{ insumoId: string; quantidade: string }>;
+    embalagem: Array<{ insumoId: string; modo: "porKit" | "itensPorCaixa"; quantidade: string }>;
     rotulo: string;
   };
 };
@@ -249,7 +253,12 @@ export async function salvarCotacao(
         ? i.kitNovo.composicao.map((c) => ({ product_id: c.produtoId, quantity: c.quantidade }))
         : null,
       ad_hoc_kit_packaging: i.kitNovo
-        ? i.kitNovo.embalagem.map((e) => ({ input_id: e.insumoId, quantity: e.quantidade }))
+        ? i.kitNovo.embalagem.map((e) => ({
+            input_id: e.insumoId,
+            quantity_type: e.modo === "itensPorCaixa" ? "lot" : "direct",
+            quantity: e.modo === "porKit" ? e.quantidade : null,
+            lot_size: e.modo === "itensPorCaixa" ? e.quantidade : null,
+          }))
         : null,
       ad_hoc_kit_label: i.kitNovo?.rotulo ?? null,
     })),

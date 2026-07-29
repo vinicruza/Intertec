@@ -3,6 +3,8 @@ import {
   custoKitCompleto,
   type CustoProdutoKit,
   type EmbalagemKit,
+  type ItemEmbalagem,
+  type Quantidade,
 } from "@calc";
 
 // ============================================================
@@ -23,7 +25,16 @@ import {
 // financeiro dentro de componente.
 
 export type ProdutoDoKit = { produtoId: string; quantidade: string };
-export type EmbalagemDoKit = { insumoId: string; quantidade: string };
+
+// A embalagem tem dois modos, e a diferença muda o custo em ordem de grandeza:
+//
+//   "porKit"      — N unidades por kit. É o envelope.
+//   "itensPorCaixa" — a caixa atende N kits, então cada um leva 1÷N dela.
+//
+// Veio do retorno da Intertech: no kit, a quantidade por caixa varia conforme
+// o que foi montado, por isso é escolhida na hora de montar.
+export type ModoEmbalagem = "porKit" | "itensPorCaixa";
+export type EmbalagemDoKit = { insumoId: string; modo: ModoEmbalagem; quantidade: string };
 
 export type CatalogoParaKit = {
   custoPorProduto: Map<string, CustoProdutoKit>;
@@ -70,9 +81,19 @@ export function resolverKitDoPedido(
   }
   const embalagem = limpar(embalagemBruta, "insumoId");
 
+  const quantidadeDe = (e: EmbalagemDoKit): Quantidade =>
+    e.modo === "itensPorCaixa"
+      ? { tipo: "lote", tamanhoLote: e.quantidade }
+      : { tipo: "direta", quantidade: e.quantidade };
+
+  const paraAssinatura: ItemEmbalagem[] = embalagem.map((e) => ({
+    insumoId: e.insumoId,
+    quantidade: quantidadeDe(e),
+  }));
+
   let assinatura: string;
   try {
-    assinatura = assinaturaKitCompleta(produtos, embalagem);
+    assinatura = assinaturaKitCompleta(produtos, paraAssinatura);
   } catch (e) {
     return { ...vazio, erro: e instanceof Error ? e.message : "Composição inválida." };
   }
@@ -83,7 +104,7 @@ export function resolverKitDoPedido(
     return [{
       nome: insumo.nome,
       custoUnitario: insumo.precoSemImposto,
-      quantidade: e.quantidade,
+      quantidade: quantidadeDe(e),
       maoDeObra: insumo.maoDeObra,
     }];
   });

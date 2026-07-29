@@ -1,4 +1,5 @@
 import { Decimal, dec } from "./decimal";
+import { resolverQuantidade, type Quantidade } from "./cmv";
 import { ErroCalculoBloqueante, type EntradaDecimal } from "./types";
 
 // ============================================================
@@ -74,15 +75,24 @@ export type EmbalagemKit = {
   nome: string;
   // Preço sem imposto do insumo (Camada 1), já calculado.
   custoUnitario: EntradaDecimal;
-  // Quantidade consumida POR KIT (ex.: 1 envelope, 2 caixas).
-  quantidade: EntradaDecimal;
+  // Como o insumo é consumido. Dois casos, e a diferença é grande:
+  //
+  //   direta — N unidades por kit. É o envelope: um kit, um envelope.
+  //   lote   — 1 ÷ itens por caixa. É a caixa de esterilização, que atende
+  //            VÁRIOS kits. Lançar a caixa como "1 por kit" multiplicaria o
+  //            custo pelo número de kits que cabem nela.
+  //
+  // A distinção veio da Intertech: nos produtos individuais o rateio já está
+  // na ficha (o Campo Catarata tem 1÷150), mas no kit a quantidade por caixa
+  // varia conforme o que foi montado — por isso é escolhida na hora.
+  quantidade: Quantidade;
   maoDeObra?: boolean;
 };
 
 // Item de embalagem para efeito de ASSINATURA (identidade do kit).
 export type ItemEmbalagem = {
   insumoId: string;
-  quantidade: EntradaDecimal;
+  quantidade: Quantidade;
 };
 
 // Assinatura completa: composição de produtos + embalagem/esterilização.
@@ -99,24 +109,50 @@ export function assinaturaKitCompleta(itens: ItemKit[], embalagem: ItemEmbalagem
   const base = assinaturaKit(itens);
   if (embalagem.length === 0) return base;
 
-  const porInsumo = new Map<string, Decimal>();
+  // A forma de consumo entra na assinatura, não só o número resolvido: uma
+  // caixa para 3 itens vale 0,333… e uma para 6 vale 0,166… — comparar o
+  // decimal arredondado poderia confundir composições diferentes. Guardando a
+  // expressão ("/3" contra "/6"), a distinção é exata.
+  const porInsumo = new Map<string, string>();
   for (const e of embalagem) {
-    const qtd = dec(e.quantidade);
-    if (qtd.lte(0)) {
-      throw new ErroCalculoBloqueante(`Quantidade inválida para o insumo "${e.insumoId}" na embalagem.`);
+    if (porInsumo.has(e.insumoId)) {
+      throw new ErroCalculoBloqueante(
+        `Insumo "${e.insumoId}" repetido na embalagem do kit — junte numa linha só.`
+      );
     }
-    porInsumo.set(e.insumoId, (porInsumo.get(e.insumoId) ?? new Decimal(0)).plus(qtd));
+    const q = e.quantidade;
+    let marca: string;
+    if (q.tipo === "lote") {
+      const lote = dec(q.tamanhoLote);
+      if (lote.lte(0)) {
+        throw new ErroCalculoBloqueante(
+          `Itens por caixa inválido para o insumo "${e.insumoId}".`
+        );
+      }
+      marca = `/${lote.toString()}`;
+    } else {
+      const qtd = resolverQuantidade(q);
+      if (qtd.lte(0)) {
+        throw new ErroCalculoBloqueante(`Quantidade inválida para o insumo "${e.insumoId}" na embalagem.`);
+      }
+      marca = qtd.toString();
+    }
+    porInsumo.set(e.insumoId, marca);
   }
 
   const parte = [...porInsumo.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([id, qtd]) => `${id}:${qtd.toString()}`)
+    .map(([id, marca]) => `${id}:${marca}`)
     .join("|");
 
   return `${base}#emb:${parte}`;
 }
 
-export type LinhaEmbalagem = EmbalagemKit & { custo: Decimal };
+export type LinhaEmbalagem = EmbalagemKit & {
+  // Quantidade já resolvida (no rateio, 1 ÷ itens por caixa).
+  quantidadeResolvida: Decimal;
+  custo: Decimal;
+};
 
 // Custo vigente de um produto nas duas leituras (ver cascade.ts).
 export type CustoProdutoKit = {
@@ -157,13 +193,13 @@ export function custoKitCompleto(
   }
 
   const linhasEmbalagem: LinhaEmbalagem[] = embalagem.map((e) => {
-    const qtd = dec(e.quantidade);
+    const qtd = resolverQuantidade(e.quantidade);
     if (qtd.lte(0)) {
       throw new ErroCalculoBloqueante(
         `Quantidade inválida para "${e.nome}" na embalagem do kit.`
       );
     }
-    return { ...e, custo: dec(e.custoUnitario).times(qtd) };
+    return { ...e, quantidadeResolvida: qtd, custo: dec(e.custoUnitario).times(qtd) };
   });
 
   const custoEmbalagem = linhasEmbalagem.reduce((s, l) => s.plus(l.custo), new Decimal(0));

@@ -28,8 +28,8 @@ describe("kit montado dentro do pedido", () => {
         { produtoId: "campo", quantidade: "3" },
       ],
       [
-        { insumoId: "envelope", quantidade: "1" },
-        { insumoId: "caixa", quantidade: "2" },
+        { insumoId: "envelope", modo: "porKit", quantidade: "1" },
+        { insumoId: "caixa", modo: "porKit", quantidade: "2" },
       ],
       catalogo()
     );
@@ -57,8 +57,10 @@ describe("kit montado dentro do pedido", () => {
 
   it("avisa quando a composição já existe no catálogo, em vez de duplicar", () => {
     const produtos = [{ produtoId: "avental", quantidade: "2" }];
-    const embalagem = [{ insumoId: "caixa", quantidade: "1" }];
-    const assinatura = assinaturaKitCompleta(produtos, embalagem);
+    const embalagem = [{ insumoId: "caixa", modo: "porKit" as const, quantidade: "1" }];
+    const assinatura = assinaturaKitCompleta(produtos, [
+      { insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "1" } },
+    ]);
 
     const r = resolverKitDoPedido(
       produtos,
@@ -71,8 +73,8 @@ describe("kit montado dentro do pedido", () => {
 
   it("não confunde kits que só diferem no número de caixas", () => {
     const produtos = [{ produtoId: "avental", quantidade: "2" }];
-    const uma = resolverKitDoPedido(produtos, [{ insumoId: "caixa", quantidade: "1" }], catalogo());
-    const duas = resolverKitDoPedido(produtos, [{ insumoId: "caixa", quantidade: "2" }], catalogo());
+    const uma = resolverKitDoPedido(produtos, [{ insumoId: "caixa", modo: "porKit", quantidade: "1" }], catalogo());
+    const duas = resolverKitDoPedido(produtos, [{ insumoId: "caixa", modo: "porKit", quantidade: "2" }], catalogo());
 
     expect(uma.assinatura).not.toBe(duas.assinatura);
     // E o custo realmente difere por uma caixa.
@@ -86,12 +88,30 @@ describe("kit montado dentro do pedido", () => {
         { produtoId: "", quantidade: "1" },
         { produtoId: "campo", quantidade: "" },
       ],
-      [{ insumoId: "", quantidade: "1" }],
+      [{ insumoId: "", modo: "porKit", quantidade: "1" }],
       catalogo()
     );
     expect(r.erro).toBeNull();
     expect(r.assinatura).toBe("avental:2");
     expect(r.custoEmbalagem).toBe("0");
+  });
+
+  it("a caixa de esterilização é rateada pelos itens que cabem nela", () => {
+    // Retorno da Intertech (29/07/2026): no kit, a quantidade por caixa varia.
+    // Lançar a caixa como "1 por kit" cobraria a caixa inteira de cada um.
+    const produtos = [{ produtoId: "avental", quantidade: "1" }];
+    const porKit = resolverKitDoPedido(
+      produtos, [{ insumoId: "caixa", modo: "porKit", quantidade: "1" }], catalogo()
+    );
+    const rateada = resolverKitDoPedido(
+      produtos, [{ insumoId: "caixa", modo: "itensPorCaixa", quantidade: "10" }], catalogo()
+    );
+
+    expect(Number(porKit.custoEmbalagem)).toBeCloseTo(0.066542, 6);
+    expect(Number(rateada.custoEmbalagem)).toBeCloseTo(0.0066542, 7);
+    // E são kits diferentes, porque o custo é diferente.
+    expect(porKit.assinatura).not.toBe(rateada.assinatura);
+    expect(rateada.assinatura).toContain("caixa:/10");
   });
 
   it("kit sem nenhum produto é erro, não custo zero", () => {
@@ -110,7 +130,7 @@ describe("kit montado dentro do pedido", () => {
   it("insumo de embalagem sem preço não derruba o cálculo, só não soma", () => {
     const r = resolverKitDoPedido(
       [{ produtoId: "avental", quantidade: "1" }],
-      [{ insumoId: "semPreco", quantidade: "1" }],
+      [{ insumoId: "semPreco", modo: "porKit", quantidade: "1" }],
       catalogo()
     );
     expect(r.erro).toBeNull();

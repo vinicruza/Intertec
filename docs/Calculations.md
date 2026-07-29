@@ -107,6 +107,19 @@ CMV_kit = Σ (CMV_produto × qtd)  +  Σ (preco_sem_imposto_insumo × qtd_por_ki
 
 A parcela de embalagem deve ser exibida **destacada**, não diluída no total — pedido explícito na reunião.
 
+**Os dois modos de consumo (retorno da Intertech em 29/07/2026).** Envelope e caixa não se comportam igual:
+
+| Modo | Fórmula | Caso |
+|---|---|---|
+| Direto | `quantidade × preço` | **Envelope** — um por kit |
+| Rateio | `preço ÷ itens por caixa` | **Caixa de esterilização** — atende vários kits |
+
+Nos produtos individuais esse rateio já está na ficha e é fixo (o Campo Catarata tem a caixa como `1÷150`, porque já se sabe quantos cabem). No kit ele **varia conforme o que foi montado**: um kit grande vai num envelope 40×55, duas ou três campinhas vão num 10×15. Por isso a escolha é feita na hora de montar o kit.
+
+Lançar a caixa como "1 por kit" cobraria a caixa **inteira** de cada kit — se cabem 10, o custo sai dez vezes maior. Golden test T11c.
+
+O modo entra na assinatura pela expressão, não pelo número resolvido: `caixa:/10` contra `caixa:2`. Comparar o decimal (0,1 contra 2) funcionaria, mas `1÷3` e `1÷6` viram dízimas, e a comparação por texto ficaria sujeita a arredondamento. Golden test T11d.
+
 **Identidade do kit:** a embalagem entra na assinatura. Dois kits com os mesmos produtos mas com 1 ou 2 caixas de esterilização têm CMV diferente; se compartilhassem assinatura, colidiriam no índice único e o segundo herdaria o custo do primeiro. Kits sem embalagem mantêm a assinatura anterior, então o catálogo já cadastrado continua válido. Golden test T11.
 
 ### 4.2 CMV com e sem mão de obra (reunião Intertech 16/07/2026)
@@ -339,6 +352,8 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T9 | validação | produto sem ficha ou CMV=0 em pedido | erro bloqueante (não zero silencioso) |
 | T10 | assinatura de kit | mesma composição em ordem diferente | mesma assinatura |
 | T11 | cmv_kit com embalagem | 2 aventais + 3 campos; 1 envelope + 2 caixas | produtos 16,892502 + embalagem 0,651104 = 17,543606 |
+| T11c | caixa rateada | caixa 9,9813 com 10 itens por caixa | 0,99813 por kit (contra 9,9813 se lançada como 1 por kit) |
+| T11d | identidade por modo | mesma caixa, 10 ou 20 itens | assinaturas distintas (`/10` contra `/20`) |
 | T12 | cmv com/sem mão de obra | ficha com costureira 0,85 marcada como `mao_de_obra` | cheio 1,973848; sem MO 1,123848; propaga ao kit |
 | T13 | explosão de consumo | 10 aventais + 4 campos, fichas da §3 | bobina 14,121212; punho 20; caixa 0,026667 |
 

@@ -256,19 +256,19 @@ describe("Kits — assinatura única (PRD §6.5)", () => {
 
     // Mesmos produtos, número de caixas diferente = kits diferentes, porque o
     // CMV é diferente. Colidir aqui faria o segundo herdar o custo do primeiro.
-    const umaCaixa = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: "1" }]);
-    const duasCaixas = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: "2" }]);
+    const umaCaixa = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "1" } }]);
+    const duasCaixas = assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "2" } }]);
     expect(umaCaixa).not.toBe(duasCaixas);
     expect(umaCaixa).not.toBe(assinaturaKit(itens));
 
     // A ordem da embalagem não importa, como nos produtos.
     const ordemA = assinaturaKitCompleta(itens, [
-      { insumoId: "envelope", quantidade: "1" },
-      { insumoId: "caixa", quantidade: "2" },
+      { insumoId: "envelope", quantidade: { tipo: "direta", quantidade: "1" } },
+      { insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "2" } },
     ]);
     const ordemB = assinaturaKitCompleta(itens, [
-      { insumoId: "caixa", quantidade: "2" },
-      { insumoId: "envelope", quantidade: "1" },
+      { insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "2" } },
+      { insumoId: "envelope", quantidade: { tipo: "direta", quantidade: "1" } },
     ]);
     expect(ordemA).toBe(ordemB);
   });
@@ -291,8 +291,8 @@ describe("Kits — embalagem e esterilização do kit (T11)", () => {
     // Produtos: 4,043151×2 + 2,935400×3 = 8,086302 + 8,806200 = 16,892502
     // Embalagem: 1 envelope (0,51802) + 2 caixas (9,9813 ÷ 150 = 0,066542 cada)
     const r = custoKitCompleto(itens, custos, [
-      { nome: "Envelope 25x30", custoUnitario: "0.51802", quantidade: "1" },
-      { nome: "Caixa 6 (rateada por 150)", custoUnitario: "0.066542", quantidade: "2" },
+      { nome: "Envelope 25x30", custoUnitario: "0.51802", quantidade: { tipo: "direta", quantidade: "1" } },
+      { nome: "Caixa 6 (rateada por 150)", custoUnitario: "0.066542", quantidade: { tipo: "direta", quantidade: "2" } },
     ]);
 
     esperarProximo(r.custoProdutos, "16.892502");
@@ -302,6 +302,56 @@ describe("Kits — embalagem e esterilização do kit (T11)", () => {
     // O custo de embalagem fica DESTACADO, não diluído (pedido na reunião).
     expect(r.linhasEmbalagem).toHaveLength(2);
     esperarProximo(r.linhasEmbalagem[1].custo, "0.133084");
+  });
+
+  it("T11c — a caixa de esterilização é RATEADA pelos itens que cabem nela", () => {
+    // Correção vinda da Intertech (áudio de 29/07/2026): no kit, a quantidade
+    // por caixa varia conforme o que foi montado. Lançar a caixa como "1 por
+    // kit" cobraria a caixa inteira de cada kit — se cabem 10, o custo sai
+    // dez vezes maior.
+    const caixaInteira = "9.9813";
+
+    const errado = custoKitCompleto(itens, custos, [
+      { nome: "Caixa esterilização", custoUnitario: caixaInteira, quantidade: { tipo: "direta", quantidade: "1" } },
+    ]);
+    const certo = custoKitCompleto(itens, custos, [
+      { nome: "Caixa esterilização", custoUnitario: caixaInteira, quantidade: { tipo: "lote", tamanhoLote: "10" } },
+    ]);
+
+    // Cabendo 10 kits na caixa, cada kit carrega um décimo dela.
+    esperarProximo(errado.custoEmbalagem, "9.9813");
+    esperarProximo(certo.custoEmbalagem, "0.99813");
+    esperarProximo(errado.custoEmbalagem.div(certo.custoEmbalagem), "10");
+
+    // O envelope continua sendo um por kit — a distinção é por linha.
+    const misto = custoKitCompleto(itens, custos, [
+      { nome: "Envelope 40x55", custoUnitario: "0.51802", quantidade: { tipo: "direta", quantidade: "1" } },
+      { nome: "Caixa esterilização", custoUnitario: caixaInteira, quantidade: { tipo: "lote", tamanhoLote: "10" } },
+    ]);
+    esperarProximo(misto.custoEmbalagem, "1.51615"); // 0,51802 + 0,99813
+  });
+
+  it("T11d — itens por caixa diferentes são kits diferentes", () => {
+    // Mesmos produtos e mesma caixa, mas rateio diferente: o CMV difere, então
+    // a identidade precisa diferir. Se colidissem, o segundo herdaria o custo
+    // do primeiro no índice único.
+    const paraDez = assinaturaKitCompleta(itens, [
+      { insumoId: "caixa", quantidade: { tipo: "lote", tamanhoLote: "10" } },
+    ]);
+    const paraVinte = assinaturaKitCompleta(itens, [
+      { insumoId: "caixa", quantidade: { tipo: "lote", tamanhoLote: "20" } },
+    ]);
+    const duasUnidades = assinaturaKitCompleta(itens, [
+      { insumoId: "caixa", quantidade: { tipo: "direta", quantidade: "2" } },
+    ]);
+
+    expect(paraDez).not.toBe(paraVinte);
+    // "2 caixas por kit" e "caixa para 2 itens" são coisas opostas.
+    expect(duasUnidades).not.toBe(
+      assinaturaKitCompleta(itens, [{ insumoId: "caixa", quantidade: { tipo: "lote", tamanhoLote: "2" } }])
+    );
+    expect(paraDez).toContain("caixa:/10");
+    expect(duasUnidades).toContain("caixa:2");
   });
 
   it("T11b — kit sem embalagem informada tem custo igual à soma dos produtos", () => {

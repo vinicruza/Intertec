@@ -23,7 +23,10 @@ export default function KitsPage() {
         ? [{
             nome: e.inputs.name,
             custoUnitario: e.inputs.price_without_tax,
-            quantidade: e.quantity,
+            quantidade:
+              e.quantity_type === "lot"
+                ? ({ tipo: "lote", tamanhoLote: String(e.lot_size) } as const)
+                : ({ tipo: "direta", quantidade: String(e.quantity) } as const),
             maoDeObra: e.inputs.is_labor,
           }]
         : []
@@ -91,7 +94,11 @@ export default function KitsPage() {
                     {k.kit_items.map((i) => `${i.quantity}× ${i.products?.name ?? "?"}`).join(" · ")}
                     {k.kit_packaging.length > 0 && (
                       <div className="mt-1 text-xs">
-                        Embalagem: {k.kit_packaging.map((e) => `${e.quantity}× ${e.inputs?.name ?? "?"}`).join(" · ")}
+                        Embalagem: {k.kit_packaging.map((e) =>
+                          e.quantity_type === "lot"
+                            ? `${e.inputs?.name ?? "?"} (1 para ${e.lot_size} itens)`
+                            : `${e.quantity}× ${e.inputs?.name ?? "?"}`
+                        ).join(" · ")}
                       </div>
                     )}
                   </td>
