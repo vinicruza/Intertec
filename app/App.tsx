@@ -17,6 +17,7 @@ const KitFormPage = lazyComRetry(() => import("./pages/KitFormPage"));
 const SimuladorPage = lazyComRetry(() => import("./pages/SimuladorPage"));
 const PedidosPage = lazyComRetry(() => import("./pages/PedidosPage"));
 const PedidoDetalhePage = lazyComRetry(() => import("./pages/PedidoDetalhePage"));
+const PedidoFichaPage = lazyComRetry(() => import("./pages/PedidoFichaPage"));
 const DREPage = lazyComRetry(() => import("./pages/DREPage"));
 const ConfiguracoesPage = lazyComRetry(() => import("./pages/ConfiguracoesPage"));
 const IntegridadePage = lazyComRetry(() => import("./pages/IntegridadePage"));
@@ -83,6 +84,10 @@ export default function App() {
               <Route
                 path="/pedidos/:id"
                 element={<ExigirAcesso caminho="/pedidos"><PedidoDetalhePage /></ExigirAcesso>}
+              />
+              <Route
+                path="/pedidos/:id/ficha"
+                element={<ExigirAcesso caminho="/pedidos"><PedidoFichaPage /></ExigirAcesso>}
               />
               <Route
                 path="/dre"

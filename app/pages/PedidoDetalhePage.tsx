@@ -3,6 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { cancelarPedido, duplicarPedido, fecharPedido, obterPedidoCompleto, reabrirPedido } from "../lib/db/fechamento";
 import { listarMotivosPerda, listarVersoes, marcarCotacaoPerdida, reabrirCotacaoPerdida } from "../lib/db/pedidos";
+import {
+  decidirAprovacao,
+  enviarParaAprovacao,
+  obterParametrosAprovacao,
+  podeAprovar,
+  podeVerNumerosDeMargem,
+} from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
@@ -20,6 +27,7 @@ export default function PedidoDetalhePage() {
   const [perdendo, setPerdendo] = useState(false);
   const [motivoPerdaId, setMotivoPerdaId] = useState("");
   const [observacaoPerda, setObservacaoPerda] = useState("");
+  const [observacaoAprovacao, setObservacaoAprovacao] = useState("");
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ["pedido", id],
@@ -63,6 +71,17 @@ export default function PedidoDetalhePage() {
     onSuccess: () => { setPerdendo(false); setMotivoPerdaId(""); setObservacaoPerda(""); recarregar(); },
     onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao registrar a perda."),
   });
+  const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
+  const enviar = useMutation({
+    mutationFn: () => enviarParaAprovacao(id!),
+    onSuccess: recarregar,
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao enviar para aprovação."),
+  });
+  const decidir = useMutation({
+    mutationFn: (aprovado: boolean) => decidirAprovacao(id!, aprovado, observacaoAprovacao),
+    onSuccess: () => { setObservacaoAprovacao(""); recarregar(); },
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao registrar a decisão."),
+  });
   const reabrirPerdida = useMutation({
     mutationFn: () => reabrirCotacaoPerdida(id!),
     onSuccess: recarregar,
@@ -74,6 +93,10 @@ export default function PedidoDetalhePage() {
 
   const fechado = pedido.status === "closed";
   const perdida = pedido.status === "lost";
+  const params = paramsQuery.data;
+  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, params);
+  const souAprovador = podeAprovar(perfil?.perfil, params);
+  const aprovacao = pedido.approval_status;
   const cancelado = Boolean(pedido.cancelled_at);
   const t = pedido.totals_display;
 
@@ -83,13 +106,26 @@ export default function PedidoDetalhePage() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">Pedido — {pedido.customers?.name ?? "sem cliente"}</h1>
           <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Ganho em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : "Em cotação"}</Badge>
+          {!cancelado && !perdida && aprovacao !== "rascunho" && (
+            <Badge>
+              {aprovacao === "pendente" ? "Aguardando aprovação"
+                : aprovacao === "aprovado" ? `Aprovado ${dataCurta(pedido.approved_at)}`
+                : "Aprovação recusada"}
+            </Badge>
+          )}
         </div>
-        <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate("/pedidos")}>
-          Voltar
-        </Button>
+        <div className="flex gap-2">
+          <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/pedidos/${pedido.id}/ficha`)}>
+            Ficha do pedido
+          </Button>
+          <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate("/pedidos")}>
+            Voltar
+          </Button>
+        </div>
       </div>
 
       <Card className="space-y-1 text-sm">
+        <p><span className="text-[var(--cor-texto-suave)]">Orçamento:</span> <strong className="font-mono">{pedido.quote_number ?? "—"}</strong></p>
         <p><span className="text-[var(--cor-texto-suave)]">Vendedor:</span> {pedido.sellers?.name ?? "—"} · <span className="text-[var(--cor-texto-suave)]">UF:</span> {pedido.uf ?? "—"} · <span className="text-[var(--cor-texto-suave)]">Comissão:</span> {pedido.commission_rate ?? "—"}</p>
         {fechado && (
           <p className="text-xs text-[var(--cor-texto-suave)]">
@@ -108,7 +144,7 @@ export default function PedidoDetalhePage() {
               <th className="px-4 py-3 font-medium">Item</th>
               <th className="px-4 py-3 font-medium">Qtd</th>
               <th className="px-4 py-3 font-medium">Preço</th>
-              <th className="px-4 py-3 font-medium">CMV un. {fechado ? "(congelado)" : "(vigente ao fechar)"}</th>
+              {verNumeros && <th className="px-4 py-3 font-medium">CMV un. {fechado ? "(congelado)" : "(vigente ao fechar)"}</th>}
             </tr>
           </thead>
           <tbody>
@@ -128,7 +164,7 @@ export default function PedidoDetalhePage() {
                 </td>
                 <td className="px-4 py-3">{i.quantity}</td>
                 <td className="px-4 py-3">{reais(i.unit_price)}</td>
-                <td className="px-4 py-3">{reais(i.cmv_unit_snapshot)}</td>
+                {verNumeros && <td className="px-4 py-3">{reais(i.cmv_unit_snapshot)}</td>}
               </tr>
             ))}
           </tbody>
@@ -138,7 +174,12 @@ export default function PedidoDetalhePage() {
       {fechado && t && (
         <Card className="space-y-1">
           <h2 className="mb-2 text-lg font-semibold">Cascata congelada</h2>
-          <table className="w-full text-sm">
+          {!verNumeros && (
+            <p className="mb-2 text-sm text-[var(--cor-texto-suave)]">
+              Os valores de custo e margem ficam visíveis para quem aprova.
+            </p>
+          )}
+          {verNumeros && <table className="w-full text-sm">
             <tbody>
               <Linha rotulo="Receita bruta" valor={t.receita_bruta} />
               <Linha rotulo="(−) Impostos + DIFAL" valor={`${t.impostos} + ${t.difal}`} />
@@ -154,14 +195,19 @@ export default function PedidoDetalhePage() {
                 </>
               )}
             </tbody>
-          </table>
+          </table>}
         </Card>
       )}
 
       {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
       <div className="flex gap-2">
-        {!fechado && !cancelado && !perdida && (
+        {!fechado && !cancelado && !perdida && aprovacao === "rascunho" && params?.require_approval && (
+          <Button disabled={enviar.isPending} onClick={() => { setErro(null); enviar.mutate(); }}>
+            {enviar.isPending ? "Enviando…" : "Enviar para aprovação"}
+          </Button>
+        )}
+        {!fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval) && (
           <Button
             disabled={fechar.isPending}
             onClick={() => {
@@ -214,6 +260,38 @@ export default function PedidoDetalhePage() {
         }}>{cancelar.isPending ? "Cancelando…" : "Confirmar cancelamento"}</Button>
         <Button className="bg-transparent text-[var(--cor-texto-suave)]" onClick={() => setCancelando(false)}>Voltar</Button></div>
       </Card>}
+
+      {aprovacao === "pendente" && souAprovador && !cancelado && (
+        <Card className="space-y-3 border-[var(--cor-primaria)]">
+          <h2 className="font-semibold">Aprovação do pedido</h2>
+          <p className="text-sm text-[var(--cor-texto-suave)]">
+            Confira preço de venda, CMV e margem de contribuição acima antes de decidir.
+            É o que o papel na pasta não mostrava.
+          </p>
+          <Input
+            value={observacaoAprovacao}
+            onChange={(e) => setObservacaoAprovacao(e.target.value)}
+            placeholder="Observação (opcional)"
+          />
+          <div className="flex gap-2">
+            <Button disabled={decidir.isPending} onClick={() => { setErro(null); decidir.mutate(true); }}>
+              {decidir.isPending ? "Registrando…" : "Aprovar"}
+            </Button>
+            <Button className="bg-red-700" disabled={decidir.isPending} onClick={() => { setErro(null); decidir.mutate(false); }}>
+              Recusar
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {aprovacao === "recusado" && (
+        <Card className="border-red-200">
+          <p className="text-sm text-red-700">
+            <strong>Aprovação recusada.</strong>{pedido.approval_notes ? ` ${pedido.approval_notes}` : ""} Ajuste a
+            cotação e envie de novo.
+          </p>
+        </Card>
+      )}
 
       {perdendo && <Card className="space-y-3 border-amber-200">
         <h2 className="font-semibold">Registrar perda da cotação</h2>

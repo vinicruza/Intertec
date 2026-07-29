@@ -49,6 +49,10 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
 export type PedidoCompleto = {
   id: string;
   status: "simulation" | "closed" | "lost";
+  approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
+  approved_at: string | null;
+  approval_notes: string | null;
+  quote_number: string | null;
   uf: string | null;
   freight: string | null;
   freight_paid_by_customer: boolean;
@@ -84,7 +88,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -127,6 +131,12 @@ export async function fecharPedido(orderId: string): Promise<void> {
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
   // código quando a mesma composição já existe. Precisa vir ANTES de ler o
   // pedido, porque a materialização preenche o kit_id dos itens.
+  // Aprovação vem antes de tudo: se o Administrador exigir, pedido não
+  // aprovado não fecha (reunião 16/07/2026 — o papel que ia para a mesa da
+  // conferência agora é um estado no sistema).
+  const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
+  if (erroAprovacao) throw erroAprovacao;
+
   const { error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", { p_order_id: orderId });
   if (erroKits) throw erroKits;
 

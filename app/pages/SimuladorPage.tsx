@@ -9,6 +9,8 @@ import {
   type ContextoSimulador,
   type ItemSimulacao,
 } from "../lib/db/pedidos";
+import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
+import { useAuth } from "../auth/AuthProvider";
 import { reais, percentual } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
@@ -89,7 +91,11 @@ const CORES: Record<string, string> = {
 
 export default function SimuladorPage() {
   const queryClient = useQueryClient();
+  const { perfil } = useAuth();
   const ctxQuery = useQuery({ queryKey: ["ctxSimulador"], queryFn: carregarContextoSimulador });
+  const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
+  // Comercial vê a COR da margem, não o número (reunião 16/07/2026).
+  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, paramsQuery.data);
 
   const [vendedorId, setVendedorId] = useState("");
   const [uf, setUf] = useState("");
@@ -343,7 +349,7 @@ export default function SimuladorPage() {
               <div><Label>Preço de venda</Label><Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} /></div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
-                  ? <>CMV un.: {reais(r.cmvUnitario)}</>
+                  ? (verNumeros ? <>CMV un.: {reais(r.cmvUnitario)}</> : null)
                   : <span className="text-red-600">sem custo vigente (bloqueante)</span>)}
               </div>
               <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={() => setLinhas((a) => a.filter((_, idx) => idx !== i))}>
@@ -382,7 +388,14 @@ export default function SimuladorPage() {
             })()}
           </div>
 
-          <table className="w-full text-sm">
+          {!verNumeros && (
+            <p className="text-sm text-[var(--cor-texto-suave)]">
+              A faixa acima indica a saúde da margem deste pedido. Os valores de custo e margem
+              ficam visíveis para quem aprova.
+            </p>
+          )}
+
+          {verNumeros && <table className="w-full text-sm">
             <tbody>
               <LinhaCascata rotulo="Receita bruta" valor={simulacao.resultado.receitaBruta.toString()} />
               <LinhaCascata rotulo="(−) Impostos sobre venda + DIFAL" valor={simulacao.resultado.imposto.plus(simulacao.resultado.difal).negated().toString()} />
@@ -395,12 +408,12 @@ export default function SimuladorPage() {
                 destaque
               />
             </tbody>
-          </table>
-          <p className="text-xs text-[var(--cor-texto-suave)]">
+          </table>}
+          {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
             Deduções da receita líquida: frete {toMoney(simulacao.freteUsado).replace(".", ",")} · imposto frete{" "}
             {toMoney(simulacao.resultado.impostoFrete).replace(".", ",")} · comissão {toMoney(simulacao.resultado.comissao).replace(".", ",")}
             {simulacao.resultado.ajusteFrete.isZero() ? "" : " · frete devolvido pelo cliente"}
-          </p>
+          </p>}
 
           {simulacao.avisos.map((a, i) => (
             <p key={i} className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">⚠️ {a}</p>

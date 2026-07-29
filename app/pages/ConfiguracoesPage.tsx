@@ -17,13 +17,20 @@ import {
   type PortalLinha,
   type RegraMargemLinha,
 } from "../lib/db/configuracoes";
-import { Badge, Button, Card, Input } from "@components/ui/primitives";
+import {
+  obterParametrosAprovacao,
+  salvarParametrosAprovacao,
+  type ParametrosAprovacao,
+} from "../lib/db/aprovacao";
+import type { Perfil } from "../lib/roles";
+import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
-type Aba = "canais" | "margem" | "icsm" | "difal" | "portal";
+type Aba = "canais" | "margem" | "aprovacao" | "icsm" | "difal" | "portal";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "canais", rotulo: "Canais" },
   { id: "margem", rotulo: "Faixas de margem" },
+  { id: "aprovacao", rotulo: "Aprovação de pedidos" },
   { id: "icsm", rotulo: "ICSM por UF" },
   { id: "difal", rotulo: "DIFAL por UF" },
   { id: "portal", rotulo: "Frete Portal (Marketplace)" },
@@ -58,6 +65,7 @@ export default function ConfiguracoesPage() {
 
       {aba === "canais" && <AbaCanais />}
       {aba === "margem" && <AbaMargem />}
+      {aba === "aprovacao" && <AbaAprovacao />}
       {aba === "icsm" && <AbaIcsm />}
       {aba === "difal" && <AbaDifal />}
       {aba === "portal" && <AbaPortal />}
@@ -132,6 +140,122 @@ function LinhaCanal({ canal, onSalvar }: { canal: CanalLinha; onSalvar: (c: Para
         )}
       </td>
     </tr>
+  );
+}
+
+// ---------- Aprovação de pedidos ----------
+
+const PERFIS_APROVADORES: Array<{ id: Perfil; rotulo: string }> = [
+  { id: "admin", rotulo: "Administrador" },
+  { id: "financeiro", rotulo: "Financeiro" },
+  { id: "comercial", rotulo: "Comercial" },
+  { id: "producao", rotulo: "Produção" },
+];
+
+function AbaAprovacao() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
+  const [form, setForm] = useState<ParametrosAprovacao | null>(null);
+  const atual = form ?? data ?? null;
+
+  const salvar = useMutation({
+    mutationFn: (p: ParametrosAprovacao) => salvarParametrosAprovacao(p),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["paramsAprovacao"] }),
+  });
+
+  if (isLoading || !atual) return <Carregando />;
+
+  function mudar(campos: Partial<ParametrosAprovacao>) {
+    setForm({ ...(atual as ParametrosAprovacao), ...campos });
+  }
+
+  return (
+    <Card className="max-w-2xl space-y-4">
+      <p className="text-xs text-[var(--cor-texto-suave)]">
+        Quem aprova é definido por <strong>perfil</strong>, não por pessoa — assim a regra não
+        quebra quando muda quem faz a conferência.
+      </p>
+
+      <div>
+        <Label>Perfis que podem aprovar</Label>
+        <div className="mt-1 flex flex-wrap gap-4">
+          {PERFIS_APROVADORES.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={atual.approver_roles.includes(p.id)}
+                onChange={(e) =>
+                  mudar({
+                    approver_roles: e.target.checked
+                      ? [...atual.approver_roles, p.id]
+                      : atual.approver_roles.filter((r) => r !== p.id),
+                  })
+                }
+              />
+              {p.rotulo}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={atual.require_approval}
+          onChange={(e) => mudar({ require_approval: e.target.checked })}
+        />
+        <span>
+          <strong>Exigir aprovação para fechar o pedido</strong>
+          <span className="block text-xs text-[var(--cor-texto-suave)]">
+            Equivale ao papel que hoje vai para a mesa da conferência, só que com a margem à vista.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={atual.hide_margin_numbers_from_sales}
+          onChange={(e) => mudar({ hide_margin_numbers_from_sales: e.target.checked })}
+        />
+        <span>
+          <strong>Mostrar ao Comercial só a cor da margem, sem o número</strong>
+          <span className="block text-xs text-[var(--cor-texto-suave)]">
+            Vendo o percentual, o desconto ganha um alvo — desconta-se até raspar o limite da faixa.
+            Vendo só a cor, não dá para saber se está em 52% ou em 80%.
+          </span>
+        </span>
+      </label>
+
+      <div>
+        <Label>Travar aprovação abaixo da margem (fração, ex.: 0,20)</Label>
+        <Input
+          className="w-40"
+          value={atual.block_below_margin ?? ""}
+          placeholder="vazio = sem trava"
+          onChange={(e) => mudar({ block_below_margin: e.target.value.trim().replace(",", ".") || null })}
+        />
+        <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+          Deixe vazio no começo: a orientação da reunião foi primeiro dar visibilidade e observar o
+          que acontece, e só depois decidir se trava.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button
+          disabled={salvar.isPending || atual.approver_roles.length === 0}
+          onClick={() => salvar.mutate(atual)}
+        >
+          {salvar.isPending ? "Salvando…" : "Salvar"}
+        </Button>
+        {atual.approver_roles.length === 0 && (
+          <span className="text-sm text-red-600">Escolha ao menos um perfil aprovador.</span>
+        )}
+        {salvar.isSuccess && !form && <span className="text-sm text-green-700">Salvo ✓</span>}
+      </div>
+    </Card>
   );
 }
 
