@@ -5,15 +5,9 @@ import { toPercent } from "@calc";
 import { montarDRE, type AberturaDRE, type DRE, type LinhaDRE } from "../lib/sim/dre";
 import { dadosDREDoMes, obterDespesaReal, salvarDespesaReal } from "../lib/db/dre";
 import { exportarDREExcel } from "../lib/export/dre";
-import { mesAnterior } from "../lib/periodo";
+import { mesAnterior, mesAtual } from "../lib/periodo";
 import { reais } from "../lib/format";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
-
-function mesAtual(): string {
-  const partes = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" })
-    .formatToParts(new Date());
-  return `${partes.find((p) => p.type === "year")!.value}-${partes.find((p) => p.type === "month")!.value}`;
-}
 
 export default function DREPage() {
   const queryClient = useQueryClient();

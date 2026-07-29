@@ -21,3 +21,10 @@ export function mesAnterior(mes: string): string {
   if (numeroMes < 1 || numeroMes > 12) throw new Error("Mês inválido; use YYYY-MM.");
   return numeroMes === 1 ? `${ano - 1}-12` : `${ano}-${String(numeroMes - 1).padStart(2, "0")}`;
 }
+
+// Mês corrente no fuso de São Paulo, no formato "AAAA-MM" usado pelos filtros.
+export function mesAtual(): string {
+  const partes = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" })
+    .formatToParts(new Date());
+  return `${partes.find((p) => p.type === "year")!.value}-${partes.find((p) => p.type === "month")!.value}`;
+}

@@ -232,6 +232,16 @@ O risco nº 1 do projeto é o sistema dar números diferentes da planilha e perd
 
 Regra de operação com o Claude Code: uma sprint por vez, commits pequenos, testes das funções de cálculo obrigatórios em toda sprint, nenhuma tela antes da Sprint 5.
 
+### 6.12 Vendas do ERP e consumo de insumos (novo — reunião 16/07/2026)
+
+Importação do relatório de vendas por código vindo do sistema de faturamento, com conciliação contra código semântico, código de ERP e código legado. O que não casa fica registrado e visível como pendência — nunca é descartado em silêncio.
+
+A partir das vendas conciliadas, o sistema explode a composição até o insumo e responde quanto se consumiu de cada um no período (Calculations.md §10.1). Reimportar o mesmo mês substitui o lote anterior.
+
+### 6.13 Código de produto para o ERP (novo — reunião 16/07/2026)
+
+Código numérico **paralelo** ao código semântico, com total de dígitos e dígitos de categoria configuráveis, e prefixo numérico por categoria. Desligado por padrão: o limite real do ERP ainda não foi confirmado pela Intertech, e foi levantado em reunião que os atributos do produto podem não caber no código. A geração é manual, só do Administrador, e nunca altera código já emitido.
+
 ## 11. Fora de escopo da v1
 
 Cálculo automático de legislação tributária (alíquotas são tabelas editáveis, como na planilha); integração com ERP/emissão de NF; controle de estoque; multi-tenant funcional; app mobile.

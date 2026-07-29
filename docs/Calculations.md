@@ -301,6 +301,25 @@ A margem de contribuição coincide numericamente com a margem que a planilha j�
 
 ---
 
+## 10.1 Camada 5 — Explosão de consumo (reunião Intertech 16/07/2026)
+
+Pergunta feita várias vezes na reunião: *"quanto que a gente vendeu de produtos com gramatura, TNT azul, 30 gramas?"* e *"o que a gente está vendendo de laminado?"*
+
+O problema apontado é real: **o laminado não tem código próprio** — é um tecido dentro de vários produtos. Não dá para responder olhando o código do que foi vendido; é preciso descer a ficha técnica até o insumo.
+
+```
+consumo_unitario(produto) = Σ quantidade_do_componente            (componente = insumo)
+                          + Σ consumo_unitario(filho) × qtd       (componente = produto)
+
+consumo_periodo(insumo)   = Σ consumo_unitario(produto)[insumo] × quantidade_vendida
+```
+
+Kits entram como produtos compostos — o cálculo é o mesmo. Referência circular é erro bloqueante, como no CMV: um ciclo aqui produziria consumo infinito. Quantidade vendida zero ou negativa é ignorada, nunca subtrai consumo. Golden test T13.
+
+**Fonte das vendas:** o faturamento continua no ERP, então o sistema não terá 100% das vendas. O acordo da reunião foi importar o relatório de vendas por código — *"eu puxo no Simples um relatório de venda por código; ele joga aqui e já passa"* — e cruzar com o CMV unitário que o sistema já calcula. Linha do relatório que não casa com o catálogo fica registrada, mas **não entra no consumo**: não se explode a composição de um produto que o sistema não conhece.
+
+---
+
 ## 11. Golden tests (suíte mínima antes de qualquer tela)
 
 Toda implementação das funções de cálculo deve passar, com tolerância de 0,01 centavo.
@@ -321,5 +340,6 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T10 | assinatura de kit | mesma composição em ordem diferente | mesma assinatura |
 | T11 | cmv_kit com embalagem | 2 aventais + 3 campos; 1 envelope + 2 caixas | produtos 16,892502 + embalagem 0,651104 = 17,543606 |
 | T12 | cmv com/sem mão de obra | ficha com costureira 0,85 marcada como `mao_de_obra` | cheio 1,973848; sem MO 1,123848; propaga ao kit |
+| T13 | explosão de consumo | 10 aventais + 4 campos, fichas da §3 | bobina 14,121212; punho 20; caixa 0,026667 |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.

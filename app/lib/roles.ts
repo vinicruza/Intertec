@@ -27,6 +27,7 @@ export const MENU: ItemMenu[] = [
   { caminho: "/kits", rotulo: "Kits", icone: "◇", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/produtos", rotulo: "Produtos e fichas", icone: "□", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },
+  { caminho: "/vendas-consumo", rotulo: "Vendas do ERP e consumo", icone: "⇄", perfis: ["admin", "financeiro"] },
   { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"] },
   { caminho: "/configuracoes", rotulo: "Configurações", icone: "⚙", perfis: ["admin", "financeiro"] },
   { caminho: "/integridade", rotulo: "Integridade dos dados", icone: "✓", perfis: ["admin", "financeiro"] },
