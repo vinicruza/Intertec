@@ -23,6 +23,7 @@ export const MENU: ItemMenu[] = [
   { caminho: "/", rotulo: "Início", icone: "⌂", perfis: ["admin", "financeiro", "comercial"] },
   { caminho: "/simulador", rotulo: "Simulador de pedido", icone: "＋", perfis: ["admin", "financeiro", "comercial"] },
   { caminho: "/pedidos", rotulo: "Histórico de pedidos", icone: "≡", perfis: ["admin", "financeiro", "comercial"] },
+  { caminho: "/clientes", rotulo: "Clientes", icone: "◎", perfis: ["admin", "financeiro", "comercial"] },
   { caminho: "/kits", rotulo: "Kits", icone: "◇", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/produtos", rotulo: "Produtos e fichas", icone: "□", perfis: ["admin", "financeiro", "comercial", "producao"] },
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"] },

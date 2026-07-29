@@ -23,7 +23,14 @@ export type PedidoResumo = {
   totals_display: Record<string, string> | null;
   contribution_margin_snapshot: string | null;
   net_revenue_snapshot: string | null;
-  customers: { id: string; name: string } | null;
+  customers: {
+    id: string;
+    name: string;
+    // Segmento do cliente — é por aqui que se responde "quantas cotações
+    // foram para veterinário?" (reunião 16/07/2026).
+    customer_types: { id: string; name: string } | null;
+    customer_specialties: { id: string; name: string } | null;
+  } | null;
   sellers: { id: string; name: string } | null;
   channels: { id: string; name: string } | null;
   order_items: Array<{
@@ -38,7 +45,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code), kits(name,code))"
+      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);

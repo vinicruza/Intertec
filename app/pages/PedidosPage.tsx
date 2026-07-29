@@ -21,6 +21,7 @@ export default function PedidosPage() {
   const [canal, setCanal] = useState("");
   const [faixa, setFaixa] = useState("");
   const [motivoPerda, setMotivoPerda] = useState("");
+  const [segmento, setSegmento] = useState("");
   const [exportando, setExportando] = useState(false);
   const pedidosQuery = useQuery({ queryKey: ["pedidos"], queryFn: listarPedidos });
   const regrasQuery = useQuery({ queryKey: ["marginRules"], queryFn: listarRegrasMargem });
@@ -35,6 +36,10 @@ export default function PedidosPage() {
       .sort((a, b) => a.name.localeCompare(b.name)),
     motivos: [...new Map(todos.filter((p) => p.loss_reasons).map((p) => [p.loss_reasons!.id, p.loss_reasons!])).values()]
       .sort((a, b) => a.label.localeCompare(b.label)),
+    segmentos: [...new Map(
+      todos.filter((p) => p.customers?.customer_types)
+        .map((p) => [p.customers!.customer_types!.id, p.customers!.customer_types!])
+    ).values()].sort((a, b) => a.name.localeCompare(b.name)),
   }), [todos]);
 
   const pedidos = useMemo(() => {
@@ -48,6 +53,7 @@ export default function PedidosPage() {
       if (vendedor && p.sellers?.id !== vendedor) return false;
       if (canal && p.channels?.id !== canal) return false;
       if (motivoPerda && p.loss_reasons?.id !== motivoPerda) return false;
+      if (segmento && p.customers?.customer_types?.id !== segmento) return false;
       const nomesItens = p.order_items.map((i) => i.item_name_snapshot ?? i.products?.name ?? i.kits?.name ?? "").join(" ");
       const alvo = `${p.quote_number ?? ""} ${p.customers?.name ?? ""} ${nomesItens}`;
       if (busca && !alvo.toLocaleLowerCase("pt-BR").includes(busca)) return false;
@@ -58,7 +64,7 @@ export default function PedidosPage() {
       }
       return true;
     });
-  }, [todos, status, periodo, texto, uf, vendedor, canal, faixa, motivoPerda, regras]);
+  }, [todos, status, periodo, texto, uf, vendedor, canal, faixa, motivoPerda, segmento, regras]);
 
   return (
     <div className="space-y-4">
@@ -69,7 +75,7 @@ export default function PedidosPage() {
         }}>{exportando ? "Gerando…" : "Exportar Excel"}</Button>
       </div>
 
-      <Card className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-8">
+      <Card className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-9">
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as StatusFiltro)}>
           <option value="todos">Todos os status</option><option value="simulation">Em cotação</option>
           <option value="closed">Ganhos</option><option value="lost">Perdidas</option>
@@ -92,6 +98,9 @@ export default function PedidosPage() {
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={motivoPerda} onChange={(e) => setMotivoPerda(e.target.value)} title="Motivo da perda">
           <option value="">Todos os motivos</option>{opcoes.motivos.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
         </select>
+        <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={segmento} onChange={(e) => setSegmento(e.target.value)} title="Segmento do cliente">
+          <option value="">Todos os segmentos</option>{opcoes.segmentos.map((sg) => <option key={sg.id} value={sg.id}>{sg.name}</option>)}
+        </select>
       </Card>
 
       {pedidosQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
@@ -112,7 +121,15 @@ export default function PedidosPage() {
               <span className="font-mono text-xs">{p.quote_number ?? "—"}</span>
               <span className="block text-xs text-[var(--cor-texto-suave)]">{dataCurta(p.cancelled_at ?? p.closed_at ?? p.lost_at ?? p.created_at)}</span>
             </td>
-            <td className="px-4 py-3 font-medium">{p.customers?.name ?? "—"}</td>
+            <td className="px-4 py-3 font-medium">
+              {p.customers?.name ?? "—"}
+              {p.customers?.customer_types && (
+                <span className="block text-xs text-[var(--cor-texto-suave)]">
+                  {p.customers.customer_types.name}
+                  {p.customers.customer_specialties ? ` · ${p.customers.customer_specialties.name}` : ""}
+                </span>
+              )}
+            </td>
             <td className="px-4 py-3">{p.sellers?.name ?? "—"}<span className="block text-xs text-[var(--cor-texto-suave)]">{p.channels?.name ?? "—"}</span></td>
             <td className="px-4 py-3">{p.uf ?? "—"}</td>
             <td className="px-4 py-3">
