@@ -15,6 +15,8 @@ export type ProdutoLinha = {
   grammage: string | null;
   status: "active" | "inactive";
   cmv: string | null; // de product_costs (pode não existir ainda)
+  // CMV sem mão de obra: leitura de competência, para o DRE (Calculations.md §4.2).
+  cmvSemMaoDeObra: string | null;
 };
 
 export type TipoQuantidade = "direct" | "area" | "lot";
@@ -106,18 +108,23 @@ export async function carregarBaseCascata(
 export async function listarProdutos(): Promise<ProdutoLinha[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv)")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv, cmv_without_labor)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
-    const custos = p.product_costs as { cmv: string }[] | { cmv: string } | null;
-    const cmv = Array.isArray(custos) ? custos[0]?.cmv ?? null : (custos?.cmv ?? null);
-    return { ...p, cmv } as ProdutoLinha;
+    type Custo = { cmv: string; cmv_without_labor: string | null };
+    const custos = p.product_costs as Custo[] | Custo | null;
+    const custo = Array.isArray(custos) ? custos[0] ?? null : custos;
+    return {
+      ...p,
+      cmv: custo?.cmv ?? null,
+      cmvSemMaoDeObra: custo?.cmv_without_labor ?? null,
+    } as ProdutoLinha;
   });
 }
 
 export type ProdutoCompleto = {
-  produto: Omit<ProdutoLinha, "cmv">;
+  produto: Omit<ProdutoLinha, "cmv" | "cmvSemMaoDeObra">;
   componentes: Array<{
     id: string;
     component_input_id: string | null;
