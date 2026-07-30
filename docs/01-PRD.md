@@ -73,7 +73,9 @@ Conta em produção: `vinicius@avgestaofinanceira.com.br`.
 
 Todo o ciclo acontece dentro do sistema, na tela de Usuários: criar o acesso (nome, e-mail, perfil e senha provisória), redefinir senha, desativar e excluir. Ninguém precisa abrir o painel do Supabase.
 
-Criar credencial, trocar a senha de outra pessoa e apagar acesso exigem a chave de administração do projeto, que não pode ficar no navegador — essas três passam pela Edge Function `gestao-usuarios`, que confere a permissão no banco (`assert_can_manage_user`) antes de agir. Cada pessoa troca a própria senha em **Meu perfil**.
+Criar credencial, trocar a senha de outra pessoa e apagar acesso exigem a chave de administração do projeto, que não pode ficar no navegador — essas três passam pela Edge Function `gestao-usuarios`, que confere a permissão no banco (`assert_can_manage_user`) antes de agir.
+
+Senha provisória vale uma vez: no primeiro acesso (e depois de qualquer redefinição pelo Administrador) o sistema só mostra a tela de definir senha, porque a senha entregue por outra pessoa não é segredo de ninguém. Depois disso, cada um troca a própria senha em **Meu perfil**.
 
 Excluir só é possível para quem nunca registrou nada. Quem já fechou pedido, montou kit ou mudou preço é **desativado**, nunca excluído: o histórico tem de continuar mostrando quem fez cada coisa.
 

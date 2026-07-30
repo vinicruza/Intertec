@@ -9,6 +9,9 @@ export type PerfilUsuario = {
   perfil: Perfil;
   tenantId: string;
   superAdmin: boolean;
+  // Senha definida por outra pessoa (cadastro ou redefinição): trocar é o único
+  // caminho para o resto do sistema.
+  trocaDeSenhaObrigatoria: boolean;
 };
 
 type EstadoAuth = {
@@ -30,7 +33,7 @@ async function carregarPerfil(userId: string): Promise<PerfilUsuario | null> {
   // parecer quebrada.
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, role, tenant_id, is_super_admin")
+    .select("id, full_name, role, tenant_id, is_super_admin, must_change_password")
     .eq("id", userId)
     .eq("active", true)
     .maybeSingle();
@@ -41,6 +44,7 @@ async function carregarPerfil(userId: string): Promise<PerfilUsuario | null> {
     perfil: data.role as Perfil,
     tenantId: data.tenant_id,
     superAdmin: Boolean(data.is_super_admin),
+    trocaDeSenhaObrigatoria: Boolean(data.must_change_password),
   };
 }
 
@@ -90,7 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (conferencia.error) return { erro: "A senha atual está incorreta." };
         const { error } = await supabase.auth.updateUser({ password: novaSenha });
-        return { erro: error ? traduzErro(error.message) : null };
+        if (error) return { erro: traduzErro(error.message) };
+
+        // A senha agora é só dela: a obrigação de trocar acabou. O perfil é
+        // recarregado para a tela de troca obrigatória sair da frente na hora.
+        await supabase.rpc("clear_must_change_password");
+        if (session) setPerfil(await carregarPerfil(session.user.id));
+        return { erro: null };
       },
       sair: async () => {
         await supabase.auth.signOut();

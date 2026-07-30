@@ -22,6 +22,7 @@ export type UsuarioAdmin = {
   role: Perfil;
   active: boolean;
   is_super_admin: boolean;
+  must_change_password: boolean;
   email: string;
   last_sign_in_at: string | null;
   created_at: string;
@@ -101,13 +102,4 @@ export async function redefinirSenha(id: string, senha: string): Promise<void> {
 
 export async function removerUsuario(id: string): Promise<void> {
   await chamarGestao({ acao: "remover", id });
-}
-
-// Senha provisória sugerida pela tela: aleatória, para o Administrador não
-// cair em "Intertech123". Quem recebe troca depois em Meu perfil.
-export function senhaSugerida(): string {
-  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const sorteio = new Uint32Array(14);
-  crypto.getRandomValues(sorteio);
-  return Array.from(sorteio, (n) => alfabeto[n % alfabeto.length]).join("");
 }

@@ -130,6 +130,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return erro(perfilSalvo.error.message);
     }
 
+    // A senha provisória passou por conversa, papel ou mensagem: não é segredo
+    // de ninguém. A pessoa entra e o sistema só a deixa sair da tela de troca
+    // depois de definir uma senha que só ela conhece.
+    await comoUsuario.rpc("mark_password_provisional", { p_id: novoId });
+
     await comoUsuario.rpc("log_user_access_event", {
       p_id: novoId,
       p_action: "create_access",
@@ -147,6 +152,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const atualizado = await comoServico.auth.admin.updateUserById(id!, { password: senha });
     if (atualizado.error) return erro(atualizado.error.message);
+
+    // Mesma regra do cadastro: senha entregue por outra pessoa é provisória.
+    await comoUsuario.rpc("mark_password_provisional", { p_id: id });
 
     await comoUsuario.rpc("log_user_access_event", {
       p_id: id,

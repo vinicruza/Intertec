@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import TrocaSenhaObrigatoria from "../auth/TrocaSenhaObrigatoria";
 import { menuPorArea, NOME_AREA, nomePerfil } from "../lib/roles";
 import { Badge, Button } from "@components/ui/primitives";
 import { cn } from "@components/ui/cn";
@@ -27,6 +28,9 @@ export default function ShellLayout() {
       </div>
     );
   }
+
+  // Senha provisória pendente: nenhuma tela do sistema antes da troca.
+  if (perfil.trocaDeSenhaObrigatoria) return <TrocaSenhaObrigatoria />;
 
   const grupos = menuPorArea(perfil.perfil);
   const iniciais = perfil.nome.split(" ").slice(0, 2).map((parte) => parte[0]).join("").toUpperCase();

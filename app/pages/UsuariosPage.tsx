@@ -6,9 +6,9 @@ import {
   redefinirSenha,
   removerUsuario,
   salvarUsuario,
-  senhaSugerida,
   type UsuarioAdmin,
 } from "../lib/db/usuarios";
+import { SENHA_MINIMA, senhaSugerida } from "../lib/senha";
 import { NOME_PERFIL, nomePerfil, type Perfil } from "../lib/roles";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta } from "../lib/format";
@@ -55,7 +55,7 @@ export default function UsuariosPage() {
     onSuccess: (_r, v) => {
       setErro(null);
       setAviso(
-        `Acesso criado para ${v.email}. Entregue a senha provisória a ${v.nome} — ela troca a senha em Meu perfil.`
+        `Acesso criado para ${v.email}. Entregue a senha provisória a ${v.nome} — no primeiro acesso o sistema pede que ela defina a senha dela.`
       );
       recarregar();
     },
@@ -66,7 +66,9 @@ export default function UsuariosPage() {
     mutationFn: (v: { id: string; senha: string; email: string }) => redefinirSenha(v.id, v.senha),
     onSuccess: (_r, v) => {
       setErro(null);
-      setAviso(`Senha de ${v.email} redefinida. Entregue a nova senha provisória à pessoa.`);
+      setAviso(
+        `Senha de ${v.email} redefinida. Entregue a nova senha provisória à pessoa — ela vai definir a própria senha ao entrar.`
+      );
       recarregar();
     },
     onError: (e) => comoErro(e, "Erro ao redefinir a senha."),
@@ -227,14 +229,15 @@ function FormularioNovoUsuario({
             </Button>
           </div>
           <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
-            Copie e entregue à pessoa. Ela troca em Meu perfil depois de entrar.
+            Copie e entregue à pessoa. No primeiro acesso, o sistema pede que ela defina a senha
+            dela — esta aqui deixa de valer.
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <Button
-          disabled={salvando || !nome.trim() || !email.trim() || senha.length < 8}
+          disabled={salvando || !nome.trim() || !email.trim() || senha.length < SENHA_MINIMA}
           onClick={() => aoCriar({ nome: nome.trim(), email: email.trim(), perfil, senha })}
         >
           {salvando ? "Criando…" : "Criar acesso"}
@@ -319,6 +322,7 @@ function LinhaUsuario({
                 : "nunca acessou"
               : "acesso desativado"}
           </Badge>
+          {usuario.must_change_password && <Badge>senha provisória pendente</Badge>}
         </div>
 
         <Button disabled={!mudou || ocupado} onClick={() => aoSalvar(nome, perfil, ativo)}>
@@ -386,7 +390,7 @@ function LinhaUsuario({
               Sortear
             </Button>
             <Button
-              disabled={ocupado || novaSenha.length < 8}
+              disabled={ocupado || novaSenha.length < SENHA_MINIMA}
               onClick={() => {
                 aoRedefinirSenha(novaSenha);
                 setNovaSenha(null);

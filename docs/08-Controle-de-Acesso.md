@@ -13,11 +13,19 @@ Além disso, telas que mexem em regra de cálculo e em acesso — Configuraçõe
 
 ### 2.1 Cadastro de usuário, do começo ao fim, na tela
 
-Na tela **Usuários**, o Administrador clica em *Novo usuário* e informa nome, e-mail, perfil e uma senha provisória (a tela já sugere uma senha sorteada). O acesso nasce pronto e liberado. A pessoa entra com essa senha e troca em **Meu perfil**.
+Na tela **Usuários**, o Administrador clica em *Novo usuário* e informa nome, e-mail, perfil e uma senha provisória (a tela já sugere uma senha sorteada). O acesso nasce pronto e liberado.
 
 Na mesma tela o Administrador também: muda nome e perfil, desativa e reativa acesso, redefine senha de quem esqueceu, e exclui acesso.
 
 O painel do Supabase deixou de ser necessário para qualquer uma dessas operações.
+
+### 2.1.1 Senha provisória tem de ser trocada
+
+A senha que o Administrador entrega passou por conversa, papel ou mensagem — não é segredo de ninguém. Então ela vale uma vez: no primeiro acesso, o sistema mostra **só** a tela de definir senha, e nenhuma outra, até a pessoa escolher uma senha que só ela conheça. O mesmo vale depois de uma redefinição pelo Administrador.
+
+Enquanto isso não acontece, a tela de Usuários mostra a marca *senha provisória pendente* ao lado da pessoa — o Administrador sabe quem ainda não entrou.
+
+Uma honestidade sobre o alcance disso: é uma trava de bom uso, não uma fechadura. Quem soubesse mexer na API poderia desligar a marca sem trocar a senha — e não ganharia nada, porque o acesso seria o dele mesmo, que já tem. O que a trava garante é que ninguém **esqueça** de trocar.
 
 ### 2.2 Desativar ≠ excluir
 
@@ -84,14 +92,9 @@ Enquanto esta sprint era feita, **outra sessão de trabalho implementou o mesmo 
 
 Duas marcas para a mesma coisa é um desastre esperando acontecer: bastaria uma tela gravar numa coluna e a política ler a outra para o dono do sistema aparecer na lista, ou ficar editável.
 
-A migração `20260729001600` converge isso sem apagar trabalho de ninguém:
+A migração `20260729001600` convergiu isso sem apagar trabalho de ninguém: `is_super_admin` passou a ser a única fonte da verdade (a marca que só existia na outra coluna foi copiada para ela), o nome antigo continuou respondendo como espelho automático, e a gravação de perfil voltou à versão mais restritiva.
 
-- `is_super_admin` passa a ser a única fonte da verdade (qualquer marca que só existia na outra coluna foi copiada para ela);
-- o nome antigo continua respondendo, mas como **espelho**: `is_superadmin` virou coluna gerada, sempre igual — divergir ficou impossível, porque coluna gerada não aceita escrita;
-- `is_superadmin()` passa a apenas repassar a pergunta, e a lista de usuários devolve as duas grafias;
-- a gravação de perfil voltou à versão mais restritiva (a desta sprint), que também impede remover o próprio acesso e não conta o dono do sistema como Administrador de plantão da Intertech.
-
-**Decisão pendente para o cliente:** escolher qual das duas implementações vai para produção. Os espelhos são uma ponte, não um destino — depois da escolha, o nome perdedor sai numa migração de uma linha.
+**Decisão do cliente em 30/07/2026:** ficar só com esta implementação. A migração `20260729001700` remove os espelhos — a coluna `is_superadmin` e a função `is_superadmin()` não existem mais. Uma coisa, um nome.
 
 ## 5. Onde cada coisa mora
 
@@ -99,12 +102,21 @@ A migração `20260729001600` converge isso sem apagar trabalho de ninguém:
 |---|---|
 | Matriz de perfis, áreas do menu | `app/lib/roles.ts` |
 | Testes da matriz de acesso | `tests/acesso.test.ts` |
+| Regras de senha (mínimo, sorteio) | `app/lib/senha.ts` · testes em `tests/senha.test.ts` |
 | Tela de Usuários | `app/pages/UsuariosPage.tsx` |
-| Troca da própria senha | `app/pages/PerfilPage.tsx` |
+| Formulário de troca de senha | `app/auth/FormularioTrocarSenha.tsx` |
+| Tela de troca obrigatória no 1º acesso | `app/auth/TrocaSenhaObrigatoria.tsx` |
 | Chamadas de gestão de acesso | `app/lib/db/usuarios.ts` |
 | Serviço com a chave de administração | `supabase/functions/gestao-usuarios/index.ts` |
 | Marca, políticas e guardas | `supabase/migrations/20260729001400_super_admin_e_area_restrita.sql` |
 | Correção do ciclo infinito | `supabase/migrations/20260729001500_profiles_sem_recursao.sql` |
 | Convergência das duas implementações | `supabase/migrations/20260729001600_convergencia_super_admin.sql` |
+| Fim dos espelhos + senha provisória | `supabase/migrations/20260729001700_remove_espelho_e_senha_provisoria.sql` |
 
-A senha provisória do Super Administrador **não** está no repositório, de propósito — foi entregue fora dele. Trocar em Meu perfil no primeiro acesso.
+A senha provisória do Super Administrador **não** está no repositório, de propósito — foi entregue fora dele, e o sistema pede a troca no primeiro acesso.
+
+## 6. Uma configuração que só o cliente pode ligar
+
+No painel do Supabase, em **Authentication → Policies → Password security**, existe a *proteção contra senhas vazadas*: o Supabase confere a senha escolhida contra a base pública do HaveIBeenPwned e recusa senhas que já apareceram em vazamentos. Está **desligada** neste projeto.
+
+Vale ligar, agora que as pessoas escolhem as próprias senhas. É um clique, e não exige mudança de código — mas depende de acesso ao painel, então fica registrado aqui em vez de feito.
