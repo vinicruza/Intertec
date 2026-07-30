@@ -40,7 +40,7 @@ export default function ProdutoFormPage() {
   const { register, control, handleSubmit, reset, watch } = useForm<ProdutoForm>({
     defaultValues: {
       code: "", name: "", categoryId: "", type: "", sterile: false, size: "", grammage: "",
-      componentes: [COMPONENTE_VAZIO],
+      nfDescription: "", componentes: [COMPONENTE_VAZIO],
     },
   });
   const ficha = useFieldArray({ control, name: "componentes" });
@@ -58,6 +58,7 @@ export default function ProdutoFormPage() {
       code: p.produto.code, name: p.produto.name, categoryId: p.produto.category_id,
       type: p.produto.type ?? "", sterile: p.produto.sterile ?? false,
       size: p.produto.size ?? "", grammage: p.produto.grammage ?? "",
+      nfDescription: p.produto.nf_description ?? "",
       componentes: p.componentes.length
         ? p.componentes.map((c) => ({
             tipo: c.component_input_id ? "insumo" : "produto",
@@ -136,6 +137,14 @@ export default function ProdutoFormPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" {...register("sterile")} /> Estéril
           </label>
+          <div>
+            <Label>Descrição NF</Label>
+            <Input {...register("nfDescription")} placeholder="Texto que sai na nota fiscal ao faturar este produto" />
+            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+              Guardado aqui para não depender de decorar ou copiar de outro lugar na hora de
+              faturar. O sistema ainda não emite nota fiscal — isso continua manual, fora daqui.
+            </p>
+          </div>
         </Card>
 
         <Card className="space-y-3">

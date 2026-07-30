@@ -345,8 +345,14 @@ export default function SimuladorPage() {
                   {ctx.itens.map((it) => <option key={it.id} value={it.id}>{it.codigo} — {it.nome}</option>)}
                 </select>
               </div>
-              <div><Label>Quantidade</Label><Input className="w-28" value={l.quantidade} onChange={(e) => atualizarLinha(i, "quantidade", e.target.value)} /></div>
-              <div><Label>Preço de venda</Label><Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} /></div>
+              <div>
+                <Label>{l.itemId === KIT_NOVO ? "Quantidade de kits" : "Quantidade"}</Label>
+                <Input className="w-28" value={l.quantidade} onChange={(e) => atualizarLinha(i, "quantidade", e.target.value)} />
+              </div>
+              <div>
+                <Label>{l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
+                <Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} />
+              </div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
                   ? (verNumeros ? <>CMV un.: {reais(r.cmvUnitario)}</> : null)
@@ -450,8 +456,26 @@ function MontadorKit({
   resolvida: LinhaResolvida | null;
   aoMudar: (muda: (k: KitNovoEdicao) => KitNovoEdicao) => void;
 }) {
+  // Escape hatch: nem todo insumo de embalagem já foi marcado como tal na
+  // tela de Insumos (é o Administrador quem marca). Sem isto, quem monta o
+  // kit e não acha o insumo certo na lista filtrada ficaria travado — e
+  // Comercial nem tem acesso à tela de Insumos para corrigir sozinho.
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  // Um insumo já escolhido nunca some da lista, mesmo filtrado: senão, tirar
+  // o "mostrar todos" depois de escolher um insumo fora da marcação faria a
+  // seleção sumir da tela sem avisar.
+  function opcoesPara(insumoIdAtual: string): typeof ctx.insumosEmbalagem {
+    if (mostrarTodos) return ctx.insumosEmbalagem;
+    return ctx.insumosEmbalagem.filter((i) => i.embalagem || i.id === insumoIdAtual);
+  }
+
   return (
     <div className="space-y-3 rounded-md bg-[var(--cor-fundo)] p-3">
+      <p className="text-sm text-[var(--cor-texto-suave)]">
+        A quantidade e o preço acima são da <strong>venda deste kit</strong>. Aqui embaixo é a{" "}
+        <strong>receita do kit</strong> — o que entra dentro de cada um.
+      </p>
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-64 flex-1">
           <Label>Como chamar este kit (uso interno)</Label>
@@ -481,7 +505,12 @@ function MontadorKit({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label>Produtos do kit</Label>
+          <div>
+            <Label>Produtos do kit</Label>
+            <p className="text-xs text-[var(--cor-texto-suave)]">
+              Quantas unidades de cada produto entram em <strong>1 kit</strong> — não é a venda.
+            </p>
+          </div>
           <button
             type="button"
             className="text-xs font-medium text-[var(--cor-primaria)] hover:underline"
@@ -490,6 +519,12 @@ function MontadorKit({
             + Adicionar produto
           </button>
         </div>
+        {kit.produtos.length > 0 && (
+          <div className="flex gap-2 px-1 text-xs text-[var(--cor-texto-suave)]">
+            <span className="flex-1">Produto</span>
+            <span className="w-24">Qtd. no kit</span>
+          </div>
+        )}
         {kit.produtos.map((p, j) => (
           <div key={j} className="flex items-end gap-2">
             <select
@@ -534,7 +569,8 @@ function MontadorKit({
             <Label>Embalagem e esterilização</Label>
             <p className="text-xs text-[var(--cor-texto-suave)]">
               O envelope é <strong>um por kit</strong>. A caixa de esterilização atende vários
-              kits: escolha "itens por caixa" e o custo é rateado.
+              kits: escolha "itens por caixa" e diga quantos kits ela atende — o custo é rateado
+              automaticamente, não é a quantidade de caixas.
             </p>
           </div>
           <button
@@ -542,9 +578,13 @@ function MontadorKit({
             className="text-xs font-medium text-[var(--cor-primaria)] hover:underline"
             onClick={() => aoMudar((k) => ({ ...k, embalagem: [...k.embalagem, { insumoId: "", modo: "porKit", quantidade: "1" }] }))}
           >
-            + Adicionar insumo
+            + Adicionar embalagem
           </button>
         </div>
+        <label className="flex items-center gap-2 text-xs text-[var(--cor-texto-suave)]">
+          <input type="checkbox" checked={mostrarTodos} onChange={(e) => setMostrarTodos(e.target.checked)} />
+          Não achei o insumo — mostrar todos os insumos do catálogo
+        </label>
         {kit.embalagem.map((e, j) => (
           <div key={j} className="flex items-end gap-2">
             <select
@@ -558,7 +598,7 @@ function MontadorKit({
               }
             >
               <option value="">Selecione…</option>
-              {ctx.insumosEmbalagem.map((ins) => (
+              {opcoesPara(e.insumoId).map((ins) => (
                 <option key={ins.id} value={ins.id}>{ins.nome}</option>
               ))}
             </select>
@@ -577,16 +617,21 @@ function MontadorKit({
               <option value="porKit">un. por kit</option>
               <option value="itensPorCaixa">itens por caixa</option>
             </select>
-            <Input
-              className="w-24"
-              value={e.quantidade}
-              onChange={(ev) =>
-                aoMudar((k) => ({
-                  ...k,
-                  embalagem: k.embalagem.map((x, idx) => (idx === j ? { ...x, quantidade: ev.target.value } : x)),
-                }))
-              }
-            />
+            <div>
+              <Input
+                className="w-24"
+                value={e.quantidade}
+                onChange={(ev) =>
+                  aoMudar((k) => ({
+                    ...k,
+                    embalagem: k.embalagem.map((x, idx) => (idx === j ? { ...x, quantidade: ev.target.value } : x)),
+                  }))
+                }
+              />
+              <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
+                {e.modo === "itensPorCaixa" ? "kits por caixa" : "un. por kit"}
+              </span>
+            </div>
             <button
               type="button"
               className="pb-2 text-xs text-red-600 hover:underline"

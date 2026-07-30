@@ -26,12 +26,13 @@ const esquema = z.object({
   icms_rate: z.string(),
   pis_cofins_rate: z.string(),
   is_labor: z.boolean(),
+  is_packaging: z.boolean(),
 });
 
 const VAZIO: InsumoFormulario = {
   name: "", category: "", purchase_unit: "", purchase_price: "",
   conversion_factor: "1", consumption_unit: "", icms_rate: "0", pis_cofins_rate: "0.0925",
-  is_labor: false,
+  is_labor: false, is_packaging: false,
 };
 
 export default function InsumoFormPage() {
@@ -66,6 +67,7 @@ export default function InsumoFormPage() {
         consumption_unit: i.consumption_unit ?? "", icms_rate: i.icms_rate ?? "0",
         pis_cofins_rate: i.pis_cofins_rate ?? "0",
         is_labor: i.is_labor ?? false,
+        is_packaging: i.is_packaging ?? false,
       });
     }
   }, [insumoQuery.data, reset]);
@@ -127,6 +129,18 @@ export default function InsumoFormPage() {
                 Continua entrando no CMV cheio usado no pedido. O sistema passa a
                 calcular também o CMV sem mão de obra, que é o usado no DRE por
                 competência — paga-se costureira referente à produção passada.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
+            <input type="checkbox" className="mt-1" {...register("is_packaging")} />
+            <span>
+              <strong>É embalagem ou esterilização</strong> (ex.: envelope, caixa, serviço de esterilização)
+              <span className="block text-xs text-[var(--cor-texto-suave)]">
+                Não muda o cálculo do custo — o insumo entra igual no CMV do kit, marcado ou não. Só
+                filtra a lista que aparece ao montar um kit no Simulador, para não precisar procurar
+                o envelope no meio de laminado, compressa e elástico.
               </span>
             </span>
           </label>

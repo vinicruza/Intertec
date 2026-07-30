@@ -27,6 +27,9 @@ export type InsumoEmbalagem = {
   nome: string;
   precoSemImposto: string | null;
   maoDeObra: boolean;
+  // Marcado como embalagem/esterilização (envelope, caixa...). É o que filtra
+  // a lista no montador de kit — sem isso, aparecia todo insumo do catálogo.
+  embalagem: boolean;
 };
 
 export type ContextoSimulador = {
@@ -58,7 +61,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       .select("id, code, name, signature, kit_items(product_id, quantity), kit_packaging(quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
       .eq("status", "active")
       .order("name"),
-    supabase.from("inputs").select("id, name, price_without_tax, is_labor").eq("status", "active").order("name"),
+    supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
   ]);
   for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos]) {
     if (r.error) throw r.error;
@@ -185,6 +188,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       nome: i.name as string,
       precoSemImposto: (i.price_without_tax as string | null) ?? null,
       maoDeObra: (i.is_labor as boolean | null) ?? false,
+      embalagem: (i.is_packaging as boolean | null) ?? false,
     })),
     kitPorAssinatura,
   };

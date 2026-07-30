@@ -19,6 +19,9 @@ export type InsumoLinha = {
   updated_at: string | null;
   // Mão de obra (costureira): entra no CMV cheio e sai do CMV de competência.
   is_labor: boolean;
+  // Embalagem/esterilização: filtra a lista do montador de kit. Não muda
+  // cálculo — o custo entra igual, marcado ou não.
+  is_packaging: boolean;
 };
 
 // Dados que o formulário coleta (o preço com/sem imposto é derivado, não digitado).
@@ -32,6 +35,7 @@ export type InsumoFormulario = {
   icms_rate: string; // fração (0,18)
   pis_cofins_rate: string;
   is_labor: boolean;
+  is_packaging: boolean;
 };
 
 // Converte texto do formulário (aceita vírgula) em Decimal.
@@ -77,6 +81,7 @@ function paraRegistro(form: InsumoFormulario) {
     price_with_tax: comImposto.toString(),
     price_without_tax: semImposto.toString(),
     is_labor: form.is_labor,
+    is_packaging: form.is_packaging,
   };
 }
 

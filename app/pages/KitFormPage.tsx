@@ -29,6 +29,10 @@ export default function KitFormPage() {
   const [embalagem, setEmbalagem] = useState<EmbalagemEdicao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [duplicado, setDuplicado] = useState<{ id: string; name: string } | null>(null);
+  // Nem todo insumo de embalagem já foi marcado como tal (é o Administrador
+  // quem marca, na tela de Insumos) — sem este escape, quem monta o kit e não
+  // acha o insumo certo na lista filtrada ficaria travado.
+  const [mostrarTodosInsumos, setMostrarTodosInsumos] = useState(false);
 
   const { perfil } = useAuth();
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
@@ -64,7 +68,12 @@ export default function KitFormPage() {
     [produtosQuery.data]
   );
 
-  const insumos = insumosQuery.data ?? [];
+  const todosInsumos = insumosQuery.data ?? [];
+  // Um insumo já escolhido nunca some da lista, mesmo filtrado.
+  function insumosPara(insumoIdAtual: string) {
+    if (mostrarTodosInsumos) return todosInsumos;
+    return todosInsumos.filter((i) => i.is_packaging || i.id === insumoIdAtual);
+  }
 
   const itensValidos: ItemKit[] = useMemo(
     () =>
@@ -91,7 +100,7 @@ export default function KitFormPage() {
       {
         custoPorProduto,
         insumoPorId: new Map(
-          insumos.map((i) => [i.id, { nome: i.name, precoSemImposto: i.price_without_tax, maoDeObra: i.is_labor }])
+          todosInsumos.map((i) => [i.id, { nome: i.name, precoSemImposto: i.price_without_tax, maoDeObra: i.is_labor }])
         ),
         kitPorAssinatura: new Map(),
       }
@@ -103,7 +112,7 @@ export default function KitFormPage() {
       custoProdutos: r.custoProdutos,
       custoEmbalagem: r.custoEmbalagem,
     };
-  }, [itensValidos, embalagemValida, custoPorProduto, insumos]);
+  }, [itensValidos, embalagemValida, custoPorProduto, todosInsumos]);
 
   const salvar = useMutation({
     mutationFn: () =>
@@ -283,7 +292,7 @@ export default function KitFormPage() {
               </p>
             </div>
             <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", modo: "porKit", quantidade: "1" }])}>
-              Adicionar insumo
+              Adicionar embalagem
             </Button>
           </div>
 
@@ -291,6 +300,17 @@ export default function KitFormPage() {
             <p className="text-sm text-[var(--cor-texto-suave)]">
               Nenhum insumo de embalagem informado — o CMV do kit fica só com a soma dos produtos.
             </p>
+          )}
+
+          {embalagem.length > 0 && (
+            <label className="flex items-center gap-2 text-xs text-[var(--cor-texto-suave)]">
+              <input
+                type="checkbox"
+                checked={mostrarTodosInsumos}
+                onChange={(e) => setMostrarTodosInsumos(e.target.checked)}
+              />
+              Não achei o insumo — mostrar todos os insumos do catálogo
+            </label>
           )}
 
           {embalagem.map((linha, i) => (
@@ -303,7 +323,7 @@ export default function KitFormPage() {
                   onChange={(e) => atualizarEmbalagem(i, "insumoId", e.target.value)}
                 >
                   <option value="">Selecione…</option>
-                  {insumos.map((ins) => (
+                  {insumosPara(linha.insumoId).map((ins) => (
                     <option key={ins.id} value={ins.id}>{ins.name}</option>
                   ))}
                 </select>

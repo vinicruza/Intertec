@@ -14,6 +14,10 @@ export type ProdutoLinha = {
   size: string | null;
   grammage: string | null;
   status: "active" | "inactive";
+  // Texto que sai na nota fiscal ao faturar — a emissão em si é fora do
+  // escopo do sistema (PRD §11); aqui só guarda o texto para não depender de
+  // decorar ou copiar de outro lugar na hora de faturar.
+  nf_description: string | null;
   cmv: string | null; // de product_costs (pode não existir ainda)
   // CMV sem mão de obra: leitura de competência, para o DRE (Calculations.md §4.2).
   cmvSemMaoDeObra: string | null;
@@ -41,6 +45,7 @@ export type ProdutoForm = {
   sterile: boolean;
   size: string;
   grammage: string;
+  nfDescription: string;
   componentes: ComponenteForm[];
 };
 
@@ -108,7 +113,7 @@ export async function carregarBaseCascata(
 export async function listarProdutos(): Promise<ProdutoLinha[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status, product_costs(cmv, cmv_without_labor)")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, status, product_costs(cmv, cmv_without_labor)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
@@ -142,7 +147,7 @@ export type ProdutoCompleto = {
 export async function obterProduto(id: string): Promise<ProdutoCompleto | null> {
   const { data: produto, error } = await supabase
     .from("products")
-    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, status")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, status")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -183,6 +188,7 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
     sterile: form.sterile,
     size: form.size.trim() || null,
     grammage: form.grammage.trim() || null,
+    nf_description: form.nfDescription.trim() || null,
   };
 
   const linhas = componentesParaBanco(form);
