@@ -30,8 +30,11 @@ export type ItemMenu = {
   caminho: string;
   rotulo: string;
   icone: string;
-  perfis: Perfil[]; // quem enxerga este item
+  perfis: Perfil[]; // quem PODE acessar (guarda a rota, mesmo sem link no menu)
   area: AreaMenu;
+  // Fica fora do menu lateral, mas continua acessível por URL direta a quem
+  // está em `perfis` — não é uma restrição de acesso, só de navegação visível.
+  oculto?: boolean;
 };
 
 export const MENU: ItemMenu[] = [
@@ -43,7 +46,9 @@ export const MENU: ItemMenu[] = [
   { caminho: "/produtos", rotulo: "Produtos e fichas", icone: "□", perfis: ["admin", "financeiro", "comercial", "producao"], area: "operacao" },
   { caminho: "/insumos", rotulo: "Insumos", icone: "○", perfis: ["admin", "financeiro", "producao"], area: "operacao" },
   { caminho: "/vendas-consumo", rotulo: "Vendas do ERP e consumo", icone: "⇄", perfis: ["admin", "financeiro"], area: "operacao" },
-  { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"], area: "operacao" },
+  // Removida do menu lateral por decisão do cliente em 30/07/2026. A rota
+  // continua existindo e protegida por perfil — só o link some da navegação.
+  { caminho: "/dre", rotulo: "DRE mensal", icone: "↗", perfis: ["admin", "financeiro"], area: "operacao", oculto: true },
   { caminho: "/perfil", rotulo: "Meu perfil", icone: "●", perfis: ["admin", "financeiro", "comercial", "producao"], area: "operacao" },
 
   // Área restrita. Cadastros define as listas que classificam cliente e perda;
@@ -57,7 +62,7 @@ export const MENU: ItemMenu[] = [
 ];
 
 export function menuDoPerfil(perfil: Perfil): ItemMenu[] {
-  return MENU.filter((item) => item.perfis.includes(perfil));
+  return MENU.filter((item) => item.perfis.includes(perfil) && !item.oculto);
 }
 
 // Itens agrupados por área, sem devolver área vazia — quem não é Administrador

@@ -66,6 +66,16 @@ describe("menu por perfil", () => {
   });
 });
 
+describe("item oculto do menu (DRE mensal — decisão do cliente, 30/07/2026)", () => {
+  it("some do menu, mas continua acessível por URL a quem tem perfil", () => {
+    expect(menuDoPerfil("admin").map((i) => i.caminho)).not.toContain("/dre");
+    expect(menuDoPerfil("financeiro").map((i) => i.caminho)).not.toContain("/dre");
+    expect(perfilPodeAcessar("admin", "/dre")).toBe(true);
+    expect(perfilPodeAcessar("financeiro", "/dre")).toBe(true);
+    expect(perfilPodeAcessar("comercial", "/dre")).toBe(false);
+  });
+});
+
 describe("nome do perfil", () => {
   it("distingue o dono do sistema do Administrador comum", () => {
     expect(nomePerfil("admin")).toBe("Administrador");

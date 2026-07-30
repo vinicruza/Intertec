@@ -58,7 +58,27 @@ A pedido do cliente, para ver a funcionar na prática — dois pedidos, cada um 
 
 Os números de receita e margem de cada versão são ilustrativos (calculados à mão para o exemplo, não pelo motor) — servem para ver a tela funcionando, não como cálculo de referência. Continuam em cotação (não fechados), então dá para editar, enviar para aprovação, ou excluir livremente.
 
-## 7. Onde cada coisa mora
+## 7. Segunda rodada (mesmo dia)
+
+### 7.1 Selo de margem na fila de Aprovações
+
+Pedido do cliente, olhando a própria tela de Aprovações: *"é legal ter um alerta visual, baseado nas margens, se o pedido está com margem boa, média ou ruim... para diminuir erro de aprovação de pedido com margem abaixo do esperado."*
+
+Cada linha da fila agora mostra um selo colorido — a mesma régua de cor de Configurações e do simulador (Boa/Atenção/Crítica/Negativa), calculada com os custos vigentes (ninguém aprova sem ver a saúde da margem, mesmo sem abrir o pedido). Financeiro e Administrador veem o percentual junto; se um perfil Comercial um dia for marcado como aprovador, vê só a cor — mesma regra de `hide_margin_numbers_from_sales` que já vale em todo o resto do sistema.
+
+Calcular margem de vários pedidos ao mesmo tempo tem um cuidado técnico: carregar produtos, kits e alíquotas é uma consulta pesada, e repeti-la pedido por pedido multiplicaria o custo por N. `avaliarMargensPendentes` (`app/lib/db/aprovacao.ts`) carrega esse contexto **uma vez** e reaproveita para toda a fila.
+
+### 7.2 Explicação de erro conhecido na tela de Integridade
+
+Pedido do cliente, depois de eu explicar por que um erro específico ("Failed to fetch dynamically imported module") aparecia na lista mas não era uma pendência real: *"seria interessante ter essa pequena explicação lá na tela para os usuários."*
+
+Agora está lá: um parágrafo explica que, depois de cada publicação, uma aba antiga pode tentar buscar uma versão de tela que não existe mais — e que o próprio sistema já resolve isso sozinho, recarregando a página sem a pessoa notar. Cada linha da lista que corresponde a esse padrão específico ganha o selo **"resolvido sozinho"** e aparece em cinza, não em vermelho — o vermelho fica só para o que precisa mesmo de atenção.
+
+### 7.3 DRE mensal saiu do menu lateral
+
+Decisão do cliente em 30/07/2026: **DRE mensal não aparece mais no menu**. A rota `/dre` continua existindo e protegida por perfil (Administrador e Financeiro) — só o link sumiu da navegação. Mecanismo novo e reutilizável: `ItemMenu.oculto` em `app/lib/roles.ts` — um item pode ficar fora do menu sem deixar de estar liberado para quem já tinha acesso, útil se outra tela precisar do mesmo tratamento no futuro.
+
+## 8. Onde cada coisa mora
 
 | Peça | Arquivo |
 |---|---|
@@ -69,3 +89,6 @@ Os números de receita e margem de cada versão são ilustrativos (calculados à
 | Selo de contagem no menu | `app/pages/ShellLayout.tsx` |
 | Origem do kit (dados) | `app/lib/db/kits.ts` (`obterOrigemKit`) |
 | Origem do kit (telas) | `app/pages/KitsPage.tsx`, `app/pages/KitFormPage.tsx` |
+| Selo de margem na fila | `app/lib/db/aprovacao.ts` (`avaliarMargensPendentes`), `app/pages/AprovacoesPage.tsx` |
+| Erro conhecido explicado | `app/pages/IntegridadePage.tsx` |
+| Item de menu oculto (DRE) | `app/lib/roles.ts` (`ItemMenu.oculto`, `menuDoPerfil`) |

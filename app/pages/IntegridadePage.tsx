@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { carregarDetalhesIntegridade, carregarResumoIntegridade } from "../lib/db/integridade";
 import { listarErrosRecentes } from "../lib/db/observabilidade";
+import { ehErroDeChunk } from "../lib/recarregarChunk";
 import { dataCurta } from "../lib/format";
-import { Card } from "@components/ui/primitives";
+import { Badge, Card } from "@components/ui/primitives";
 
 const ITENS = [
   ["products_without_components", "Produtos ativos sem ficha técnica"],
@@ -44,15 +45,27 @@ export default function IntegridadePage() {
         ))}
       </div>
       <Card>
-        <h2 className="mb-2 text-lg font-semibold">Erros recentes da interface</h2>
+        <h2 className="text-lg font-semibold">Erros recentes da interface</h2>
+        <p className="mb-2 mt-1 text-xs text-[var(--cor-texto-suave)]">
+          Nem todo erro aqui exige ação. Depois de cada publicação do sistema, uma aba que já estava
+          aberta pode tentar buscar uma versão de tela que não existe mais — o próprio sistema percebe
+          e recarrega a página sozinho, sem a pessoa notar. Esses ficam marcados como{" "}
+          <Badge>resolvido sozinho</Badge> na lista abaixo.
+        </p>
         {errosQuery.isLoading ? <p className="text-sm text-[var(--cor-texto-suave)]">Carregando…</p>
           : (errosQuery.data?.length ?? 0) === 0 ? <p className="text-sm text-green-700">Nenhum erro registrado.</p>
           : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
             <th className="py-2">Data</th><th className="py-2">Usuário</th><th className="py-2">Tela</th><th className="py-2">Mensagem</th>
-          </tr></thead><tbody>{errosQuery.data!.map((erro) => <tr key={erro.id} className="border-b border-[var(--cor-borda)] last:border-0">
-            <td className="py-2">{dataCurta(erro.occurred_at)}</td><td className="py-2">{erro.profiles?.full_name ?? "—"}</td>
-            <td className="py-2">{erro.path}</td><td className="max-w-md break-words py-2 text-red-700">{erro.message}</td>
-          </tr>)}</tbody></table></div>}
+          </tr></thead><tbody>{errosQuery.data!.map((erro) => {
+            const autoResolvido = ehErroDeChunk(new Error(erro.message));
+            return <tr key={erro.id} className="border-b border-[var(--cor-borda)] last:border-0">
+              <td className="py-2">{dataCurta(erro.occurred_at)}</td><td className="py-2">{erro.profiles?.full_name ?? "—"}</td>
+              <td className="py-2">{erro.path}</td>
+              <td className={`max-w-md break-words py-2 ${autoResolvido ? "text-[var(--cor-texto-suave)]" : "text-red-700"}`}>
+                {autoResolvido && <Badge>resolvido sozinho</Badge>} {erro.message}
+              </td>
+            </tr>;
+          })}</tbody></table></div>}
       </Card>
     </div>
   );

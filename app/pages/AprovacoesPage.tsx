@@ -1,23 +1,50 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "react-router-dom";
-import { listarPedidosPendentesDeAprovacao, obterParametrosAprovacao, podeAprovar } from "../lib/db/aprovacao";
+import {
+  avaliarMargensPendentes,
+  listarPedidosPendentesDeAprovacao,
+  obterParametrosAprovacao,
+  podeAprovar,
+  podeVerNumerosDeMargem,
+} from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, haQuanto, reais } from "../lib/format";
+import { dataCurta, haQuanto, percentual, reais } from "../lib/format";
 import { Badge, Button, Card } from "@components/ui/primitives";
+
+// Cores da faixa de margem — mesma régua de Configurações e do simulador
+// (SimuladorPage.tsx), para o selo aqui significar a mesma coisa em toda tela.
+const CORES: Record<string, string> = {
+  green: "bg-green-100 text-green-800",
+  yellow: "bg-yellow-100 text-yellow-800",
+  orange: "bg-orange-100 text-orange-800",
+  red: "bg-red-100 text-red-800",
+};
 
 // Fila de quem pode aprovar. Existir aqui foi pedido do cliente: "vai facilitar
 // a visualização e deixar o processo mais ágil" — hoje, achar o que está
 // pendente exige abrir pedido por pedido no histórico.
+//
+// O selo de margem em cada linha também foi pedido do cliente: sem ele, dá
+// para aprovar um pedido com margem ruim sem perceber, porque a fila só
+// mostrava preço — era preciso abrir cada pedido para ver a cascata.
 export default function AprovacoesPage() {
   const navigate = useNavigate();
   const { perfil } = useAuth();
   const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
   const souAprovador = podeAprovar(perfil?.perfil, paramsQuery.data);
+  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, paramsQuery.data);
 
   const pedidosQuery = useQuery({
     queryKey: ["pedidosPendentesAprovacao"],
     queryFn: listarPedidosPendentesDeAprovacao,
     enabled: souAprovador,
+  });
+
+  const ids = (pedidosQuery.data ?? []).map((p) => p.id);
+  const margensQuery = useQuery({
+    queryKey: ["margensPendentesAprovacao", ids],
+    queryFn: () => avaliarMargensPendentes(ids),
+    enabled: souAprovador && ids.length > 0,
   });
 
   // A tela só existe para quem o próprio parâmetro de Configurações marcou
@@ -32,7 +59,8 @@ export default function AprovacoesPage() {
       <div>
         <h1 className="text-2xl font-semibold">Aprovações</h1>
         <p className="text-sm text-[var(--cor-texto-suave)]">
-          Pedidos aguardando decisão. Preço, CMV e margem só aparecem depois de abrir o pedido.
+          Pedidos aguardando decisão, com a faixa de margem calculada nos custos vigentes — abra o
+          pedido para ver a cascata completa antes de decidir.
         </p>
       </div>
 
@@ -52,6 +80,7 @@ export default function AprovacoesPage() {
           0
         );
         const souRemetente = Boolean(perfil?.id) && p.submitted_by === perfil?.id;
+        const margem = margensQuery.data?.get(p.id);
         return (
           <div
             key={p.id}
@@ -74,6 +103,19 @@ export default function AprovacoesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                {margensQuery.isLoading && !margem && (
+                  <span className="text-xs text-[var(--cor-texto-suave)]">calculando margem…</span>
+                )}
+                {margem && !margem.ok && (
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700" title={margem.erro}>
+                    margem indisponível
+                  </span>
+                )}
+                {margem?.ok && margem.regra && (
+                  <span className={`rounded-full px-3 py-1 text-sm font-medium ${CORES[margem.regra.color ?? ""] ?? "bg-gray-100 text-gray-800"}`}>
+                    {margem.regra.label}{verNumeros ? ` · ${percentual(margem.pct)}` : ""}
+                  </span>
+                )}
                 <span className="text-sm font-semibold">{reais(String(total))}</span>
                 <Button
                   className="min-h-9 border border-[var(--cor-borda)] bg-white px-4 text-[var(--cor-primaria)] shadow-none hover:bg-[var(--cor-fundo)]"

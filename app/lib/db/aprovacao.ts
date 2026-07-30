@@ -1,5 +1,9 @@
+import { dec } from "@calc";
 import { supabase } from "../supabase";
 import { PARAMETROS_APROVACAO_PADRAO, type ParametrosAprovacao } from "../sim/aprovacao";
+import { statusMargem, type RegraMargem } from "../sim/params";
+import { obterPedidoCompleto, simularPedidoComCustosVigentes } from "./fechamento";
+import { carregarContextoSimulador } from "./pedidos";
 
 export { podeAprovar, podeVerNumerosDeMargem, type ParametrosAprovacao } from "../sim/aprovacao";
 
@@ -91,4 +95,46 @@ export async function contarPedidosPendentesDeAprovacao(): Promise<number> {
     .is("cancelled_at", null);
   if (error) throw error;
   return count ?? 0;
+}
+
+// ---------- Selo de margem na fila (evita aprovar com margem ruim sem ver) ----------
+//
+// Mesma régua de cor da tela de Configurações (margin_rules) e do simulador —
+// "Boa/Atenção/Crítica/Negativa". O pedido pendente ainda não tem CMV/margem
+// gravados (só o fechamento grava, Decisão D7), então cada linha é calculada
+// com os custos vigentes, igual à pré-visualização do detalhe do pedido.
+//
+// Carrega o contexto do simulador (produtos, kits, alíquotas…) UMA vez só e
+// reaproveita para todos os pedidos da fila — chamar calcularCascataVigente
+// pedido a pedido recarregaria a mesma tabela dezenas de vezes.
+export type MargemPedido =
+  | { ok: true; pct: string; regra: RegraMargem | null }
+  | { ok: false; erro: string };
+
+export async function avaliarMargensPendentes(ids: string[]): Promise<Map<string, MargemPedido>> {
+  const resultados = new Map<string, MargemPedido>();
+  if (ids.length === 0) return resultados;
+
+  const ctx = await carregarContextoSimulador();
+
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const pedido = await obterPedidoCompleto(id);
+        if (!pedido) return resultados.set(id, { ok: false, erro: "Pedido não encontrado." });
+        if (!pedido.uf) return resultados.set(id, { ok: false, erro: "Sem UF definida." });
+        if (pedido.itens.length === 0) return resultados.set(id, { ok: false, erro: "Sem itens." });
+
+        const { snap } = await simularPedidoComCustosVigentes(pedido, ctx);
+        const receitaLiquida = dec(snap.pedido.net_revenue_snapshot);
+        const margem = dec(snap.pedido.contribution_margin_snapshot);
+        const pct = receitaLiquida.isZero() ? dec("0") : margem.div(receitaLiquida);
+        resultados.set(id, { ok: true, pct: pct.toString(), regra: statusMargem(pct, ctx.regrasMargem) });
+      } catch (e) {
+        resultados.set(id, { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular." });
+      }
+    })
+  );
+
+  return resultados;
 }

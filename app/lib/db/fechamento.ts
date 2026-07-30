@@ -140,7 +140,10 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
 // em dois lugares: no fechamento de verdade (que grava o snapshot) e na
 // pré-visualização de quem aprova (que só EXIBE, sem gravar nada — o snapshot
 // nasce só no fechamento, Decisão D7).
-async function simularPedidoComCustosVigentes(
+// Exportada para a fila de Aprovações (avaliarMargensPendentes em
+// aprovacao.ts): ela avalia vários pedidos de uma vez e precisa carregar o
+// contexto do simulador só UMA vez para todos, não um a um.
+export async function simularPedidoComCustosVigentes(
   pedido: PedidoCompleto,
   ctx: ContextoSimulador
 ): Promise<{ sim: Simulacao; snap: SnapshotPedido }> {
