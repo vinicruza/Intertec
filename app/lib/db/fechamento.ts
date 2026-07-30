@@ -1,8 +1,8 @@
 import { type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
-import { simular } from "../sim/params";
-import { montarSnapshot, type ItemParaSnapshot } from "../sim/snapshot";
-import { carregarContextoSimulador } from "./pedidos";
+import { simular, type Simulacao } from "../sim/params";
+import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
+import { carregarContextoSimulador, type ContextoSimulador } from "./pedidos";
 
 // ---------- Histórico ----------
 
@@ -59,6 +59,8 @@ export type PedidoCompleto = {
   approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
   approved_at: string | null;
   approval_notes: string | null;
+  submitted_by: string | null;
+  submitted_at: string | null;
   quote_number: string | null;
   uf: string | null;
   freight: string | null;
@@ -95,7 +97,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -133,30 +135,17 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
 // Fecha o pedido: calcula com os custos VIGENTES, grava o snapshot nos itens
 // e no pedido e muda o status. A partir daí o banco impede qualquer alteração
 // (trigger da Sprint 2). Reabrir: só Admin, gera trilha de auditoria.
-export async function fecharPedido(orderId: string): Promise<void> {
-  // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
-  // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
-  // código quando a mesma composição já existe. Precisa vir ANTES de ler o
-  // pedido, porque a materialização preenche o kit_id dos itens.
-  // Aprovação vem antes de tudo: se o Administrador exigir, pedido não
-  // aprovado não fecha (reunião 16/07/2026 — o papel que ia para a mesa da
-  // conferência agora é um estado no sistema).
-  const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
-  if (erroAprovacao) throw erroAprovacao;
-
-  const { error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", { p_order_id: orderId });
-  if (erroKits) throw erroKits;
-
-  const pedido = await obterPedidoCompleto(orderId);
-  if (!pedido) throw new Error("Pedido não encontrado.");
-  if (pedido.status === "closed") throw new Error("Pedido já está fechado.");
-  if (pedido.status === "lost") throw new Error("Cotação marcada como perdida — reabra antes de fechar.");
-  if (pedido.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
-  if (!pedido.uf) throw new Error("Fechamento exige UF definida.");
-
-  const ctx = await carregarContextoSimulador();
-  const tabela = ctx.tabelaPorUF.get(pedido.uf);
-  if (!tabela) throw new Error(`UF ${pedido.uf} sem alíquotas cadastradas.`);
+// Monta a cascata (preço, CMV, margem) com os custos VIGENTES agora — os
+// mesmos que o fechamento usaria se fosse fechado neste instante. Reaproveitada
+// em dois lugares: no fechamento de verdade (que grava o snapshot) e na
+// pré-visualização de quem aprova (que só EXIBE, sem gravar nada — o snapshot
+// nasce só no fechamento, Decisão D7).
+async function simularPedidoComCustosVigentes(
+  pedido: PedidoCompleto,
+  ctx: ContextoSimulador
+): Promise<{ sim: Simulacao; snap: SnapshotPedido }> {
+  const tabela = ctx.tabelaPorUF.get(pedido.uf ?? "");
+  if (!tabela) throw new Error(`UF ${pedido.uf ?? "—"} sem alíquotas cadastradas.`);
   const vendedor = ctx.vendedores.find((v) => v.id === pedido.seller_id);
   if (!vendedor) throw new Error("Pedido sem vendedor/canal definido.");
 
@@ -220,7 +209,32 @@ export async function fecharPedido(orderId: string): Promise<void> {
     uf: tabela,
   });
 
-  const snap = montarSnapshot(sim, tabela.aliquotaIcsm, itensSnapshot);
+  return { sim, snap: montarSnapshot(sim, tabela.aliquotaIcsm, itensSnapshot) };
+}
+
+export async function fecharPedido(orderId: string): Promise<void> {
+  // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
+  // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
+  // código quando a mesma composição já existe. Precisa vir ANTES de ler o
+  // pedido, porque a materialização preenche o kit_id dos itens.
+  // Aprovação vem antes de tudo: se o Administrador exigir, pedido não
+  // aprovado não fecha (reunião 16/07/2026 — o papel que ia para a mesa da
+  // conferência agora é um estado no sistema).
+  const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
+  if (erroAprovacao) throw erroAprovacao;
+
+  const { error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", { p_order_id: orderId });
+  if (erroKits) throw erroKits;
+
+  const pedido = await obterPedidoCompleto(orderId);
+  if (!pedido) throw new Error("Pedido não encontrado.");
+  if (pedido.status === "closed") throw new Error("Pedido já está fechado.");
+  if (pedido.status === "lost") throw new Error("Cotação marcada como perdida — reabra antes de fechar.");
+  if (pedido.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
+  if (!pedido.uf) throw new Error("Fechamento exige UF definida.");
+
+  const ctx = await carregarContextoSimulador();
+  const { sim, snap } = await simularPedidoComCustosVigentes(pedido, ctx);
 
   // Snapshot dos itens e do pedido são persistidos na mesma transação.
   const { error } = await supabase.rpc("close_order_with_snapshots", {
@@ -231,6 +245,35 @@ export async function fecharPedido(orderId: string): Promise<void> {
     p_commission_rate: sim.comissaoUsada.toString(),
   });
   if (error) throw error;
+}
+
+// ---------- Pré-visualização para quem aprova (nada é gravado) ----------
+//
+// O pedido pendente de aprovação ainda está em simulação: CMV, margem e a
+// cascata inteira só são gravados no FECHAMENTO (Decisão D7), então
+// `pedido.totals_display` está vazio enquanto aprova. Sem isto, o card de
+// aprovação pedia para "conferir CMV e margem" sem mostrar nenhum dos dois.
+export type CascataVigente =
+  | { ok: true; totals: Record<string, string>; cmvPorItem: Map<string, string> }
+  | { ok: false; erro: string };
+
+export async function calcularCascataVigente(orderId: string): Promise<CascataVigente> {
+  const pedido = await obterPedidoCompleto(orderId);
+  if (!pedido) return { ok: false, erro: "Pedido não encontrado." };
+  if (!pedido.uf) return { ok: false, erro: "Pedido sem UF definida." };
+  if (pedido.itens.length === 0) return { ok: false, erro: "Pedido sem itens." };
+
+  try {
+    const ctx = await carregarContextoSimulador();
+    const { snap } = await simularPedidoComCustosVigentes(pedido, ctx);
+    return {
+      ok: true,
+      totals: snap.pedido.totals_display,
+      cmvPorItem: new Map(snap.itens.map((i) => [i.orderItemId, i.cmv_unit_snapshot])),
+    };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular a cascata." };
+  }
 }
 
 // Pedido fechado permanece imutável; a revisão é uma nova simulação vinculada.

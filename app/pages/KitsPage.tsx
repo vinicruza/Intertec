@@ -4,7 +4,7 @@ import { custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc
 import { listarKits, type KitLinha } from "../lib/db/kits";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais } from "../lib/format";
-import { Card } from "@components/ui/primitives";
+import { Badge, Card } from "@components/ui/primitives";
 
 export default function KitsPage() {
   const navigate = useNavigate();
@@ -89,6 +89,9 @@ export default function KitsPage() {
                     <strong className="font-mono text-base text-[var(--cor-primaria)]">{k.code}</strong>
                     <div className="text-xs text-[var(--cor-texto-suave)]">{k.name}</div>
                     {k.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {k.legacy_code}</div>}
+                    <div className="mt-1">
+                      <Badge>{k.source_order_id ? "de um pedido" : "cadastro manual"}</Badge>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--cor-texto-suave)]">
                     {k.kit_items.map((i) => `${i.quantity}× ${i.products?.name ?? "?"}`).join(" · ")}

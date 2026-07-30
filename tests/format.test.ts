@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { percentual, reais } from "../app/lib/format";
+import { describe, expect, it, vi } from "vitest";
+import { haQuanto, percentual, reais } from "../app/lib/format";
 
 describe("formatação defensiva de valores do Supabase", () => {
   it.each([
@@ -20,5 +20,30 @@ describe("formatação defensiva de valores do Supabase", () => {
     ["inválido", "—"],
   ])("formata percentual %j", (entrada, esperado) => {
     expect(percentual(entrada)).toBe(esperado);
+  });
+});
+
+describe("tempo decorrido (fila de aprovação)", () => {
+  const agora = new Date("2026-07-30T12:00:00Z");
+
+  it("nulo devolve travessão", () => {
+    expect(haQuanto(null)).toBe("—");
+    expect(haQuanto(undefined)).toBe("—");
+  });
+
+  it.each([
+    ["2026-07-30T11:59:00Z", "agora há pouco"],
+    ["2026-07-30T10:00:00Z", "há 2 horas"],
+    ["2026-07-30T11:00:00Z", "há 1 hora"],
+    ["2026-07-29T12:00:00Z", "há 1 dia"],
+    ["2026-07-25T12:00:00Z", "há 5 dias"],
+  ])("%s → %s", (iso, esperado) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(agora);
+    try {
+      expect(haQuanto(iso)).toBe(esperado);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

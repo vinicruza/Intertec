@@ -9,6 +9,10 @@ export type KitLinha = {
   description: string | null;
   signature: string;
   status: "active" | "inactive";
+  // Nulo = cadastrado manualmente na tela de Kits. Preenchido = nasceu do
+  // fechamento deste pedido (reunião 16/07/2026: o código oficial só nasce
+  // quando o pedido é ganho). Rastreabilidade pedida pelo cliente em 30/07/2026.
+  source_order_id: string | null;
   kit_items: Array<{
     product_id: string;
     quantity: string;
@@ -69,7 +73,7 @@ function normalizarKit(kit: KitLinhaBruta): KitLinha {
 }
 
 const SELECT_KIT =
-  "id, code, legacy_code, name, description, signature, status, " +
+  "id, code, legacy_code, name, description, signature, status, source_order_id, " +
   "kit_items(product_id, quantity, products(name)), " +
   "kit_packaging(input_id, quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))";
 
@@ -120,4 +124,25 @@ export async function salvarKit(id: string | null, form: KitForm): Promise<Resul
   });
   if (error) throw error;
   return data as ResultadoSalvarKit;
+}
+
+// ---------- Rastreabilidade (decisão do cliente, 30/07/2026) ----------
+//
+// "Quem criou" mora em profiles, e o RLS de profiles só deixa um Administrador
+// ler o perfil de OUTRA pessoa. Sem uma função dedicada, Financeiro, Comercial
+// e Produção abririam um kit e não veriam quem criou nem de qual pedido ele
+// nasceu — metade da rastreabilidade pedida ficaria faltando para 3 dos 4
+// perfis. A função no banco devolve só o necessário para esta pergunta.
+export type OrigemKit = {
+  created_by_name: string | null;
+  created_at: string;
+  source_order_id: string | null;
+  source_order_quote_number: string | null;
+  source_order_status: "simulation" | "closed" | "lost" | null;
+};
+
+export async function obterOrigemKit(kitId: string): Promise<OrigemKit | null> {
+  const { data, error } = await supabase.rpc("get_kit_origin", { p_kit_id: kitId });
+  if (error) throw error;
+  return ((data as OrigemKit[] | null) ?? [])[0] ?? null;
 }

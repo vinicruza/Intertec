@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import TrocaSenhaObrigatoria from "../auth/TrocaSenhaObrigatoria";
 import { menuPorArea, NOME_AREA, nomePerfil } from "../lib/roles";
+import { contarPedidosPendentesDeAprovacao, obterParametrosAprovacao, podeAprovar } from "../lib/db/aprovacao";
 import { Badge, Button } from "@components/ui/primitives";
 import { cn } from "@components/ui/cn";
 import { IntertechLogo } from "@components/brand/IntertechLogo";
@@ -13,6 +15,24 @@ export default function ShellLayout() {
   const local = useLocation();
 
   useEffect(() => setMenuAberto(false), [local.pathname]);
+
+  // Aprovações não é um item fixo do menu: aparece para quem os parâmetros de
+  // Configurações marcaram como aprovador — a mesma permissão que libera o
+  // botão Aprovar/Recusar dentro do pedido, não uma lista separada que possa
+  // ficar desalinhada dela. Hooks vêm antes de qualquer "return" condicional.
+  const habilitado = Boolean(perfil) && !perfil?.trocaDeSenhaObrigatoria;
+  const paramsQuery = useQuery({
+    queryKey: ["paramsAprovacao"],
+    queryFn: obterParametrosAprovacao,
+    enabled: habilitado,
+  });
+  const souAprovador = habilitado && podeAprovar(perfil?.perfil, paramsQuery.data);
+  const contagemQuery = useQuery({
+    queryKey: ["pedidosPendentesAprovacaoContagem"],
+    queryFn: contarPedidosPendentesDeAprovacao,
+    enabled: souAprovador,
+    refetchInterval: 60_000, // sinal de "chegou pedido novo" sem exigir recarregar a página
+  });
 
   if (!perfil) {
     return (
@@ -33,6 +53,14 @@ export default function ShellLayout() {
   if (perfil.trocaDeSenhaObrigatoria) return <TrocaSenhaObrigatoria />;
 
   const grupos = menuPorArea(perfil.perfil);
+  if (souAprovador) {
+    const operacao = grupos.find((g) => g.area === "operacao");
+    const item = { caminho: "/aprovacoes", rotulo: "Aprovações", icone: "🗹", area: "operacao" as const, perfis: [] };
+    // Logo depois de "Histórico de pedidos": é a mesma área de trabalho.
+    const indice = operacao?.itens.findIndex((i) => i.caminho === "/pedidos") ?? -1;
+    if (operacao) operacao.itens.splice(indice >= 0 ? indice + 1 : operacao.itens.length, 0, item);
+  }
+  const pendentes = contagemQuery.data ?? 0;
   const iniciais = perfil.nome.split(" ").slice(0, 2).map((parte) => parte[0]).join("").toUpperCase();
 
   const lateral = (
@@ -65,7 +93,12 @@ export default function ShellLayout() {
                 <span aria-hidden="true" className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10 text-base group-[.active]:bg-indigo-50">
                   {item.icone}
                 </span>
-                <span>{item.rotulo}</span>
+                <span className="flex-1">{item.rotulo}</span>
+                {item.caminho === "/aprovacoes" && pendentes > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 text-[0.65rem] font-bold text-amber-950">
+                    {pendentes}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>

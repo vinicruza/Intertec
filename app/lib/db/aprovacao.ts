@@ -48,3 +48,47 @@ export async function decidirAprovacao(
   });
   if (error) throw error;
 }
+
+// ---------- Fila de aprovação ----------
+//
+// Tela visível a quem PODE aprovar de verdade (perfis marcados em
+// approver_roles), não a um perfil fixo — a permissão real já é configurável
+// em Configurações, então a visibilidade da tela segue a mesma regra, em vez
+// de duplicar uma lista separada que pode ficar desalinhada.
+
+export type PedidoPendente = {
+  id: string;
+  quote_number: string | null;
+  uf: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  customers: { name: string } | null;
+  sellers: { name: string } | null;
+  channels: { name: string } | null;
+  order_items: Array<{ quantity: string; unit_price: string }>;
+};
+
+export async function listarPedidosPendentesDeAprovacao(): Promise<PedidoPendente[]> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, quote_number, uf, submitted_at, submitted_by, customers(name), sellers(name), channels(name), order_items(quantity, unit_price)"
+    )
+    .eq("approval_status", "pendente")
+    .is("cancelled_at", null)
+    .order("submitted_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as PedidoPendente[];
+}
+
+// Só a contagem, para o selo no menu — mais leve que carregar a lista inteira
+// em toda navegação.
+export async function contarPedidosPendentesDeAprovacao(): Promise<number> {
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("approval_status", "pendente")
+    .is("cancelled_at", null);
+  if (error) throw error;
+  return count ?? 0;
+}

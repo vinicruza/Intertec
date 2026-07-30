@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { cancelarPedido, duplicarPedido, fecharPedido, obterPedidoCompleto, reabrirPedido } from "../lib/db/fechamento";
+import {
+  calcularCascataVigente,
+  cancelarPedido,
+  duplicarPedido,
+  fecharPedido,
+  obterPedidoCompleto,
+  reabrirPedido,
+} from "../lib/db/fechamento";
 import { listarMotivosPerda, listarVersoes, marcarCotacaoPerdida, reabrirCotacaoPerdida } from "../lib/db/pedidos";
 import {
   decidirAprovacao,
@@ -32,6 +39,16 @@ export default function PedidoDetalhePage() {
   const { data: pedido, isLoading } = useQuery({
     queryKey: ["pedido", id],
     queryFn: () => obterPedidoCompleto(id!),
+  });
+
+  // Enquanto o pedido não fecha, CMV e margem não existem gravados em lugar
+  // nenhum (Decisão D7: só o fechamento congela o snapshot). Sem isto, quem
+  // aprova veria só o preço de venda — exatamente o que o papel na pasta já
+  // mostrava, e a aprovação não teria como julgar nada.
+  const cascataQuery = useQuery({
+    queryKey: ["cascataVigente", id],
+    queryFn: () => calcularCascataVigente(id!),
+    enabled: Boolean(pedido) && pedido?.status === "simulation" && pedido.itens.length > 0,
   });
 
   const recarregar = () => {
@@ -99,6 +116,11 @@ export default function PedidoDetalhePage() {
   const aprovacao = pedido.approval_status;
   const cancelado = Boolean(pedido.cancelled_at);
   const t = pedido.totals_display;
+  const cascata = cascataQuery.data;
+  // Segregação de funções: quem enviou a cotação não pode ser quem aprova —
+  // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
+  // jeito (mesma regra vale no banco, é a garantia real).
+  const souRemetente = Boolean(perfil?.id) && pedido.submitted_by === perfil?.id;
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -164,7 +186,11 @@ export default function PedidoDetalhePage() {
                 </td>
                 <td className="px-4 py-3">{i.quantity}</td>
                 <td className="px-4 py-3">{reais(i.unit_price)}</td>
-                {verNumeros && <td className="px-4 py-3">{reais(i.cmv_unit_snapshot)}</td>}
+                {verNumeros && (
+                  <td className="px-4 py-3">
+                    {reais(fechado ? i.cmv_unit_snapshot : (cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : null))}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -196,6 +222,31 @@ export default function PedidoDetalhePage() {
               )}
             </tbody>
           </table>}
+        </Card>
+      )}
+
+      {!fechado && !cancelado && !perdida && verNumeros && pedido.itens.length > 0 && (
+        <Card className="space-y-1">
+          <h2 className="mb-2 text-lg font-semibold">Cascata (custos vigentes)</h2>
+          <p className="mb-2 text-sm text-[var(--cor-texto-suave)]">
+            Pedido ainda em cotação — nada aqui está gravado. Calculado agora com os custos e
+            alíquotas vigentes; pode mudar até o fechamento (Decisão D7).
+          </p>
+          {cascataQuery.isLoading && <p className="text-sm text-[var(--cor-texto-suave)]">Calculando…</p>}
+          {cascata && !cascata.ok && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{cascata.erro}</p>
+          )}
+          {cascata?.ok && (
+            <table className="w-full text-sm">
+              <tbody>
+                <Linha rotulo="Receita bruta" valor={cascata.totals.receita_bruta} />
+                <Linha rotulo="(−) Impostos + DIFAL" valor={`${cascata.totals.impostos} + ${cascata.totals.difal}`} />
+                <Linha rotulo="= Receita líquida" valor={cascata.totals.receita_liquida} destaque />
+                <Linha rotulo="(−) CMV" valor={cascata.totals.cmv} />
+                <Linha rotulo="= MARGEM DE CONTRIBUIÇÃO" valor={cascata.totals.margem_contribuicao} destaque />
+              </tbody>
+            </table>
+          )}
         </Card>
       )}
 
@@ -261,7 +312,17 @@ export default function PedidoDetalhePage() {
         <Button className="bg-transparent text-[var(--cor-texto-suave)]" onClick={() => setCancelando(false)}>Voltar</Button></div>
       </Card>}
 
-      {aprovacao === "pendente" && souAprovador && !cancelado && (
+      {aprovacao === "pendente" && souAprovador && souRemetente && !cancelado && (
+        <Card className="border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-900">
+            <strong>Você enviou esta cotação para aprovação.</strong> Por isso não pode aprová-la —
+            peça a outra pessoa com perfil aprovador para decidir. É a mesma regra que o banco impõe;
+            aqui é só para explicar por quê o botão não aparece.
+          </p>
+        </Card>
+      )}
+
+      {aprovacao === "pendente" && souAprovador && !souRemetente && !cancelado && (
         <Card className="space-y-3 border-[var(--cor-primaria)]">
           <h2 className="font-semibold">Aprovação do pedido</h2>
           <p className="text-sm text-[var(--cor-texto-suave)]">

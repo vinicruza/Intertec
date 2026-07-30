@@ -16,6 +16,7 @@ const KitsPage = lazyComRetry(() => import("./pages/KitsPage"));
 const KitFormPage = lazyComRetry(() => import("./pages/KitFormPage"));
 const SimuladorPage = lazyComRetry(() => import("./pages/SimuladorPage"));
 const PedidosPage = lazyComRetry(() => import("./pages/PedidosPage"));
+const AprovacoesPage = lazyComRetry(() => import("./pages/AprovacoesPage"));
 const PedidoDetalhePage = lazyComRetry(() => import("./pages/PedidoDetalhePage"));
 const PedidoFichaPage = lazyComRetry(() => import("./pages/PedidoFichaPage"));
 const ClientesPage = lazyComRetry(() => import("./pages/ClientesPage"));
@@ -97,6 +98,10 @@ export default function App() {
                 path="/pedidos/:id/ficha"
                 element={<ExigirAcesso caminho="/pedidos"><PedidoFichaPage /></ExigirAcesso>}
               />
+              {/* Não é ExigirAcesso: a permissão vem de approval_settings
+                  (configurável em Configurações), não do perfil fixo — a
+                  própria tela redireciona quem não pode aprovar. */}
+              <Route path="/aprovacoes" element={<AprovacoesPage />} />
               <Route
                 path="/vendas-consumo"
                 element={<ExigirAcesso caminho="/vendas-consumo"><VendasConsumoPage /></ExigirAcesso>}

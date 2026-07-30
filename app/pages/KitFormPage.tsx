@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { CustoProdutoKit, ItemKit } from "@calc";
-import { obterKit, salvarKit, type ResultadoSalvarKit } from "../lib/db/kits";
+import { obterKit, obterOrigemKit, salvarKit, type ResultadoSalvarKit } from "../lib/db/kits";
 import { listarInsumos } from "../lib/db/insumos";
 import { resolverKitDoPedido, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import { listarProdutos } from "../lib/db/produtos";
-import { reais } from "../lib/format";
-import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { useAuth } from "../auth/AuthProvider";
+import { perfilPodeAcessar } from "../lib/roles";
+import { dataCurta, reais } from "../lib/format";
+import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
 type ItemEdicao = { produtoId: string; quantidade: string };
 // Envelope e caixas de esterilização: consumidos UMA vez por kit montado
@@ -28,9 +30,12 @@ export default function KitFormPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [duplicado, setDuplicado] = useState<{ id: string; name: string } | null>(null);
 
+  const { perfil } = useAuth();
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
   const insumosQuery = useQuery({ queryKey: ["insumos"], queryFn: listarInsumos });
   const kitQuery = useQuery({ queryKey: ["kit", id], queryFn: () => obterKit(id!), enabled: editando });
+  // Rastreabilidade pedida pelo cliente em 30/07/2026: de onde este kit veio.
+  const origemQuery = useQuery({ queryKey: ["origemKit", id], queryFn: () => obterOrigemKit(id!), enabled: editando });
 
   useEffect(() => {
     const k = kitQuery.data;
@@ -171,6 +176,35 @@ export default function KitFormPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <h1 className="text-2xl font-semibold">{editando ? "Editar kit" : "Novo kit"}</h1>
+
+      {editando && origemQuery.data && (
+        <Card className="flex flex-wrap items-center gap-2 bg-[var(--cor-fundo)] text-sm">
+          <span className="text-[var(--cor-texto-suave)]">Origem:</span>
+          {origemQuery.data.source_order_id ? (
+            <>
+              <Badge>Nasceu de um pedido</Badge>
+              {perfilPodeAcessar(perfil?.perfil ?? "producao", "/pedidos") ? (
+                <Link
+                  className="font-medium text-[var(--cor-primaria)] underline"
+                  to={`/pedidos/${origemQuery.data.source_order_id}`}
+                >
+                  {origemQuery.data.source_order_quote_number ?? "ver pedido"}
+                </Link>
+              ) : (
+                origemQuery.data.source_order_quote_number && (
+                  <span className="font-mono text-xs">{origemQuery.data.source_order_quote_number}</span>
+                )
+              )}
+            </>
+          ) : (
+            <Badge>Cadastro manual</Badge>
+          )}
+          <span className="text-[var(--cor-texto-suave)]">
+            · criado {origemQuery.data.created_by_name ? `por ${origemQuery.data.created_by_name}` : ""} em{" "}
+            {dataCurta(origemQuery.data.created_at)}
+          </span>
+        </Card>
+      )}
 
       <form
         className="space-y-4"
