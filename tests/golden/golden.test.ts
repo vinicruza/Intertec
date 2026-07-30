@@ -304,6 +304,30 @@ describe("Kits — embalagem e esterilização do kit (T11)", () => {
     esperarProximo(r.linhasEmbalagem[1].custo, "0.133084");
   });
 
+  it("T11e — participação de custo por produto e por embalagem soma 100% do kit (30/07/2026)", () => {
+    // Pedido do cliente: "não saberemos qual produto deu maior ou menor
+    // margem em cada kit". Não existe preço por produto dentro do kit (o
+    // cliente negocia o kit inteiro) — o que existe, e é isso que o cliente
+    // aceitou como caminho, é o peso de custo de cada item no kit.
+    const r = custoKitCompleto(itens, custos, [
+      { nome: "Envelope 25x30", custoUnitario: "0.51802", quantidade: { tipo: "direta", quantidade: "1" } },
+      { nome: "Caixa 6 (rateada por 150)", custoUnitario: "0.066542", quantidade: { tipo: "direta", quantidade: "2" } },
+    ]);
+
+    expect(r.linhasProdutos).toHaveLength(2);
+    esperarProximo(r.linhasProdutos[0].participacao, "0.460925"); // avental
+    esperarProximo(r.linhasProdutos[1].participacao, "0.501960"); // campo
+    esperarProximo(r.linhasEmbalagem[0].participacao, "0.029527"); // envelope
+    esperarProximo(r.linhasEmbalagem[1].participacao, "0.007585"); // caixa
+
+    // As frações de TODAS as linhas (produtos + embalagem) somam o kit inteiro.
+    const soma = [...r.linhasProdutos, ...r.linhasEmbalagem].reduce(
+      (s, l) => s.plus(l.participacao),
+      new Decimal(0)
+    );
+    esperarProximo(soma, "1");
+  });
+
   it("T11c — a caixa de esterilização é RATEADA pelos itens que cabem nela", () => {
     // Correção vinda da Intertech (áudio de 29/07/2026): no kit, a quantidade
     // por caixa varia conforme o que foi montado. Lançar a caixa como "1 por

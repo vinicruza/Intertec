@@ -127,6 +127,30 @@ describe("kit montado dentro do pedido", () => {
     expect(r.assinatura).toBe("desconhecido:1");
   });
 
+  it("expõe a participação de custo por produto e por embalagem (30/07/2026)", () => {
+    // Pedido do cliente: saber qual produto pesa mais no custo do kit, já
+    // que não existe preço por produto (o cliente negocia o kit inteiro).
+    const r = resolverKitDoPedido(
+      [
+        { produtoId: "avental", quantidade: "2" },
+        { produtoId: "campo", quantidade: "3" },
+      ],
+      [{ insumoId: "envelope", modo: "porKit", quantidade: "1" }],
+      catalogo()
+    );
+
+    expect(r.linhasProdutos).toHaveLength(2);
+    expect(r.linhasProdutos[0].produtoId).toBe("avental");
+    expect(r.linhasEmbalagem).toHaveLength(1);
+    expect(r.linhasEmbalagem[0].insumoId).toBe("envelope");
+
+    const soma = [...r.linhasProdutos, ...r.linhasEmbalagem].reduce(
+      (s, l) => s + Number(l.participacao),
+      0
+    );
+    expect(soma).toBeCloseTo(1, 6);
+  });
+
   it("insumo de embalagem sem preço não derruba o cálculo, só não soma", () => {
     const r = resolverKitDoPedido(
       [{ produtoId: "avental", quantidade: "1" }],

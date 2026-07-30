@@ -44,11 +44,35 @@ export type CatalogoParaKit = {
   kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string }>;
 };
 
+// Peso de cada produto no custo do kit — pedido do cliente em 30/07/2026:
+// "não saberemos qual produto deu maior ou menor margem em cada kit". Não é
+// preço por produto (isso não existe: o cliente negocia o kit inteiro, não a
+// peça); é participação de CUSTO, que aponta o mesmo problema — qual item
+// está pesando mais — sem inventar um preço que não existe.
+export type LinhaCustoKit = {
+  produtoId: string;
+  quantidade: string;
+  custoUnitario: string;
+  custo: string;
+  participacao: string; // fração do custo total do kit (produtos + embalagem)
+};
+
+export type LinhaCustoEmbalagemKit = {
+  insumoId: string;
+  nome: string;
+  custo: string;
+  participacao: string;
+};
+
 export type KitResolvido = {
   assinatura: string;
   cmvUnitario: string | null; // null = algum produto sem custo vigente
   custoProdutos: string | null;
   custoEmbalagem: string | null;
+  // Vazio quando há erro ou algum produto sem custo vigente — a mesma regra
+  // de "nunca zero silencioso" vale para a participação.
+  linhasProdutos: LinhaCustoKit[];
+  linhasEmbalagem: LinhaCustoEmbalagemKit[];
   kitExistente: { id: string; codigo: string; nome: string } | null;
   erro: string | null;
 };
@@ -71,6 +95,8 @@ export function resolverKitDoPedido(
     cmvUnitario: null,
     custoProdutos: null,
     custoEmbalagem: null,
+    linhasProdutos: [],
+    linhasEmbalagem: [],
     kitExistente: null,
     erro: null,
   };
@@ -98,16 +124,23 @@ export function resolverKitDoPedido(
     return { ...vazio, erro: e instanceof Error ? e.message : "Composição inválida." };
   }
 
-  const linhasEmbalagem: EmbalagemKit[] = embalagem.flatMap((e) => {
+  // insumoId fica de lado (EmbalagemKit não carrega essa chave — é a
+  // identidade do PEDIDO, não do cálculo). Guardado em paralelo para religar
+  // depois, na mesma ordem, ao resultado de custoKitCompleto.
+  const embalagemValida = embalagem.flatMap((e) => {
     const insumo = catalogo.insumoPorId.get(e.insumoId);
     if (!insumo?.precoSemImposto) return [];
     return [{
-      nome: insumo.nome,
-      custoUnitario: insumo.precoSemImposto,
-      quantidade: quantidadeDe(e),
-      maoDeObra: insumo.maoDeObra,
+      insumoId: e.insumoId,
+      item: {
+        nome: insumo.nome,
+        custoUnitario: insumo.precoSemImposto,
+        quantidade: quantidadeDe(e),
+        maoDeObra: insumo.maoDeObra,
+      } satisfies EmbalagemKit,
     }];
   });
+  const linhasEmbalagem: EmbalagemKit[] = embalagemValida.map((x) => x.item);
 
   const kitExistente = catalogo.kitPorAssinatura.get(assinatura) ?? null;
 
@@ -118,6 +151,19 @@ export function resolverKitDoPedido(
       cmvUnitario: r.custoTotal.toString(),
       custoProdutos: r.custoProdutos.toString(),
       custoEmbalagem: r.custoEmbalagem.toString(),
+      linhasProdutos: r.linhasProdutos.map((l) => ({
+        produtoId: l.produtoId,
+        quantidade: l.quantidade.toString(),
+        custoUnitario: l.custoUnitario.toString(),
+        custo: l.custo.toString(),
+        participacao: l.participacao.toString(),
+      })),
+      linhasEmbalagem: r.linhasEmbalagem.map((l, i) => ({
+        insumoId: embalagemValida[i].insumoId,
+        nome: l.nome,
+        custo: l.custo.toString(),
+        participacao: l.participacao.toString(),
+      })),
       kitExistente,
       erro: null,
     };

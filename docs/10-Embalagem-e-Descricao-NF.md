@@ -33,6 +33,16 @@ Campo novo em **Produtos → Editar produto**: texto livre que vai sair na nota 
 
 Sem validação de formato — quem decide o texto certo é a Intertech.
 
+## 3.1 Peso de custo por produto dentro do kit (mesmo dia, segunda rodada)
+
+Pergunta do cliente, olhando o preço único do kit: *"não saberemos qual produto deu maior margem ou menor margem em cada kit... talvez o melhor caminho seja colocar preço em cada produto dentro do kit."*
+
+Recomendação dada e aceita: **não** criar um preço por produto dentro do kit — isso não existe de verdade, porque o cliente negocia o kit inteiro, não a peça, e inventar um preço por item exigiria alocar o total de algum jeito arbitrário (mais uma fonte de erro, não menos). O que existe de verdade é o **custo** de cada item, e é isso que responde a pergunta real: qual produto está pesando mais no kit.
+
+O motor de cálculo (`custoKitCompleto`) passou a devolver, além dos totais que já existiam, uma linha por produto e por item de embalagem com o **custo** e a **participação** (fração do custo total do kit — soma 100% somando produtos e embalagem juntos). Mesma ideia que já existia na ficha técnica de produto avulso, aplicada ao kit inteiro.
+
+Aparece como uma tabela "Peso de cada item no custo do kit" nas duas telas que montam kit — o Simulador (kit nascendo dentro do pedido) e a tela de Kits — ordenada do item mais pesado para o mais leve.
+
 ## 4. Onde cada coisa mora
 
 | Peça | Arquivo |
@@ -42,3 +52,6 @@ Sem validação de formato — quem decide o texto certo é a Intertech.
 | Filtro no montador de kit (Simulador) | `app/pages/SimuladorPage.tsx` (`MontadorKit`) |
 | Filtro no montador de kit (tela de Kits) | `app/pages/KitFormPage.tsx` |
 | Descrição NF | `app/pages/ProdutoFormPage.tsx`, `app/lib/db/produtos.ts` |
+| Peso de custo por item do kit (motor) | `lib/calculations/kits.ts` (`custoKitCompleto` → `linhasProdutos`, `linhasEmbalagem`), golden test T11e |
+| Peso de custo por item do kit (simulador) | `app/lib/sim/kitNoPedido.ts`, `app/pages/SimuladorPage.tsx` (`PesoDeCustoDoKit`) |
+| Peso de custo por item do kit (tela de Kits) | `app/pages/KitFormPage.tsx` |

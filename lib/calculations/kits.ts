@@ -152,6 +152,23 @@ export type LinhaEmbalagem = EmbalagemKit & {
   // Quantidade já resolvida (no rateio, 1 ÷ itens por caixa).
   quantidadeResolvida: Decimal;
   custo: Decimal;
+  // Fração do custoTotal do kit (produtos + embalagem juntos — soma 1,0
+  // somando linhasProdutos e linhasEmbalagem). Mesma ideia de LinhaFicha em
+  // ficha.ts, aplicada ao kit inteiro em vez de a um produto só.
+  participacao: Decimal;
+};
+
+// Quanto cada PRODUTO pesa no custo do kit — pedido do cliente em 30/07/2026:
+// "não saberemos qual produto deu maior ou menor margem em cada kit". Preço
+// por produto dentro do kit não existe de verdade (o cliente negocia o kit
+// inteiro, não a peça); o que existe é o custo de cada um, e é isso que esta
+// linha expõe.
+export type LinhaProdutoKit = {
+  produtoId: string;
+  quantidade: Decimal;
+  custoUnitario: Decimal;
+  custo: Decimal;
+  participacao: Decimal; // fração do custoTotal do kit
 };
 
 // Custo vigente de um produto nas duas leituras (ver cascade.ts).
@@ -167,6 +184,7 @@ export type ResultadoCustoKit = {
   custoTotal: Decimal;
   custoTotalSemMaoDeObra: Decimal;
   custoMaoDeObra: Decimal;
+  linhasProdutos: LinhaProdutoKit[];
   linhasEmbalagem: LinhaEmbalagem[];
 };
 
@@ -178,7 +196,10 @@ export function custoKitCompleto(
   let custoProdutos = new Decimal(0);
   let custoProdutosSemMO = new Decimal(0);
 
-  for (const item of itens) {
+  // Sem a fração ainda: ela depende do custoTotal, que só existe depois de
+  // somar produtos E embalagem — por isso a participação é preenchida numa
+  // segunda passada, abaixo.
+  const linhasProdutosSemFracao = itens.map((item) => {
     const custo = custoPorProduto.get(item.produtoId);
     if (custo === undefined) {
       throw new ErroCalculoBloqueante(
@@ -188,11 +209,13 @@ export function custoKitCompleto(
     const qtd = dec(item.quantidade);
     const cmv = dec(custo.cmv);
     const semMO = custo.cmvSemMaoDeObra === undefined ? cmv : dec(custo.cmvSemMaoDeObra);
-    custoProdutos = custoProdutos.plus(cmv.times(qtd));
+    const custoLinha = cmv.times(qtd);
+    custoProdutos = custoProdutos.plus(custoLinha);
     custoProdutosSemMO = custoProdutosSemMO.plus(semMO.times(qtd));
-  }
+    return { produtoId: item.produtoId, quantidade: qtd, custoUnitario: cmv, custo: custoLinha };
+  });
 
-  const linhasEmbalagem: LinhaEmbalagem[] = embalagem.map((e) => {
+  const linhasEmbalagemSemFracao = embalagem.map((e) => {
     const qtd = resolverQuantidade(e.quantidade);
     if (qtd.lte(0)) {
       throw new ErroCalculoBloqueante(
@@ -202,8 +225,8 @@ export function custoKitCompleto(
     return { ...e, quantidadeResolvida: qtd, custo: dec(e.custoUnitario).times(qtd) };
   });
 
-  const custoEmbalagem = linhasEmbalagem.reduce((s, l) => s.plus(l.custo), new Decimal(0));
-  const embalagemMaoDeObra = linhasEmbalagem.reduce(
+  const custoEmbalagem = linhasEmbalagemSemFracao.reduce((s, l) => s.plus(l.custo), new Decimal(0));
+  const embalagemMaoDeObra = linhasEmbalagemSemFracao.reduce(
     (s, l) => (l.maoDeObra ? s.plus(l.custo) : s),
     new Decimal(0)
   );
@@ -211,12 +234,25 @@ export function custoKitCompleto(
   const custoTotal = custoProdutos.plus(custoEmbalagem);
   const custoTotalSemMaoDeObra = custoProdutosSemMO.plus(custoEmbalagem.minus(embalagemMaoDeObra));
 
+  const participacao = (custo: Decimal): Decimal =>
+    custoTotal.isZero() ? new Decimal(0) : custo.div(custoTotal);
+
+  const linhasProdutos: LinhaProdutoKit[] = linhasProdutosSemFracao.map((l) => ({
+    ...l,
+    participacao: participacao(l.custo),
+  }));
+  const linhasEmbalagem: LinhaEmbalagem[] = linhasEmbalagemSemFracao.map((l) => ({
+    ...l,
+    participacao: participacao(l.custo),
+  }));
+
   return {
     custoProdutos,
     custoEmbalagem,
     custoTotal,
     custoTotalSemMaoDeObra,
     custoMaoDeObra: custoTotal.minus(custoTotalSemMaoDeObra),
+    linhasProdutos,
     linhasEmbalagem,
   };
 }

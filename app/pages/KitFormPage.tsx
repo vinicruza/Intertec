@@ -8,7 +8,7 @@ import { resolverKitDoPedido, type ModoEmbalagem } from "../lib/sim/kitNoPedido"
 import { listarProdutos } from "../lib/db/produtos";
 import { useAuth } from "../auth/AuthProvider";
 import { perfilPodeAcessar } from "../lib/roles";
-import { dataCurta, reais } from "../lib/format";
+import { dataCurta, percentual, reais } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
 type ItemEdicao = { produtoId: string; quantidade: string };
@@ -111,6 +111,9 @@ export default function KitFormPage() {
       custo: r.cmvUnitario,
       custoProdutos: r.custoProdutos,
       custoEmbalagem: r.custoEmbalagem,
+      // Peso de cada item no custo do kit — pedido do cliente em 30/07/2026.
+      linhasProdutos: r.linhasProdutos,
+      linhasEmbalagem: r.linhasEmbalagem,
     };
   }, [itensValidos, embalagemValida, custoPorProduto, todosInsumos]);
 
@@ -373,6 +376,32 @@ export default function KitFormPage() {
               <span className="text-[var(--cor-texto-suave)]">Inclua produtos para ver o custo e a assinatura.</span>
             )}
           </div>
+
+          {previa?.custo && (previa.linhasProdutos.length > 0 || previa.linhasEmbalagem.length > 0) && (
+            <div className="space-y-1 rounded-md border border-[var(--cor-borda)] p-3 text-sm">
+              <Label>Peso de cada item no custo do kit</Label>
+              <table className="w-full text-sm">
+                <tbody>
+                  {[
+                    ...previa.linhasProdutos.map((l) => ({
+                      nome: produtos.find((p) => p.id === l.produtoId)?.name ?? l.produtoId,
+                      custo: l.custo,
+                      participacao: l.participacao,
+                    })),
+                    ...previa.linhasEmbalagem.map((l) => ({ nome: l.nome, custo: l.custo, participacao: l.participacao })),
+                  ]
+                    .sort((a, b) => Number(b.participacao) - Number(a.participacao))
+                    .map((l, i) => (
+                      <tr key={i} className="border-b border-[var(--cor-borda)] last:border-0">
+                        <td className="py-1">{l.nome}</td>
+                        <td className="py-1 text-right text-[var(--cor-texto-suave)]">{reais(l.custo)}</td>
+                        <td className="w-16 py-1 text-right font-medium">{percentual(l.participacao)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
 
         {duplicado && (

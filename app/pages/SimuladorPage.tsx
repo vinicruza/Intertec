@@ -2,7 +2,13 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
-import { resolverKitDoPedido, type CatalogoParaKit, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
+import {
+  resolverKitDoPedido,
+  type CatalogoParaKit,
+  type LinhaCustoEmbalagemKit,
+  type LinhaCustoKit,
+  type ModoEmbalagem,
+} from "../lib/sim/kitNoPedido";
 import {
   carregarContextoSimulador,
   salvarCotacao,
@@ -42,6 +48,10 @@ type LinhaResolvida = {
   assinatura: string | null;
   kitExistente: { id: string; codigo: string; nome: string } | null;
   erro: string | null;
+  // Peso de custo por produto/embalagem — só existe quando a linha é um kit
+  // montado na hora. Pedido do cliente em 30/07/2026, ver kitNoPedido.ts.
+  linhasProdutos: LinhaCustoKit[];
+  linhasEmbalagem: LinhaCustoEmbalagemKit[];
 };
 
 // Catálogo derivado do contexto, no formato que o módulo de cálculo espera.
@@ -67,6 +77,8 @@ function resolverLinha(l: LinhaItem, ctx: ContextoSimulador, catalogo: CatalogoP
       assinatura: null,
       kitExistente: null,
       erro: null,
+      linhasProdutos: [],
+      linhasEmbalagem: [],
     };
   }
 
@@ -79,6 +91,8 @@ function resolverLinha(l: LinhaItem, ctx: ContextoSimulador, catalogo: CatalogoP
     assinatura: r.assinatura || null,
     kitExistente: r.kitExistente,
     erro: r.erro,
+    linhasProdutos: r.linhasProdutos,
+    linhasEmbalagem: r.linhasEmbalagem,
   };
 }
 
@@ -368,6 +382,7 @@ export default function SimuladorPage() {
                 ctx={ctx}
                 kit={l.kitNovo}
                 resolvida={r}
+                verNumeros={verNumeros}
                 aoMudar={(muda) => atualizarKitNovo(i, muda)}
               />
             )}
@@ -449,11 +464,13 @@ function MontadorKit({
   ctx,
   kit,
   resolvida,
+  verNumeros,
   aoMudar,
 }: {
   ctx: ContextoSimulador;
   kit: KitNovoEdicao;
   resolvida: LinhaResolvida | null;
+  verNumeros: boolean;
   aoMudar: (muda: (k: KitNovoEdicao) => KitNovoEdicao) => void;
 }) {
   // Escape hatch: nem todo insumo de embalagem já foi marcado como tal na
@@ -642,6 +659,40 @@ function MontadorKit({
           </div>
         ))}
       </div>
+
+      {verNumeros && resolvida && !resolvida.erro && resolvida.linhasProdutos.length > 0 && (
+        <PesoDeCustoDoKit ctx={ctx} resolvida={resolvida} />
+      )}
+    </div>
+  );
+}
+
+// Peso de cada produto e embalagem no custo do kit — pedido do cliente em
+// 30/07/2026: "não saberemos qual produto deu maior ou menor margem em cada
+// kit". Não existe preço por produto dentro do kit (o cliente negocia o kit
+// inteiro, não a peça); o que existe é o custo de cada um, e isso já responde
+// "qual item está pesando mais" sem inventar um preço que não existe.
+function PesoDeCustoDoKit({ ctx, resolvida }: { ctx: ContextoSimulador; resolvida: LinhaResolvida }) {
+  const nomeDoProduto = (produtoId: string) => ctx.produtos.find((p) => p.id === produtoId)?.nome ?? produtoId;
+  const linhas = [
+    ...resolvida.linhasProdutos.map((l) => ({ nome: nomeDoProduto(l.produtoId), custo: l.custo, participacao: l.participacao })),
+    ...resolvida.linhasEmbalagem.map((l) => ({ nome: l.nome, custo: l.custo, participacao: l.participacao })),
+  ].sort((a, b) => Number(b.participacao) - Number(a.participacao));
+
+  return (
+    <div className="space-y-1 rounded-md border border-[var(--cor-borda)] bg-white p-3">
+      <Label>Peso de cada item no custo do kit</Label>
+      <table className="w-full text-sm">
+        <tbody>
+          {linhas.map((l, i) => (
+            <tr key={i} className="border-b border-[var(--cor-borda)] last:border-0">
+              <td className="py-1">{l.nome}</td>
+              <td className="py-1 text-right text-[var(--cor-texto-suave)]">{reais(l.custo)}</td>
+              <td className="w-16 py-1 text-right font-medium">{percentual(l.participacao)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
