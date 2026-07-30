@@ -46,10 +46,36 @@ Problemas concretos já identificados na planilha (detalhados no Calculations.md
 
 | Perfil | Pode |
 |---|---|
-| Administrador | Tudo, incluindo configurações e parâmetros de canal |
-| Financeiro | Ver e editar custos, despesas, alocação, DRE, dashboards |
+| Administrador | Tudo, incluindo a área restrita (usuários, cadastros, configurações, integridade) |
+| Financeiro | Ver e editar custos, despesas, DRE, dashboards; **não** entra na área restrita |
 | Comercial | Montar kits, simular e fechar pedidos; **não** vê nem edita custos de insumos |
 | Produção | Consultar produtos, fichas técnicas e composições (somente leitura) |
+
+### 4.1 Área restrita (decisão de 30/07/2026)
+
+Quatro telas mexem em regra, parâmetro ou acesso — mudar algo nelas muda o resultado de todo pedido, ou muda quem entra no sistema. Elas aparecem no menu num bloco separado, **Administração**, e só o Administrador as vê: **Usuários**, **Cadastros**, **Configurações** e **Integridade dos dados**. O Financeiro perdeu a escrita nas listas de referência (tipo de cliente, área de atuação, motivo de perda, categoria de produto) — continua lendo, porque Clientes e Pedidos mostram esses nomes.
+
+DRE, Vendas do ERP e Insumos **continuam** com o Financeiro: são as telas de trabalho dele, não configuração.
+
+### 4.2 Super Administrador
+
+Acima dos Administradores existe uma conta de dono do sistema. Ela é um Administrador com uma marca a mais (`profiles.is_super_admin`), não um quinto perfil — a segurança do banco toda está escrita sobre os quatro perfis acima, e criar um quinto obrigaria a reescrever dezenas de políticas.
+
+O que ela tem de exclusivo:
+
+- **não aparece** na lista de usuários dos Administradores da Intertech, nem pela tela nem pela API;
+- **não pode** ser alterada, desativada ou removida por nenhum Administrador;
+- a marca só é dada na instalação, por migração — nenhuma tela promove ninguém a dono do sistema.
+
+Conta em produção: `vinicius@avgestaofinanceira.com.br`.
+
+### 4.3 Cadastro de usuários
+
+Todo o ciclo acontece dentro do sistema, na tela de Usuários: criar o acesso (nome, e-mail, perfil e senha provisória), redefinir senha, desativar e excluir. Ninguém precisa abrir o painel do Supabase.
+
+Criar credencial, trocar a senha de outra pessoa e apagar acesso exigem a chave de administração do projeto, que não pode ficar no navegador — essas três passam pela Edge Function `gestao-usuarios`, que confere a permissão no banco (`assert_can_manage_user`) antes de agir. Cada pessoa troca a própria senha em **Meu perfil**.
+
+Excluir só é possível para quem nunca registrou nada. Quem já fechou pedido, montou kit ou mudou preço é **desativado**, nunca excluído: o histórico tem de continuar mostrando quem fez cada coisa.
 
 ## 5. Conceitos e regras estruturais
 

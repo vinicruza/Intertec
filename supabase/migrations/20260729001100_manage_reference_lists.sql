@@ -4,9 +4,10 @@
 -- como partida sugerida — a Intertech ainda não fechou nenhuma delas. Sem uma
 -- tela, ajustar exigiria mexer no banco à mão, e a decisão ficaria travada.
 --
--- As políticas de RLS já permitem escrita a admin e financeiro; estas funções
--- adicionam as validações que a tabela sozinha não expressa (prefixo em uso,
--- lista em uso por registro existente).
+-- Cadastros é tela de Administrador (ver a migração 20260729001400): as
+-- políticas de RLS só permitem escrita a admin, e estas funções adicionam as
+-- validações que a tabela sozinha não expressa (prefixo em uso, lista em uso
+-- por registro existente).
 
 -- ------------------------------------------------------------------
 -- Tipo de cliente e área de atuação
@@ -25,7 +26,7 @@ declare
   v_tenant_id uuid := public.current_tenant_id();
   v_id uuid := p_id;
 begin
-  if not public.has_role('admin','financeiro') then
+  if not public.has_role('admin') then
     raise exception 'Sem permissão para alterar as listas';
   end if;
   if p_tabela not in ('tipo', 'area') then
@@ -75,7 +76,7 @@ returns void
 language plpgsql security invoker set search_path = public, pg_temp as $$
 declare v_tenant_id uuid := public.current_tenant_id(); v_em_uso integer;
 begin
-  if not public.has_role('admin','financeiro') then
+  if not public.has_role('admin') then
     raise exception 'Sem permissão para alterar as listas';
   end if;
 
@@ -111,7 +112,7 @@ returns uuid
 language plpgsql security invoker set search_path = public, pg_temp as $$
 declare v_tenant_id uuid := public.current_tenant_id(); v_id uuid := p_id;
 begin
-  if not public.has_role('admin','financeiro') then
+  if not public.has_role('admin') then
     raise exception 'Sem permissão para alterar os motivos de perda';
   end if;
   if nullif(btrim(p_label), '') is null then
@@ -136,7 +137,7 @@ returns void
 language plpgsql security invoker set search_path = public, pg_temp as $$
 declare v_tenant_id uuid := public.current_tenant_id(); v_em_uso integer;
 begin
-  if not public.has_role('admin','financeiro') then
+  if not public.has_role('admin') then
     raise exception 'Sem permissão para alterar os motivos de perda';
   end if;
   select count(*) into v_em_uso from public.orders

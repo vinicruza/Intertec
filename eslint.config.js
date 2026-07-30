@@ -2,7 +2,9 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules"] },
+  // supabase/functions roda em Deno (outro conjunto de globais e de imports),
+  // não no navegador — não é código para esta configuração conferir.
+  { ignores: ["dist", "node_modules", "supabase/functions"] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

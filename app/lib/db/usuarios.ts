@@ -5,21 +5,23 @@ import type { Perfil } from "../roles";
 // Gestão de acesso (Administrador)
 // ============================================================
 //
-// A credencial em si (e-mail e senha) é criada no Supabase — por convite no
-// painel ou cadastro do próprio usuário. Fazer isso pelo navegador exigiria a
-// chave de serviço no front-end, o que daria a qualquer visitante poder total
-// sobre o projeto.
+// Tudo acontece dentro do sistema: criar o acesso de uma pessoa, escolher o
+// perfil dela, redefinir a senha e tirar o acesso. Ninguém precisa entrar no
+// painel do banco de dados para nada disso.
 //
-// Aqui o Administrador faz o resto: define nome, perfil e libera o acesso.
-// Enquanto o perfil está inativo, a pessoa entra e não enxerga nada, porque
-// todas as políticas do banco dependem de current_user_role(), que devolve
-// nulo para inativo.
+// Criar credencial, trocar a senha de outra pessoa e apagar acesso exigem a
+// chave de administração do projeto, que não pode ficar no navegador. Por isso
+// essas três operações passam por um serviço do lado do servidor (a Edge
+// Function `gestao-usuarios`), que confere a permissão no banco antes de agir.
+// O resto — nome, perfil, ativar e desativar — vai direto pelas funções do
+// banco, que já barram quem não é Administrador.
 
 export type UsuarioAdmin = {
   id: string;
   full_name: string;
   role: Perfil;
   active: boolean;
+  is_super_admin: boolean;
   email: string;
   last_sign_in_at: string | null;
   created_at: string;
@@ -44,4 +46,68 @@ export async function salvarUsuario(
     p_active: ativo,
   });
   if (error) throw error;
+}
+
+// ---------- Operações que precisam do serviço do servidor ----------
+
+type RespostaGestao = { id?: string; email?: string; erro?: string };
+
+async function chamarGestao(corpo: Record<string, unknown>): Promise<RespostaGestao> {
+  const { data, error } = await supabase.functions.invoke<RespostaGestao>("gestao-usuarios", {
+    body: corpo,
+  });
+
+  // Quando a função devolve erro (403, 400…), o supabase-js entrega um Error e
+  // guarda o corpo da resposta. Sem ler esse corpo, a tela mostraria
+  // "Edge Function returned a non-2xx status code" em vez do motivo real.
+  if (error) {
+    const detalhe = await extrairErro(error);
+    throw new Error(detalhe ?? traduzFalhaDeRede(error.message));
+  }
+  if (data?.erro) throw new Error(data.erro);
+  return data ?? {};
+}
+
+async function extrairErro(error: unknown): Promise<string | null> {
+  const resposta = (error as { context?: unknown }).context;
+  if (!(resposta instanceof Response)) return null;
+  try {
+    const corpo = (await resposta.clone().json()) as { erro?: string };
+    return corpo.erro ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function traduzFalhaDeRede(msg: string): string {
+  if (/Failed to send a request|Failed to fetch/i.test(msg)) {
+    return "Não foi possível falar com o serviço de usuários. Verifique a conexão e tente de novo.";
+  }
+  return msg;
+}
+
+export async function criarUsuario(dados: {
+  nome: string;
+  email: string;
+  perfil: Perfil;
+  senha: string;
+}): Promise<void> {
+  await chamarGestao({ acao: "criar", ...dados });
+}
+
+export async function redefinirSenha(id: string, senha: string): Promise<void> {
+  await chamarGestao({ acao: "senha", id, senha });
+}
+
+export async function removerUsuario(id: string): Promise<void> {
+  await chamarGestao({ acao: "remover", id });
+}
+
+// Senha provisória sugerida pela tela: aleatória, para o Administrador não
+// cair em "Intertech123". Quem recebe troca depois em Meu perfil.
+export function senhaSugerida(): string {
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const sorteio = new Uint32Array(14);
+  crypto.getRandomValues(sorteio);
+  return Array.from(sorteio, (n) => alfabeto[n % alfabeto.length]).join("");
 }

@@ -8,6 +8,7 @@ export type PerfilUsuario = {
   nome: string;
   perfil: Perfil;
   tenantId: string;
+  superAdmin: boolean;
 };
 
 type EstadoAuth = {
@@ -15,6 +16,7 @@ type EstadoAuth = {
   perfil: PerfilUsuario | null;
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<{ erro: string | null }>;
+  trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<{ erro: string | null }>;
   sair: () => Promise<void>;
 };
 
@@ -28,12 +30,18 @@ async function carregarPerfil(userId: string): Promise<PerfilUsuario | null> {
   // parecer quebrada.
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, role, tenant_id")
+    .select("id, full_name, role, tenant_id, is_super_admin")
     .eq("id", userId)
     .eq("active", true)
     .maybeSingle();
   if (error || !data) return null;
-  return { id: data.id, nome: data.full_name, perfil: data.role as Perfil, tenantId: data.tenant_id };
+  return {
+    id: data.id,
+    nome: data.full_name,
+    perfil: data.role as Perfil,
+    tenantId: data.tenant_id,
+    superAdmin: Boolean(data.is_super_admin),
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -71,6 +79,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
         return { erro: error ? traduzErro(error.message) : null };
       },
+      // Trocar a própria senha. Confere a senha atual antes: sem isso, quem
+      // passasse por um computador destravado assumiria a conta.
+      trocarSenha: async (senhaAtual, novaSenha) => {
+        const email = session?.user.email;
+        if (!email) return { erro: "Sessão sem e-mail; entre novamente." };
+        const conferencia = await supabase.auth.signInWithPassword({
+          email,
+          password: senhaAtual,
+        });
+        if (conferencia.error) return { erro: "A senha atual está incorreta." };
+        const { error } = await supabase.auth.updateUser({ password: novaSenha });
+        return { erro: error ? traduzErro(error.message) : null };
+      },
       sair: async () => {
         await supabase.auth.signOut();
       },
@@ -90,5 +111,9 @@ export function useAuth(): EstadoAuth {
 function traduzErro(msg: string): string {
   if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
   if (/email not confirmed/i.test(msg)) return "E-mail ainda não confirmado.";
+  if (/should be different from the old password/i.test(msg)) {
+    return "A nova senha precisa ser diferente da atual.";
+  }
+  if (/password should be at least/i.test(msg)) return "A nova senha é curta demais.";
   return msg;
 }

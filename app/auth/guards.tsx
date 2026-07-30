@@ -31,10 +31,10 @@ function AguardandoLiberacao({ aoSair }: { aoSair: () => Promise<void> }) {
   return (
     <div className="flex h-full items-center justify-center p-6">
       <div className="max-w-md space-y-3 rounded-lg border border-[var(--cor-borda)] p-6 text-center">
-        <h1 className="text-lg font-semibold">Acesso aguardando liberação</h1>
+        <h1 className="text-lg font-semibold">Acesso não liberado</h1>
         <p className="text-sm text-[var(--cor-texto-suave)]">
-          Sua conta foi criada, mas ainda não tem perfil liberado. Peça a um Administrador para
-          definir seu perfil na tela de Usuários.
+          Seu login funciona, mas o acesso está desativado — por isso nenhum dado aparece. Peça a um
+          Administrador para reativar o seu perfil na tela de Usuários.
         </p>
         <button
           type="button"
