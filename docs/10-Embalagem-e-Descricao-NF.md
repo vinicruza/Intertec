@@ -43,7 +43,7 @@ O motor de cálculo (`custoKitCompleto`) passou a devolver, além dos totais que
 
 Aparece como uma tabela "Peso de cada item no custo do kit" nas duas telas que montam kit — o Simulador (kit nascendo dentro do pedido) e a tela de Kits — ordenada do item mais pesado para o mais leve.
 
-## 4. Nomenclatura de NF dos campos cirúrgicos (04/08/2026)
+## 4. Nomenclatura de NF do catálogo (04/08/2026)
 
 O campo "Descrição NF" da Seção 3 nasceu como texto livre, e ficou vazio nos 324 produtos —
 ninguém ia digitar 324 vezes. O cliente então definiu a regra que gera esse texto sozinho,
@@ -72,26 +72,52 @@ Segundo, some do resto o que não pode variar a nota: **gramatura** (`GR30`, `GR
 **matéria-prima** (`TNT`, `SMS`) e **origem** (`China`). Tamanho, `+ Tape`, `Estéril` e
 `Não Estéril` continuam — são a diferença real do que está sendo entregue.
 
-Resultado: 216 campos → **139 descrições distintas**. Os 108 produtos das outras categorias
-(aventais, conjuntos, botas…) continuam sem descrição de NF; a regra deles ainda não foi
-definida, e a função devolve vazio em vez de inventar.
+Resultado: 216 campos → **139 descrições distintas**.
 
-### 4.1 Por que existe a marca de origem
+### 4.1 Segunda rodada: o resto do catálogo (mesmo dia)
 
-A regra vai rodar de novo — quando entrarem aventais, ou um campo novo for cadastrado. Se ela
-simplesmente reescrevesse tudo, apagaria em silêncio qualquer texto que a Intertech tivesse
+Definidas as regras dos 108 produtos restantes, o catálogo inteiro passou a ter nome fiscal.
+
+| Família no catálogo | Descrição NF |
+|---|---|
+| Avental (todos) | Avental Cirúrgico + o resto do nome |
+| Avental Gineco | Avental Cirúrgico Sem Manga |
+| Compressa Wiper | Toalha de Mão |
+| Todo o restante | o próprio nome do catálogo, sem mudança |
+
+Nos aventais, **"Tag" vira "Toalha"**, e somem o **TNT** e a **gramatura** (aqui escrita
+`30g`/`40g`, não `GR30`). O **SMS fica** — pedido explícito, ao contrário do que vale para os
+campos, onde TNT e SMS somem os dois. Tamanho (M, G, GG, EGG), "Laminado", "com Compressa" e
+"Estéril/Não Estéril" continuam.
+
+Três efeitos que valem registro, porque parecem erro e não são — saem direto das regras:
+
+- **"Avental Gineco" e "Avental TNT Sem Manga" passam a ter a mesma descrição de NF**
+  (`Avental Cirúrgico Sem Manga`): um vira "sem manga" por definição, o outro perde o TNT e
+  chega no mesmo lugar.
+- **"Avental TNT 30g ML" e "Avental TNT 40g ML" também se juntam** em `Avental Cirúrgico ML`
+  — que é exatamente o ponto de tirar a gramatura da nota.
+- **"Conjunto P/M TNT" mantém o TNT.** A remoção foi pedida para os aventais; conjunto entra
+  em "o restante se mantém igual".
+
+Catálogo completo: **324 produtos, 243 descrições distintas**, nenhum em branco.
+
+### 4.2 Por que existe a marca de origem
+
+A regra vai rodar de novo — quando um produto novo for cadastrado, ou uma família ganhar nome
+fiscal diferente. Se ela simplesmente reescrevesse tudo, apagaria em silêncio qualquer texto que a Intertech tivesse
 corrigido à mão. Por isso cada descrição guarda **como foi escrita** (`nf_description_source`):
 `regra` ou `manual`. A regra só mexe no que é dela; o que uma pessoa ajustou fica marcado
 "ajustada à mão" na lista de produtos e é intocável.
 
-### 4.2 Onde isso aparece
+### 4.3 Onde isso aparece
 
 Coluna **Descrição NF** na lista de Produtos (e na busca — dá para procurar pelo nome fiscal).
 Na tela de editar produto o campo continua editável e passa a mostrar, abaixo dele, o texto
 que a regra produziria, com um "usar esta" para aplicar.
 
-A lista de 216 descrições que a migração gravou **não foi escrita à mão nem reimplementada em
-SQL**: foi gerada rodando `descricaoNFdoProduto` sobre o catálogo. Duas cópias da mesma regra,
+As listas que as duas migrações gravaram **não foram escritas à mão nem reimplementadas em
+SQL**: saíram de rodar `descricaoNFdoProduto` sobre o catálogo. Duas cópias da mesma regra,
 uma em TypeScript e outra em SQL, divergiriam com o tempo — e a divergência sairia impressa
 na nota fiscal antes de alguém perceber.
 
@@ -108,6 +134,7 @@ na nota fiscal antes de alguém perceber.
 | Peso de custo por item do kit (simulador) | `app/lib/sim/kitNoPedido.ts`, `app/pages/SimuladorPage.tsx` (`PesoDeCustoDoKit`) |
 | Peso de custo por item do kit (tela de Kits) | `app/pages/KitFormPage.tsx` |
 | Regra de nomenclatura de NF | `lib/nomenclatura/descricaoNF.ts`, testes em `tests/nomenclatura/descricaoNF.test.ts` |
-| Migração (marca de origem + carga das 216 descrições) | `supabase/migrations/20260804000300_nomenclatura_nf_campos.sql` |
+| Migração (marca de origem + carga dos 216 campos) | `supabase/migrations/20260804000300_nomenclatura_nf_campos.sql` |
+| Migração (carga dos 108 restantes) | `supabase/migrations/20260804000400_nomenclatura_nf_resto_do_catalogo.sql` |
 | Coluna Descrição NF na lista | `app/pages/ProdutosPage.tsx` |
 | Sugestão da regra no cadastro | `app/pages/ProdutoFormPage.tsx`, `app/lib/db/produtos.ts` |

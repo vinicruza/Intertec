@@ -53,10 +53,9 @@ describe("descrição de NF dos campos cirúrgicos", () => {
     expect(descricaoNFdoProduto(nome)).toBe(esperado);
   });
 
-  it("não inventa descrição para produto que não é campo cirúrgico", () => {
-    expect(descricaoNFdoProduto("Avental TNT Sem Manga Não Estéril")).toBeNull();
-    expect(descricaoNFdoProduto("Conjunto Cirúrgico M")).toBeNull();
+  it("nome vazio não tem descrição", () => {
     expect(descricaoNFdoProduto("")).toBeNull();
+    expect(descricaoNFdoProduto("   ")).toBeNull();
   });
 
   it("família específica vence a genérica", () => {
@@ -78,6 +77,82 @@ describe("descrição de NF dos campos cirúrgicos", () => {
       expect(descricao).not.toMatch(/\bGR\s?\d+\b/i);
       expect(descricao).not.toMatch(/\bTNT\b|\bSMS\b|\bChina\b/i);
       expect(descricao).not.toMatch(/\s{2,}/);
+    }
+  });
+});
+
+// Segunda rodada: aventais, Compressa Wiper e o resto do catálogo.
+describe("descrição de NF do resto do catálogo", () => {
+  it.each([
+    // Avental → Avental Cirúrgico. Tamanho, Laminado e Compressa continuam.
+    ["Avental", "Avental Cirúrgico"],
+    ["Avental Não Estéril", "Avental Cirúrgico Não Estéril"],
+    ["Avental G", "Avental Cirúrgico G"],
+    ["Avental EGG Não Estéril", "Avental Cirúrgico EGG Não Estéril"],
+    ["Avental G Laminado", "Avental Cirúrgico G Laminado"],
+    ["Avental com Compressa", "Avental Cirúrgico com Compressa"],
+    ["Avental GG com Compressa Não Estéril", "Avental Cirúrgico GG com Compressa Não Estéril"],
+
+    // Tag vira Toalha.
+    ["Avental M com Tag", "Avental Cirúrgico M com Toalha"],
+    ["Avental EGG com Compressa e Tag", "Avental Cirúrgico EGG com Compressa e Toalha"],
+    ["Avental Laminado com Tag Não Estéril", "Avental Cirúrgico Laminado com Toalha Não Estéril"],
+
+    // Gineco é avental sem manga.
+    ["Avental Gineco", "Avental Cirúrgico Sem Manga"],
+    ["Avental Gineco Não Estéril", "Avental Cirúrgico Sem Manga Não Estéril"],
+
+    // TNT some do avental; gramatura "30g"/"40g" também.
+    ["Avental TNT Sem Manga", "Avental Cirúrgico Sem Manga"],
+    ["Avental TNT Sem Manga Tam Especial Não Estéril", "Avental Cirúrgico Sem Manga Tam Especial Não Estéril"],
+    ["Avental TNT 30g ML", "Avental Cirúrgico ML"],
+    ["Avental TNT 40g ML Não Estéril", "Avental Cirúrgico ML Não Estéril"],
+
+    // SMS, ao contrário do TNT, continua na nota.
+    ["Avental Sem Manga SMS", "Avental Cirúrgico Sem Manga SMS"],
+    ["Avental Sem Manga SMS Não Estéril", "Avental Cirúrgico Sem Manga SMS Não Estéril"],
+
+    // Compressa Wiper vira Toalha de Mão; as outras compressas não mudam.
+    ["Compressa Wiper", "Toalha de Mão"],
+    ["Compressa Wiper Não Estéril", "Toalha de Mão Não Estéril"],
+  ])("%s → %s", (nome, esperado) => {
+    expect(descricaoNFdoProduto(nome)).toBe(esperado);
+  });
+
+  it.each([
+    "Compressa Cremer Não Estéril",
+    "Compressa G Pacote 10",
+    "Compressa P Pacote 5 Não Estéril",
+    "Compressa Pré-Lavada",
+    "Conjunto G/GG TNT Não Estéril",
+    "Conjunto P/M",
+    "Kit Universal Com Avental",
+    "Kit Catarata com 2 Não Estéril",
+    "Bag Estéril",
+    "Bota Não Estéril",
+    "Oclusor",
+    "Perneira Não Estéril",
+    "Saco 0,60 x 0,90 Estéril",
+  ])("o restante se mantém igual: %s", (nome) => {
+    expect(descricaoNFdoProduto(nome)).toBe(nome);
+  });
+
+  it("o TNT do Conjunto continua na nota — a remoção é só dos aventais", () => {
+    expect(descricaoNFdoProduto("Conjunto P/M TNT")).toBe("Conjunto P/M TNT");
+    expect(descricaoNFdoProduto("Avental TNT Sem Manga")).toBe("Avental Cirúrgico Sem Manga");
+  });
+
+  it("'Kit Universal Com Avental' é kit, não avental", () => {
+    // A família casa pelo começo do nome; "Avental" no meio não conta.
+    expect(descricaoNFdoProduto("Kit Universal Sem Avental")).toBe("Kit Universal Sem Avental");
+  });
+
+  it("nenhuma descrição de avental mantém gramatura ou TNT", () => {
+    const nomes = ["Avental TNT 30g ML", "Avental TNT 40g ML Não Estéril", "Avental TNT Sem Manga"];
+    for (const nome of nomes) {
+      const descricao = descricaoNFdoProduto(nome)!;
+      expect(descricao).not.toMatch(/\bTNT\b/i);
+      expect(descricao).not.toMatch(/\b\d+\s?g\b|\bGR\s?\d+\b/i);
     }
   });
 });
