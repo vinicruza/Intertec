@@ -22,7 +22,9 @@ test.skip(
 const TELAS: Array<{ rota: string; titulo: RegExp }> = [
   { rota: "/", titulo: /./ },
   { rota: "/simulador", titulo: /Simulador de pedido/ },
-  { rota: "/pedidos", titulo: /Hist[óo]rico de pedidos|Pedidos/ },
+  // Atenção: o menu diz "Histórico de pedidos", mas o título da tela é
+  // "Cotações e pedidos". Aqui vale o que a tela desenha.
+  { rota: "/pedidos", titulo: /Cota[çc][õo]es e pedidos/ },
   { rota: "/clientes", titulo: /Clientes/ },
   { rota: "/kits", titulo: /Kits/ },
   { rota: "/produtos", titulo: /Produtos/ },
