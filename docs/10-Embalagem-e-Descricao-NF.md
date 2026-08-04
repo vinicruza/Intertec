@@ -116,6 +116,25 @@ Coluna **Descrição NF** na lista de Produtos (e na busca — dá para procurar
 Na tela de editar produto o campo continua editável e passa a mostrar, abaixo dele, o texto
 que a regra produziria, com um "usar esta" para aplicar.
 
+**Na venda, os dois nomes juntos** (pedido do cliente, mesmo dia). A Ficha do pedido é a folha
+que substituiu o papel da mesa de conferência, e é dela que sai o lançamento no faturamento —
+mas ela mostrava só o nome do catálogo. Quem ia emitir a nota lia `Campo Simples 1,00 x 1,20
+Não Estéril GR40` e tinha que ir procurar o nome fiscal em outra tela; o trabalho da regra não
+chegava em quem precisava dele.
+
+Agora cada item traz os dois, um embaixo do outro: em cima o nome do catálogo, porque a
+conferência reconhece o produto por ele; embaixo, marcado `NF:`, o nome fiscal. Substituir um
+pelo outro atenderia só metade das pessoas — por isso os dois. Quando são iguais (os 55
+produtos de "o restante se mantém igual"), a segunda linha some, para não repetir.
+
+Vale na **Ficha do pedido**, no **detalhe do pedido** e no **export de pedidos em Excel**, que
+ganhou a coluna "Itens (nome na NF)" ao lado de "Itens".
+
+**Kit não tem nome fiscal próprio.** A nota do kit é montada da composição, item a item — que é
+a lista que a ficha já imprime abaixo do nome do kit. Essa composição é um retrato congelado no
+fechamento e guarda só nome e quantidade, então os componentes saem com o nome do catálogo, não
+com o fiscal. Fica registrado como limitação conhecida.
+
 As listas que as duas migrações gravaram **não foram escritas à mão nem reimplementadas em
 SQL**: saíram de rodar `descricaoNFdoProduto` sobre o catálogo. Duas cópias da mesma regra,
 uma em TypeScript e outra em SQL, divergiriam com o tempo — e a divergência sairia impressa
@@ -138,3 +157,4 @@ na nota fiscal antes de alguém perceber.
 | Migração (carga dos 108 restantes) | `supabase/migrations/20260804000400_nomenclatura_nf_resto_do_catalogo.sql` |
 | Coluna Descrição NF na lista | `app/pages/ProdutosPage.tsx` |
 | Sugestão da regra no cadastro | `app/pages/ProdutoFormPage.tsx`, `app/lib/db/produtos.ts` |
+| Os dois nomes na venda | `app/pages/PedidoFichaPage.tsx`, `app/pages/PedidoDetalhePage.tsx`, `app/lib/export/pedidos.ts`, `app/lib/db/fechamento.ts` |

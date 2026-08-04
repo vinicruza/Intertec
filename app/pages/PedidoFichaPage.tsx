@@ -73,7 +73,7 @@ export default function PedidoFichaPage() {
           <table className="w-full">
             <thead>
               <tr className="text-left align-bottom">
-                <th className="py-1 font-medium">Código / descrição</th>
+                <th className="py-1 font-medium">Código / descrição / nome na NF</th>
                 <th className="w-16 py-1 text-right font-medium">Qtd</th>
                 <th className="w-24 py-1 text-right font-medium">Preço un.</th>
                 {verNumeros && <th className="w-24 py-1 text-right font-medium">CMV un.</th>}
@@ -90,6 +90,14 @@ export default function PedidoFichaPage() {
                   <tr key={i.id} className="border-t border-black/10 align-top">
                     <td className="py-2">
                       <span className="font-mono font-bold">{codigo}</span> — {nome}
+                      {/* Os dois nomes, um embaixo do outro: a conferência
+                          reconhece o produto pelo nome de casa (com gramatura),
+                          e o faturamento precisa do nome fiscal. */}
+                      {i.products?.nf_description && i.products.nf_description !== nome && (
+                        <div className="mt-0.5 text-xs">
+                          <span className="text-black/50">NF:</span> {i.products.nf_description}
+                        </div>
+                      )}
                       {composicao && composicao.length > 0 && (
                         <ul className="mt-1 ml-4 list-disc text-xs">
                           {composicao.map((c, idx) => (

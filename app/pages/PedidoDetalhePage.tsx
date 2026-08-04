@@ -175,6 +175,13 @@ export default function PedidoDetalhePage() {
                 <td className="px-4 py-3 font-medium">
                   <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">{i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? ""}</div>
                   {i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "—")}
+                  {/* Nome fiscal ao lado do nome do catálogo — só quando os
+                      dois diferem, para não repetir a mesma linha. */}
+                  {i.products?.nf_description && i.products.nf_description !== i.products.name && (
+                    <div className="mt-0.5 text-xs font-normal text-[var(--cor-texto-suave)]">
+                      NF: {i.products.nf_description}
+                    </div>
+                  )}
                   {fechado && i.kit_composition_snapshot != null && (
                     <div className="mt-1 text-xs text-[var(--cor-texto-suave)]">
                       Composição congelada:{" "}

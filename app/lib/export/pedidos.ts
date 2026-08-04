@@ -1,5 +1,12 @@
 import type { PedidoResumo } from "../db/fechamento";
 
+type ItemDoPedido = PedidoResumo["order_items"][number];
+
+// O código congelado no item manda; o do catálogo é só o reserva.
+function codigoDoItem(i: ItemDoPedido): string {
+  return i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? "";
+}
+
 export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise<void> {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
@@ -15,6 +22,10 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
     { header: "Canal", key: "canal", width: 20 },
     { header: "UF", key: "uf", width: 8 },
     { header: "Itens", key: "itens", width: 50 },
+    // Nome fiscal ao lado do nome do catálogo: é esta coluna que o faturamento
+    // usa. Kit não tem nome fiscal próprio — sai com o nome do catálogo e a
+    // marca [Kit], porque a nota do kit é montada da composição, item a item.
+    { header: "Itens (nome na NF)", key: "itensNF", width: 50 },
     { header: "Receita líquida (R$)", key: "receita", width: 22 },
     { header: "Margem contribuição (R$)", key: "margem", width: 28 },
     { header: "Motivo cancelamento", key: "motivo", width: 42 },
@@ -28,7 +39,8 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
     vendedor: p.sellers?.name ?? "",
     canal: p.channels?.name ?? "",
     uf: p.uf ?? "",
-    itens: p.order_items.map((i) => `${i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? ""} ${i.item_name_snapshot ?? i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "")}`.trim()).join("; "),
+    itens: p.order_items.map((i) => `${codigoDoItem(i)} ${i.item_name_snapshot ?? i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "")}`.trim()).join("; "),
+    itensNF: p.order_items.map((i) => `${codigoDoItem(i)} ${i.products?.nf_description ?? i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "")}`.trim()).join("; "),
     receita: p.net_revenue_snapshot == null ? null : Number(p.net_revenue_snapshot),
     margem: p.contribution_margin_snapshot == null ? null : Number(p.contribution_margin_snapshot),
     motivo: p.cancellation_reason ?? "",
@@ -37,7 +49,7 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
   sheet.views = [{ state: "frozen", ySplit: 1 }];
   sheet.getColumn("receita").numFmt = '#,##0.00';
   sheet.getColumn("margem").numFmt = '#,##0.00';
-  sheet.autoFilter = { from: "A1", to: "L1" };
+  sheet.autoFilter = { from: "A1", to: "M1" };
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([new Uint8Array(buffer as ArrayBuffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);

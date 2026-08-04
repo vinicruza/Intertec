@@ -100,3 +100,9 @@ aos números, o resumo financeiro completo (receita bruta, impostos, receita lí
 de contribuição). No rodapé há linhas para assinatura de "Conferido por" e "Aprovado por" (ou a
 data da aprovação, se já aprovado no sistema). Use o botão **Imprimir** no topo da tela (ele não
 aparece na impressão).
+
+Cada item aparece com **os dois nomes**: em cima o nome do catálogo, que é como a conferência
+reconhece o produto na prateleira (com gramatura, TNT etc.), e embaixo, marcado **NF:**, o nome
+que deve sair na nota fiscal. Quando os dois são iguais, a linha NF não aparece — não faria
+sentido repetir. Kit não tem nome de NF próprio: a nota do kit sai da composição, item a item,
+que é justamente a lista logo abaixo do nome dele.

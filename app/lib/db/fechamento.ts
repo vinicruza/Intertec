@@ -36,7 +36,9 @@ export type PedidoResumo = {
   order_items: Array<{
     item_name_snapshot: string | null;
     item_code_snapshot: string | null;
-    products: { name: string; code: string } | null;
+    // nf_description: o nome que sai na nota, ao lado do nome do catálogo.
+    // Kits não têm — a nota do kit sai da composição, item por item.
+    products: { name: string; code: string; nf_description: string | null } | null;
     kits: { name: string; code: string } | null;
   }>;
 };
@@ -45,7 +47,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code), kits(name,code))"
+      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code,nf_description), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -88,7 +90,7 @@ export type PedidoCompleto = {
     expense_unit_snapshot: string | null;
     kit_composition_snapshot: unknown | null;
     item_code_snapshot: string | null;
-    products: { name: string; code: string } | null;
+    products: { name: string; code: string; nf_description: string | null } | null;
     kits: { name: string; code: string } | null;
   }>;
 };
@@ -106,7 +108,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: itens, error: e2 } = await supabase
     .from("order_items")
     .select(
-      "id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, products(name,code), kits(name,code)"
+      "id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, products(name,code,nf_description), kits(name,code)"
     )
     .eq("order_id", id);
   if (e2) throw e2;
