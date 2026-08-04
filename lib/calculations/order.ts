@@ -28,12 +28,12 @@ export type ResultadoPedido = {
   receitaBruta: Decimal;
   cmvTotal: Decimal;
   despesaTotal: Decimal;      // informativo (só entra no último nível)
-  frete: Decimal;
+  frete: Decimal;             // o que de fato saiu do resultado (0 se o cliente paga)
+  freteInformado: Decimal;    // o que foi digitado/calculado, antes da regra acima
   impostoFrete: Decimal;
   imposto: Decimal;           // imposto sobre a receita (ICSM)
   difal: Decimal;
   comissao: Decimal;
-  ajusteFrete: Decimal;       // −frete quando o cliente paga
   receitaLiquida: Decimal;    // receita menos frete, impostos, DIFAL e comissão
   // Nível oficial: MARGEM DE CONTRIBUIÇÃO (dispara os alertas de status)
   margemContribuicao: Decimal;
@@ -56,8 +56,8 @@ export type ResultadoItem = {
 //   imposto          = aliquota_imposto × receita_pedido
 //   DIFAL            = aliquota_difal × receita_pedido
 //   comissao         = aliquota_comissao × receita_pedido
-//   ajuste_frete     = −frete, se o cliente paga
-//   receita_liquida  = receita − frete − imposto_frete − imposto − DIFAL − comissao + ajuste_frete
+//   frete            = 0, se o frete é por conta do cliente (e então imposto_frete = 0)
+//   receita_liquida  = receita − frete − imposto_frete − imposto − DIFAL − comissao
 //   margem_contrib.  = receita_liquida − CMV_pedido      ← métrica oficial (= 39,82% no fixture)
 //   result_rateio    = margem_contribuicao − despesa_pedido  ← informativo (= 9,33% no fixture)
 //
@@ -93,21 +93,30 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   const cmvTotal = itens.reduce((s, i) => s.plus(i.cmvTotal), zero);
   const despesaTotal = itens.reduce((s, i) => s.plus(i.despesaTotal), zero);
 
-  const frete = dec(p.frete);
+  // Frete por conta do cliente: o frete não existe neste pedido. Nem o frete,
+  // nem o imposto sobre ele — não há transporte pago pela Intertech para ser
+  // tributado.
+  //
+  // Antes daqui saía um "ajuste_frete = −frete" que era SOMADO a uma conta que
+  // já tinha subtraído o frete: ele saía duas vezes, e um frete alto derrubava
+  // a receita líquida para baixo de zero. Era o que o Calculations.md §6
+  // descrevia, copiado da planilha; a própria linha se contradizia, dizendo
+  // entre parênteses que o cliente devolve o frete. Corrigido em 04/08/2026.
+  const freteInformado = dec(p.frete);
+  const frete = p.fretePorContaCliente ? zero : freteInformado;
+
   const aliquotaImposto = dec(p.aliquotaImposto);
   const impostoFrete = aliquotaImposto.times(frete);
   const imposto = aliquotaImposto.times(receitaBruta);
   const difal = dec(p.aliquotaDifal).times(receitaBruta);
   const comissao = dec(p.aliquotaComissao).times(receitaBruta);
-  const ajusteFrete = p.fretePorContaCliente ? frete.negated() : zero;
 
   const receitaLiquida = receitaBruta
     .minus(frete)
     .minus(impostoFrete)
     .minus(imposto)
     .minus(difal)
-    .minus(comissao)
-    .plus(ajusteFrete);
+    .minus(comissao);
 
   const margemContribuicao = receitaLiquida.minus(cmvTotal);
   const resultadoAposRateio = margemContribuicao.minus(despesaTotal);
@@ -117,11 +126,11 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
     cmvTotal,
     despesaTotal,
     frete,
+    freteInformado,
     impostoFrete,
     imposto,
     difal,
     comissao,
-    ajusteFrete,
     receitaLiquida,
     margemContribuicao,
     margemContribuicaoPct: margemPct(margemContribuicao, receitaLiquida),

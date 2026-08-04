@@ -1,4 +1,4 @@
-import { Decimal, dec } from "@calc";
+import { Decimal, dec, margemPct } from "@calc";
 
 // ============================================================
 // DRE gerencial mensal (PRD §6.8 + Decisão D3)
@@ -91,8 +91,11 @@ export function montarDRE(pedidos: PedidoParaDRE[], despesaFixaReal: string | nu
   const freteEComissoes = lucroBruto.minus(margemContribuicao);
   const somaRateios = soma((p) => p.expense_total_snapshot);
 
+  // Módulo no denominador pelo mesmo motivo do simulador: num mês de receita
+  // líquida negativa, dividir pelo valor com sinal devolveria percentual
+  // positivo para uma linha negativa.
   const pct = (v: Decimal): Decimal | null =>
-    receitaLiquida.isZero() ? null : v.div(receitaLiquida);
+    receitaLiquida.isZero() ? null : margemPct(v, receitaLiquida);
 
   const real = despesaFixaReal === null ? null : dec(despesaFixaReal);
   const resultadoOperacional = real === null ? null : margemContribuicao.minus(real);

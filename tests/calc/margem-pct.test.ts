@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularPedido, dec, margemPct } from "@calc";
+import { ErroCalculoBloqueante, calcularCMV, calcularPedido, dec, margemPct } from "@calc";
 import { statusMargem, type RegraMargem } from "@app/lib/sim/params";
 
 // Defeito encontrado em teste real (04/08/2026): um pedido com PREJUÍZO de
@@ -67,5 +67,42 @@ describe("cascata do pedido com prejuízo", () => {
   it("e o percentual acompanha o sinal do dinheiro", () => {
     expect(pedido.margemContribuicaoPct.isNegative()).toBe(true);
     expect(statusMargem(pedido.margemContribuicaoPct, FAIXAS)?.label).toBe("Negativa");
+  });
+});
+
+describe("denominador zerado na ficha técnica", () => {
+  // Varredura de 04/08/2026: rendimento e tamanho de lote são denominadores, e
+  // o decimal.js devolve Infinity para divisão por zero — sem reclamar. O CMV
+  // do produto virava Infinity, e a trava de pedido (que só barra CMV <= 0)
+  // deixava passar, porque Infinity é maior que zero.
+  it("rendimento zero é bloqueante, não Infinity", () => {
+    expect(() =>
+      calcularCMV([
+        {
+          nome: "Bobina",
+          custoUnitario: "2.42",
+          quantidade: { tipo: "area", largura: "1", comprimento: "1.20", rendimento: "0" },
+        },
+      ]),
+    ).toThrow(ErroCalculoBloqueante);
+  });
+
+  it("tamanho de lote zero é bloqueante", () => {
+    expect(() =>
+      calcularCMV([
+        { nome: "Caixa", custoUnitario: "9.98", quantidade: { tipo: "lote", tamanhoLote: "0" } },
+      ]),
+    ).toThrow(ErroCalculoBloqueante);
+  });
+
+  it("e o caso normal continua calculando", () => {
+    const r = calcularCMV([
+      {
+        nome: "Bobina",
+        custoUnitario: "2.42",
+        quantidade: { tipo: "area", largura: "1", comprimento: "1.20", rendimento: "0.99" },
+      },
+    ]);
+    expect(r.cmv.isFinite()).toBe(true);
   });
 });

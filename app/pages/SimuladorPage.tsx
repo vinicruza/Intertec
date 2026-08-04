@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
@@ -124,7 +124,27 @@ export default function SimuladorPage() {
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
 
   const ctx = ctxQuery.data;
+
+  // Comercial lança pedido só para o vendedor vinculado ao acesso dele
+  // (decisão de 04/08/2026). Administrador lança por qualquer um. A trava de
+  // verdade é o gatilho no banco; aqui a lista já vem reduzida para ninguém
+  // escolher um vendedor que o sistema vai recusar só na hora de salvar.
+  const soMeuVendedor = perfil?.perfil === "comercial";
+  const vendedoresDisponiveis = useMemo(() => {
+    if (!ctx) return [];
+    if (!soMeuVendedor) return ctx.vendedores;
+    return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
+  }, [ctx, soMeuVendedor]);
+  const semVendedorVinculado = soMeuVendedor && vendedoresDisponiveis.length === 0;
+
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
+
+  // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
+  useEffect(() => {
+    if (vendedoresDisponiveis.length === 1 && !vendedorId) {
+      setVendedorId(vendedoresDisponiveis[0].id);
+    }
+  }, [vendedoresDisponiveis, vendedorId]);
 
   const catalogo = useMemo(() => (ctx ? montarCatalogo(ctx) : null), [ctx]);
 
@@ -278,12 +298,23 @@ export default function SimuladorPage() {
       <h1 className="text-2xl font-semibold">Simulador de pedido</h1>
 
       <Card className="space-y-4">
+        {semVendedorVinculado && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            ⚠️ O seu acesso ainda não está vinculado a um vendedor, então não é possível lançar
+            pedido. Peça a um Administrador para fazer o vínculo na tela de Usuários.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
             <Label>Vendedor</Label>
-            <select className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={vendedorId} onChange={(e) => { setVendedorId(e.target.value); setComissao(null); }}>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={vendedorId}
+              disabled={vendedoresDisponiveis.length <= 1}
+              onChange={(e) => { setVendedorId(e.target.value); setComissao(null); }}
+            >
               <option value="">Selecione…</option>
-              {ctx.vendedores.map((v) => (
+              {vendedoresDisponiveis.map((v) => (
                 <option key={v.id} value={v.id}>{v.name} — {v.canalNome}</option>
               ))}
             </select>
@@ -324,7 +355,13 @@ export default function SimuladorPage() {
           </div>
           <div>
             <Label>Frete (R$)</Label>
-            {freteAutomatico ? (
+            {/* Frete por conta do cliente: o campo é bloqueado e vale 0. Nada de
+                digitar um valor que o sistema depois ignora — ou pior, desconta. */}
+            {freteCliente ? (
+              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
+                R$ 0,00 — por conta do cliente
+              </p>
+            ) : freteAutomatico ? (
               <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
                 {simulacao.estado === "ok" ? reais(simulacao.freteUsado.toString()) : "—"} (automático: % da receita por UF)
               </p>
@@ -333,7 +370,14 @@ export default function SimuladorPage() {
             )}
           </div>
           <label className="flex items-end gap-2 pb-2 text-sm">
-            <input type="checkbox" checked={freteCliente} onChange={(e) => setFreteCliente(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={freteCliente}
+              onChange={(e) => {
+                setFreteCliente(e.target.checked);
+                if (e.target.checked) setFrete("0");
+              }}
+            />
             Frete por conta do cliente
           </label>
         </div>
@@ -433,7 +477,7 @@ export default function SimuladorPage() {
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
             Deduções da receita líquida: frete {toMoney(simulacao.freteUsado).replace(".", ",")} · imposto frete{" "}
             {toMoney(simulacao.resultado.impostoFrete).replace(".", ",")} · comissão {toMoney(simulacao.resultado.comissao).replace(".", ",")}
-            {simulacao.resultado.ajusteFrete.isZero() ? "" : " · frete devolvido pelo cliente"}
+            {freteCliente ? " · frete por conta do cliente (não entra no resultado)" : ""}
           </p>}
 
           {simulacao.avisos.map((a, i) => (

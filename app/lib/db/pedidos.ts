@@ -34,6 +34,11 @@ export type InsumoEmbalagem = {
 
 export type ContextoSimulador = {
   vendedores: VendedorOpcao[];
+  // Vendedor vinculado a quem está usando o sistema (null se não houver).
+  // O Comercial só lança pedido para ele — a trava de verdade é o gatilho
+  // trg_orders_vendedor_do_acesso, no banco; aqui a lista já vem filtrada
+  // para a pessoa não escolher errado e só descobrir ao salvar.
+  meuVendedorId: string | null;
   clientes: Array<{ id: string; name: string; uf: string | null }>;
   ufs: string[]; // UFs com alíquota ICSM cadastrada
   tabelaPorUF: Map<string, TabelasUF>;
@@ -47,7 +52,7 @@ export type ContextoSimulador = {
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos] = await Promise.all([
+  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("customers").select("id, name, uf").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
@@ -62,8 +67,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       .eq("status", "active")
       .order("name"),
     supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
+    supabase.rpc("meu_vendedor"),
   ]);
-  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos]) {
+  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend]) {
     if (r.error) throw r.error;
   }
 
@@ -158,6 +164,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
   }
 
   return {
+    meuVendedorId: (meuVend.data as string | null) ?? null,
     vendedores: (vend.data ?? []).map((v) => {
       const c = v.channels as unknown as { name: string; applies_difal: boolean; default_commission_rate: string; freight_model: "manual" | "uf_percent" } | null;
       return {

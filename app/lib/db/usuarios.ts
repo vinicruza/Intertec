@@ -26,7 +26,30 @@ export type UsuarioAdmin = {
   email: string;
   last_sign_in_at: string | null;
   created_at: string;
+  // Vendedor que este acesso representa. O Comercial só lança pedido para ele.
+  seller_id: string | null;
+  seller_name: string | null;
 };
+
+export type VendedorOpcaoAdmin = { id: string; name: string; profile_id: string | null };
+
+export async function listarVendedoresParaVinculo(): Promise<VendedorOpcaoAdmin[]> {
+  const { data, error } = await supabase
+    .from("sellers")
+    .select("id, name, profile_id")
+    .eq("active", true)
+    .order("name");
+  if (error) throw error;
+  return (data ?? []) as VendedorOpcaoAdmin[];
+}
+
+export async function vincularVendedor(profileId: string, sellerId: string | null): Promise<void> {
+  const { error } = await supabase.rpc("vincular_vendedor", {
+    p_profile_id: profileId,
+    p_seller_id: sellerId,
+  });
+  if (error) throw error;
+}
 
 export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
   const { data, error } = await supabase.rpc("list_users_for_admin");

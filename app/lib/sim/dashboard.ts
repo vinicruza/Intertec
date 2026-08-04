@@ -103,7 +103,7 @@ export function montarDashboard(
       cancelamentos: pedidos.filter((p) => p.sinal === -1).length,
       receitaBruta,
       margemContribuicao: margem,
-      margemMediaPct: receitaLiquida.isZero() ? null : margem.div(receitaLiquida),
+      margemMediaPct: receitaLiquida.isZero() ? null : margemPct(margem, receitaLiquida),
       pedidosCriticosOuNegativos: criticos,
     },
     rankings: {

@@ -13,6 +13,8 @@ import {
   custoKitCompleto,
   precoSemImposto,
   toMoney,
+  dec,
+  margemPct,
   toPercent,
   type ComponenteFicha,
   type InsumoCascata,
@@ -465,5 +467,57 @@ describe("Exibição — arredondamento só na ponta (Calculations.md §9.9)", (
     expect(valor.toString()).toBe("274.623975");
     // ...e vira "274.62" apenas quando formatado em R$.
     expect(toMoney(valor)).toBe("274.62");
+  });
+});
+
+describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
+  // Encontrados por teste de tela, um dia antes da operação começar.
+
+  // Mesmo item do fixture Patricia usado em T6/T7.
+  const itemAvental = {
+    nome: "Avental TNT Sem Manga Não Estéril",
+    precoVenda: "4.20",
+    quantidade: "4000",
+    cmvUnitario: "1.537605",
+    despesaUnitaria: "0.778783",
+  };
+
+  it("T14 — frete por conta do cliente zera frete E imposto sobre o frete", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      fretePorContaCliente: true,
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    esperarProximo(r.frete, "0");
+    esperarProximo(r.impostoFrete, "0");
+    esperarProximo(r.freteInformado, "1000"); // o que veio na entrada, para auditoria
+    // 16.800 − 2.730 − 2.268 − 420. Nem 9.219,50 (frete saindo duas vezes,
+    // como era antes), nem 10.219,50 (frete saindo uma vez).
+    esperarProximo(r.receitaLiquida, "11382");
+    esperarProximo(r.margemContribuicao, "5231.58");
+  });
+
+  it("T14b — sem a flag, o pedido continua exatamente igual ao T6", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      fretePorContaCliente: false,
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+    esperarProximo(r.receitaLiquida, "10219.50");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.82");
+  });
+
+  it("T15 — prejuízo nunca devolve percentual positivo", () => {
+    // Os números do pedido real que revelou o defeito.
+    const pct = margemPct(dec("-320.85"), dec("-217.50"));
+    expect(pct.isNegative()).toBe(true);
+    expect(toPercent(pct)).toBe("-147.52");
   });
 });

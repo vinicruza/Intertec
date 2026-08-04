@@ -65,6 +65,12 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     }
   }
 
+  // Frete por conta do cliente zera o frete do pedido — inclusive o automático
+  // dos canais por percentual de UF. Zerar aqui, e não só no cálculo, faz o
+  // snapshot do fechamento gravar frete 0: o DRE do mês precisa enxergar a
+  // mesma coisa que a tela mostrou.
+  if (entrada.fretePorContaCliente) freteUsado = new Decimal(0);
+
   const resultado = calcularPedido({
     itens: entrada.itens,
     frete: freteUsado,

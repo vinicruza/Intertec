@@ -1,5 +1,5 @@
 import { Decimal, dec } from "./decimal";
-import type { EntradaDecimal } from "./types";
+import { ErroCalculoBloqueante, type EntradaDecimal } from "./types";
 
 // ============================================================
 // Camada 2 — Ficha técnica e CMV (Calculations.md §3 e §4)
@@ -17,14 +17,35 @@ export type Quantidade =
   | { tipo: "lote"; tamanhoLote: EntradaDecimal };
 
 // Converte a expressão estruturada no número de fato consumido.
+//
+// Rendimento e tamanho de lote são DENOMINADORES. Zerados, o decimal.js não
+// reclama: devolve Infinity em silêncio, o custo do componente vira Infinity, o
+// CMV do produto vira Infinity, e a validação de pedido — que só barra CMV
+// menor ou igual a zero — deixa passar, porque Infinity é maior que zero. Um
+// campo digitado errado contaminaria a cascata inteira sem uma única mensagem.
+// Barrar aqui é o mesmo princípio do custo zero: nada de errado passa calado.
 export function resolverQuantidade(q: Quantidade): Decimal {
   switch (q.tipo) {
     case "direta":
       return dec(q.quantidade);
-    case "area":
-      return dec(q.largura).times(dec(q.comprimento)).div(dec(q.rendimento));
-    case "lote":
-      return new Decimal(1).div(dec(q.tamanhoLote));
+    case "area": {
+      const rendimento = dec(q.rendimento);
+      if (rendimento.lte(0)) {
+        throw new ErroCalculoBloqueante(
+          "Rendimento precisa ser maior que zero para calcular a quantidade por área (largura × comprimento ÷ rendimento)."
+        );
+      }
+      return dec(q.largura).times(dec(q.comprimento)).div(rendimento);
+    }
+    case "lote": {
+      const tamanhoLote = dec(q.tamanhoLote);
+      if (tamanhoLote.lte(0)) {
+        throw new ErroCalculoBloqueante(
+          "Tamanho do lote precisa ser maior que zero — é ele que diz quantas unidades um item atende."
+        );
+      }
+      return new Decimal(1).div(tamanhoLote);
+    }
   }
 }
 

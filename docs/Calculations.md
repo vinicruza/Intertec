@@ -199,10 +199,30 @@ imposto_frete    = aliquota_ICSM(UF) × frete
 imposto          = aliquota_ICSM(UF) × receita_pedido
 DIFAL            = aliquota_DIFAL(UF) × receita_pedido
 comissao         = 2,5% × receita_pedido                    (fixo, exceto Externos)
-ajuste_frete     = −frete, se flag "Frete Cliente" = X      (cliente paga o frete de volta)
-receita_liquida  = receita_pedido − frete − imposto_frete − imposto − DIFAL − comissao + ajuste_frete
-margem_pedido    = (receita_liquida − CMV_pedido) ÷ receita_liquida
+frete            = 0, se flag "Frete Cliente" = X           (ver correção abaixo)
+imposto_frete    = 0 quando o frete é 0
+receita_liquida  = receita_pedido − frete − imposto_frete − imposto − DIFAL − comissao
+margem_pedido    = (receita_liquida − CMV_pedido) ÷ |receita_liquida|
 ```
+
+**⚠️ Correção de 04/08/2026 — frete por conta do cliente.** Até esta data, esta seção
+descrevia `ajuste_frete = −frete` **somado** a uma receita líquida que já havia subtraído o
+frete: ele saía **duas vezes**. A própria linha se contradizia, dizendo entre parênteses que o
+cliente paga o frete de volta. Herdado da planilha e não listado na Seção 9 — ninguém tinha
+percebido. Encontrado num teste de tela em 04/08/2026, num pedido de R$ 150 com frete R$ 150,
+onde a receita líquida despencou para −217,50.
+
+Regra correta, decidida pelo cliente: **frete por conta do cliente zera o frete do pedido** —
+e, com ele, o imposto sobre o frete, porque não há transporte pago pela Intertech para ser
+tributado. Na tela, o campo de frete fica bloqueado em R$ 0,00 quando a caixa é marcada, em vez
+de aceitar um valor que o sistema depois descontaria.
+
+**⚠️ Correção de 04/08/2026 — sinal do percentual de margem.** O denominador passa a ser o
+**módulo** da receita líquida. Com o divisor sinalizado, um pedido de prejuízo (margem negativa
+sobre receita líquida negativa) devolvia percentual **positivo**, e a faixa de status carimbava
+"Boa", em verde — no simulador, na fila de Aprovações e na contagem do painel Início. Com o
+módulo, o sinal do percentual é sempre o sinal do dinheiro. Pedido com receita líquida positiva,
+que é o caso de T6 e T7, não muda.
 
 **⚠️ A margem do pedido NÃO desconta a despesa alocada** (ver Seção 9, item 1).
 
@@ -356,5 +376,7 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T11d | identidade por modo | mesma caixa, 10 ou 20 itens | assinaturas distintas (`/10` contra `/20`) |
 | T12 | cmv com/sem mão de obra | ficha com costureira 0,85 marcada como `mao_de_obra` | cheio 1,973848; sem MO 1,123848; propaga ao kit |
 | T13 | explosão de consumo | 10 aventais + 4 campos, fichas da §3 | bobina 14,121212; punho 20; caixa 0,026667 |
+| T14 | frete por conta do cliente | fixture T6 com a flag marcada | frete 0 e imposto_frete 0; RL 11.382,00 (não 9.219,50 nem −217) |
+| T15 | sinal da margem | margem −320,85 sobre RL −217,50 | −147,52% e faixa "Negativa" (nunca "Boa") |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
