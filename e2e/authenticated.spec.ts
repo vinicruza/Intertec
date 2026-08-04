@@ -76,9 +76,15 @@ for (const { rota, titulo } of TELAS) {
 
     await page.goto(rota);
 
+    // Espera a tela terminar de carregar. Sem isto, a conferência do título
+    // acontecia enquanto a página ainda mostrava "Carregando…" e falhava por
+    // pressa, não por defeito.
+    const conteudo = page.locator("main");
+    await expect(conteudo).not.toContainText("Carregando", { timeout: 20_000 });
+
     // O ErrorBoundary do app desenha esta frase quando um componente estoura.
     await expect(page.getByText("Nao foi possivel abrir esta tela")).toHaveCount(0);
-    await expect(page.locator("main, body")).toContainText(titulo, { timeout: 15_000 });
+    await expect(conteudo).toContainText(titulo, { timeout: 15_000 });
     expect(errosDeConsole, `Erro de JavaScript em ${rota}`).toEqual([]);
   });
 }
