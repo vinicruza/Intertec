@@ -111,7 +111,6 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
 
   const margemContribuicao = receitaLiquida.minus(cmvTotal);
   const resultadoAposRateio = margemContribuicao.minus(despesaTotal);
-  const semDenominador = receitaLiquida.isZero();
 
   return {
     receitaBruta,
@@ -125,9 +124,27 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
     ajusteFrete,
     receitaLiquida,
     margemContribuicao,
-    margemContribuicaoPct: semDenominador ? zero : margemContribuicao.div(receitaLiquida),
+    margemContribuicaoPct: margemPct(margemContribuicao, receitaLiquida),
     resultadoAposRateio,
-    resultadoAposRateioPct: semDenominador ? zero : resultadoAposRateio.div(receitaLiquida),
+    resultadoAposRateioPct: margemPct(resultadoAposRateio, receitaLiquida),
     itens,
   };
+}
+
+// Percentual de margem sobre a receita líquida.
+//
+// Divide pelo MÓDULO da receita líquida de propósito. Quando um pedido afunda a
+// receita líquida para baixo de zero (frete e impostos maiores que a venda), a
+// margem também fica negativa — e dividir negativo por negativo devolvia um
+// percentual POSITIVO. Um prejuízo de R$ 320,85 aparecia como +147,52% e o
+// sistema carimbava o pedido como "Boa", em verde, no simulador e na fila de
+// aprovação.
+//
+// Usando o módulo no denominador, o sinal do percentual é sempre o sinal do
+// dinheiro: prejuízo é sempre negativo, e cai na faixa "Negativa". Pedido com
+// receita líquida positiva — o caso normal, e o dos golden tests T6/T7 — não
+// muda em nada.
+export function margemPct(margem: Decimal, receitaLiquida: Decimal): Decimal {
+  if (receitaLiquida.isZero()) return new Decimal(0);
+  return margem.div(receitaLiquida.abs());
 }

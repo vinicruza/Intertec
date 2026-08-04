@@ -1,4 +1,4 @@
-import { dec } from "@calc";
+import { dec, margemPct } from "@calc";
 import { supabase } from "../supabase";
 import { PARAMETROS_APROVACAO_PADRAO, type ParametrosAprovacao } from "../sim/aprovacao";
 import { statusMargem, type RegraMargem } from "../sim/params";
@@ -128,7 +128,7 @@ export async function avaliarMargensPendentes(ids: string[]): Promise<Map<string
         const { snap } = await simularPedidoComCustosVigentes(pedido, ctx);
         const receitaLiquida = dec(snap.pedido.net_revenue_snapshot);
         const margem = dec(snap.pedido.contribution_margin_snapshot);
-        const pct = receitaLiquida.isZero() ? dec("0") : margem.div(receitaLiquida);
+        const pct = margemPct(margem, receitaLiquida);
         resultados.set(id, { ok: true, pct: pct.toString(), regra: statusMargem(pct, ctx.regrasMargem) });
       } catch (e) {
         resultados.set(id, { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular." });

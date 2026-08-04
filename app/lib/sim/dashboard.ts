@@ -1,4 +1,4 @@
-import { Decimal, dec } from "@calc";
+import { Decimal, dec, margemPct } from "@calc";
 import { statusMargem, type RegraMargem } from "./params";
 
 // ============================================================
@@ -61,7 +61,7 @@ export function montarDashboard(
     if (p.sinal === -1) return false;
     const rl = dec(p.net_revenue_snapshot);
     if (rl.isZero()) return true; // sem receita líquida = problema
-    const st = statusMargem(dec(p.contribution_margin_snapshot).div(rl), regras);
+    const st = statusMargem(margemPct(dec(p.contribution_margin_snapshot), rl), regras);
     return st !== null && /crítica|negativa/i.test(st.label);
   }).length;
 
