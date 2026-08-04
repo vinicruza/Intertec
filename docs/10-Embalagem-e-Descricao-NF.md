@@ -43,7 +43,59 @@ O motor de cálculo (`custoKitCompleto`) passou a devolver, além dos totais que
 
 Aparece como uma tabela "Peso de cada item no custo do kit" nas duas telas que montam kit — o Simulador (kit nascendo dentro do pedido) e a tela de Kits — ordenada do item mais pesado para o mais leve.
 
-## 4. Onde cada coisa mora
+## 4. Nomenclatura de NF dos campos cirúrgicos (04/08/2026)
+
+O campo "Descrição NF" da Seção 3 nasceu como texto livre, e ficou vazio nos 324 produtos —
+ninguém ia digitar 324 vezes. O cliente então definiu a regra que gera esse texto sozinho,
+começando pelos campos cirúrgicos (216 produtos, a categoria CC inteira).
+
+O problema real: o nome do catálogo carrega detalhe de fabricação que não deve sair impresso
+na nota. `Campo Simples 1,00 x 1,20 Não Estéril GR40` diz a gramatura da bobina; para o
+faturamento isso é ruído, e ainda faz o mesmo produto comercial aparecer com dois nomes só
+porque saiu de GR30 ou de GR40. **O nome do catálogo não muda** — é ele que sustenta CMV,
+ficha técnica e histórico. O que nasce é um segundo nome, paralelo, só para a nota.
+
+A regra tem duas metades. Primeiro, o começo do nome vira o nome fiscal da família:
+
+| Família no catálogo | Descrição NF |
+|---|---|
+| Campo Catarata | Campo Cirúrgico com Adesivo e Bag |
+| Campo com Fenestra | Campo Cirúrgico com Fenestra |
+| Campo com Adesivo | Campo Cirúrgico com Adesivo |
+| Campo de Mesa | Campo Cirúrgico com Reforço |
+| Campo Lasik | Campo Cirúrgico com Adesivo e 2 Bags |
+| Campo Simples | Campo Cirúrgico Sem Fenestra |
+| Steri Drape | Campo Cirúrgico Steri Drape (Grande → G, Pequeno → P) |
+| Campo Lateral, Superior, Inferior, de Mayo, Fenestra U… | Campo Cirúrgico + o resto do nome |
+
+Segundo, some do resto o que não pode variar a nota: **gramatura** (`GR30`, `GR 40`),
+**matéria-prima** (`TNT`, `SMS`) e **origem** (`China`). Tamanho, `+ Tape`, `Estéril` e
+`Não Estéril` continuam — são a diferença real do que está sendo entregue.
+
+Resultado: 216 campos → **139 descrições distintas**. Os 108 produtos das outras categorias
+(aventais, conjuntos, botas…) continuam sem descrição de NF; a regra deles ainda não foi
+definida, e a função devolve vazio em vez de inventar.
+
+### 4.1 Por que existe a marca de origem
+
+A regra vai rodar de novo — quando entrarem aventais, ou um campo novo for cadastrado. Se ela
+simplesmente reescrevesse tudo, apagaria em silêncio qualquer texto que a Intertech tivesse
+corrigido à mão. Por isso cada descrição guarda **como foi escrita** (`nf_description_source`):
+`regra` ou `manual`. A regra só mexe no que é dela; o que uma pessoa ajustou fica marcado
+"ajustada à mão" na lista de produtos e é intocável.
+
+### 4.2 Onde isso aparece
+
+Coluna **Descrição NF** na lista de Produtos (e na busca — dá para procurar pelo nome fiscal).
+Na tela de editar produto o campo continua editável e passa a mostrar, abaixo dele, o texto
+que a regra produziria, com um "usar esta" para aplicar.
+
+A lista de 216 descrições que a migração gravou **não foi escrita à mão nem reimplementada em
+SQL**: foi gerada rodando `descricaoNFdoProduto` sobre o catálogo. Duas cópias da mesma regra,
+uma em TypeScript e outra em SQL, divergiriam com o tempo — e a divergência sairia impressa
+na nota fiscal antes de alguém perceber.
+
+## 5. Onde cada coisa mora
 
 | Peça | Arquivo |
 |---|---|
@@ -55,3 +107,7 @@ Aparece como uma tabela "Peso de cada item no custo do kit" nas duas telas que m
 | Peso de custo por item do kit (motor) | `lib/calculations/kits.ts` (`custoKitCompleto` → `linhasProdutos`, `linhasEmbalagem`), golden test T11e |
 | Peso de custo por item do kit (simulador) | `app/lib/sim/kitNoPedido.ts`, `app/pages/SimuladorPage.tsx` (`PesoDeCustoDoKit`) |
 | Peso de custo por item do kit (tela de Kits) | `app/pages/KitFormPage.tsx` |
+| Regra de nomenclatura de NF | `lib/nomenclatura/descricaoNF.ts`, testes em `tests/nomenclatura/descricaoNF.test.ts` |
+| Migração (marca de origem + carga das 216 descrições) | `supabase/migrations/20260804000300_nomenclatura_nf_campos.sql` |
+| Coluna Descrição NF na lista | `app/pages/ProdutosPage.tsx` |
+| Sugestão da regra no cadastro | `app/pages/ProdutoFormPage.tsx`, `app/lib/db/produtos.ts` |

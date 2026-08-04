@@ -14,7 +14,7 @@ export default function ProdutosPage() {
   const filtrados = useMemo(() => (produtos.data ?? []).filter((p) => {
     const termo = busca.trim().toLocaleLowerCase("pt-BR");
     return (!categoria || p.category_id === categoria) && (!termo ||
-      `${p.code} ${p.legacy_code ?? ""} ${p.name}`.toLocaleLowerCase("pt-BR").includes(termo));
+      `${p.code} ${p.legacy_code ?? ""} ${p.name} ${p.nf_description ?? ""}`.toLocaleLowerCase("pt-BR").includes(termo));
   }), [produtos.data, busca, categoria]);
 
   return <div className="space-y-5">
@@ -23,7 +23,7 @@ export default function ProdutosPage() {
       <Link to="/produtos/novo"><Button>Novo produto</Button></Link>
     </div>
     <Card className="grid gap-3 p-4 md:grid-cols-[1fr_18rem]">
-      <Input aria-label="Buscar produtos" placeholder="Buscar por código novo, código antigo ou nome…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      <Input aria-label="Buscar produtos" placeholder="Buscar por código novo, código antigo, nome ou descrição de NF…" value={busca} onChange={(e) => setBusca(e.target.value)} />
       <select aria-label="Filtrar categoria" className="min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 text-sm" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
         <option value="">Todas as categorias</option>{(categorias.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.prefix} — {c.name}</option>)}
       </select>
@@ -33,14 +33,25 @@ export default function ProdutosPage() {
     {!produtos.isLoading && <p className="text-xs text-[var(--cor-texto-suave)]">{filtrados.length} produto(s) encontrado(s)</p>}
     <div className="grid gap-3 md:hidden">
       {filtrados.map((p) => <button key={p.id} className="rounded-2xl border border-[var(--cor-borda)] bg-white p-4 text-left shadow-[var(--sombra-cartao)]" onClick={() => navigate(`/produtos/${p.id}`)}>
-        <div className="flex items-start justify-between gap-3"><div><div className="font-mono text-sm font-bold text-[var(--cor-primaria)]">{p.code}</div><div className="mt-1 font-semibold">{p.name}</div></div><Badge>{p.category ?? "—"}</Badge></div>
+        <div className="flex items-start justify-between gap-3"><div><div className="font-mono text-sm font-bold text-[var(--cor-primaria)]">{p.code}</div><div className="mt-1 font-semibold">{p.name}</div>{p.nf_description && <div className="mt-1 text-sm text-[var(--cor-texto-suave)]">NF: {p.nf_description}</div>}</div><Badge>{p.category ?? "—"}</Badge></div>
         <div className="mt-3 flex justify-between text-sm text-[var(--cor-texto-suave)]"><span>{p.legacy_code ? `Anterior: ${p.legacy_code}` : ""}</span><strong className="text-[var(--cor-texto)]">CMV {reais(p.cmv)}</strong></div>
       </button>)}
     </div>
     <Card className="hidden overflow-x-auto p-0 md:block"><table className="w-full text-sm"><thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
-      <th className="px-5 py-3 font-medium">Código</th><th className="px-5 py-3 font-medium">Nome</th><th className="px-5 py-3 font-medium">Categoria</th><th className="px-5 py-3 font-medium">CMV</th></tr></thead><tbody>
+      <th className="px-5 py-3 font-medium">Código</th><th className="px-5 py-3 font-medium">Nome</th>
+      {/* Nome fiscal, paralelo ao nome do catálogo: sem gramatura, sem TNT/SMS
+          e sem origem — regra combinada em 04/08/2026. */}
+      <th className="px-5 py-3 font-medium">Descrição NF</th>
+      <th className="px-5 py-3 font-medium">Categoria</th><th className="px-5 py-3 font-medium">CMV</th></tr></thead><tbody>
       {filtrados.map((p) => <tr key={p.id} className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/produtos/${p.id}`)}>
-        <td className="px-5 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{p.code}</strong>{p.erp_code && <div className="text-xs text-[var(--cor-texto-suave)]">ERP {p.erp_code}</div>}{p.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {p.legacy_code}</div>}</td><td className="px-5 py-3 font-medium">{p.name}</td><td className="px-5 py-3"><Badge>{p.category ?? "—"}</Badge></td><td className="px-5 py-3">
+        <td className="px-5 py-3"><strong className="font-mono text-[var(--cor-primaria)]">{p.code}</strong>{p.erp_code && <div className="text-xs text-[var(--cor-texto-suave)]">ERP {p.erp_code}</div>}{p.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {p.legacy_code}</div>}</td><td className="px-5 py-3 font-medium">{p.name}</td>
+        <td className="px-5 py-3">
+          {p.nf_description ?? <span className="text-[var(--cor-texto-suave)]">—</span>}
+          {p.nf_description_source === "manual" && (
+            <div className="text-xs text-[var(--cor-texto-suave)]">ajustada à mão</div>
+          )}
+        </td>
+        <td className="px-5 py-3"><Badge>{p.category ?? "—"}</Badge></td><td className="px-5 py-3">
           {reais(p.cmv)}
           {/* Quando há costureira na ficha, mostra também a leitura de
               competência — é a que o DRE usa (reunião 16/07/2026). */}

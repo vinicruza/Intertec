@@ -23,6 +23,12 @@ Clique em **Novo produto** para cadastrar um produto, ou em uma linha para edita
 - **Descrição NF**: o texto que deve sair na nota fiscal quando este produto for faturado. O
   sistema **não emite nota fiscal** — isso continua um processo manual, fora daqui; este campo só
   existe para não depender de decorar ou copiar de outro lugar na hora de faturar.
+  Nos campos cirúrgicos ele já vem preenchido por uma regra: o nome do catálogo vira o nome
+  fiscal da família (ex.: `Campo Simples` → `Campo Cirúrgico Sem Fenestra`) e gramatura, TNT/SMS
+  e origem somem, porque não podem variar a nota. Tamanho e Estéril/Não Estéril continuam.
+  Você pode escrever outro texto à vontade — quando o texto salvo é diferente do da regra, ele
+  fica marcado como **ajustada à mão** na lista de produtos e nenhuma rodada futura da regra o
+  sobrescreve. Abaixo do campo aparece a sugestão da regra, com um **usar esta** para aplicá-la.
 
 ### Ficha técnica (composição do produto)
 

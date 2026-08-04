@@ -17,6 +17,7 @@ import {
   type ProdutoForm,
   listarCategoriasProduto,
 } from "../lib/db/produtos";
+import { descricaoNFdoProduto } from "../../lib/nomenclatura/descricaoNF";
 import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais, percentual } from "../lib/format";
@@ -37,7 +38,7 @@ export default function ProdutoFormPage() {
   const queryClient = useQueryClient();
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
 
-  const { register, control, handleSubmit, reset, watch } = useForm<ProdutoForm>({
+  const { register, control, handleSubmit, reset, watch, setValue } = useForm<ProdutoForm>({
     defaultValues: {
       code: "", name: "", categoryId: "", type: "", sterile: false, size: "", grammage: "",
       nfDescription: "", componentes: [COMPONENTE_VAZIO],
@@ -72,6 +73,13 @@ export default function ProdutoFormPage() {
   }, [produtoQuery.data, reset]);
 
   const componentes = watch("componentes");
+
+  // Descrição de NF que a regra produziria para o nome digitado. Só aparece
+  // como sugestão: quem cadastra continua livre para escrever outro texto, e o
+  // que for escrito à mão fica marcado como manual e a salvo da regra.
+  const nomeAtual = watch("name");
+  const nfDescriptionAtual = watch("nfDescription");
+  const sugestaoNF = useMemo(() => descricaoNFdoProduto(nomeAtual), [nomeAtual]);
 
   // Prévia ao vivo do CMV e participação (cálculo no motor). Só computa quando
   // todos os componentes têm referência escolhida; senão, mostra pendente.
@@ -144,6 +152,19 @@ export default function ProdutoFormPage() {
               Guardado aqui para não depender de decorar ou copiar de outro lugar na hora de
               faturar. O sistema ainda não emite nota fiscal — isso continua manual, fora daqui.
             </p>
+            {sugestaoNF && sugestaoNF !== nfDescriptionAtual.trim() && (
+              <p className="mt-2 text-xs">
+                <span className="text-[var(--cor-texto-suave)]">Pela regra de nomenclatura: </span>
+                <strong>{sugestaoNF}</strong>{" "}
+                <button
+                  type="button"
+                  className="text-[var(--cor-primaria)] hover:underline"
+                  onClick={() => setValue("nfDescription", sugestaoNF, { shouldDirty: true })}
+                >
+                  usar esta
+                </button>
+              </p>
+            )}
           </div>
         </Card>
 

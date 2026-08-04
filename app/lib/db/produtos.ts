@@ -1,4 +1,5 @@
 import { Decimal, resolverQuantidade, type InsumoCascata, type ProdutoCascata, type Quantidade } from "@calc";
+import { origemDaDescricaoNF, type OrigemDescricaoNF } from "../../../lib/nomenclatura/descricaoNF";
 import { supabase } from "../supabase";
 
 export type ProdutoLinha = {
@@ -16,8 +17,10 @@ export type ProdutoLinha = {
   status: "active" | "inactive";
   // Texto que sai na nota fiscal ao faturar — a emissão em si é fora do
   // escopo do sistema (PRD §11); aqui só guarda o texto para não depender de
-  // decorar ou copiar de outro lugar na hora de faturar.
+  // decorar ou copiar de outro lugar na hora de faturar. Nos campos
+  // cirúrgicos vem da regra de nomenclatura (lib/nomenclatura/descricaoNF.ts).
   nf_description: string | null;
+  nf_description_source: OrigemDescricaoNF | null;
   cmv: string | null; // de product_costs (pode não existir ainda)
   // CMV sem mão de obra: leitura de competência, para o DRE (Calculations.md §4.2).
   cmvSemMaoDeObra: string | null;
@@ -113,7 +116,7 @@ export async function carregarBaseCascata(
 export async function listarProdutos(): Promise<ProdutoLinha[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, status, product_costs(cmv, cmv_without_labor)")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, nf_description_source, status, product_costs(cmv, cmv_without_labor)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
@@ -147,7 +150,7 @@ export type ProdutoCompleto = {
 export async function obterProduto(id: string): Promise<ProdutoCompleto | null> {
   const { data: produto, error } = await supabase
     .from("products")
-    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, status")
+    .select("id, code, erp_code, legacy_code, name, category, category_id, type, sterile, size, grammage, nf_description, nf_description_source, status")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -189,6 +192,9 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
     size: form.size.trim() || null,
     grammage: form.grammage.trim() || null,
     nf_description: form.nfDescription.trim() || null,
+    // Marca se o texto ainda é o da regra ou se alguém o ajustou — é o que
+    // impede uma futura rodada da regra de apagar o ajuste.
+    nf_description_source: origemDaDescricaoNF(form.name, form.nfDescription),
   };
 
   const linhas = componentesParaBanco(form);
