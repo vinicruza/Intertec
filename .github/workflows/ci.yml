@@ -7,6 +7,11 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  # Permite disparar a verificação à mão, pelo botão "Run workflow" na aba
+  # Actions. Útil quando o que mudou não foi o código e sim a configuração —
+  # trocar um segredo, por exemplo, não gera commit nenhum e portanto não
+  # dispara nada.
+  workflow_dispatch:
 
 jobs:
   verificar:
