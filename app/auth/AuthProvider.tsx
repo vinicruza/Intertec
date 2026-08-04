@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { traduzErro } from "../lib/erros";
 import type { Perfil } from "../lib/roles";
 
 export type PerfilUsuario = {
@@ -116,14 +117,4 @@ export function useAuth(): EstadoAuth {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth precisa estar dentro de <AuthProvider>");
   return ctx;
-}
-
-function traduzErro(msg: string): string {
-  if (/invalid login credentials/i.test(msg)) return "E-mail ou senha incorretos.";
-  if (/email not confirmed/i.test(msg)) return "E-mail ainda não confirmado.";
-  if (/should be different from the old password/i.test(msg)) {
-    return "A nova senha precisa ser diferente da atual.";
-  }
-  if (/password should be at least/i.test(msg)) return "A nova senha é curta demais.";
-  return msg;
 }
