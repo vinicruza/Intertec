@@ -101,12 +101,47 @@ quem já registrou algo.
 5. **O teste em paralelo de 2 semanas (§4) não aconteceu.** É o critério de aceite da
    Sprint 14 e o único que prova que o sistema dá o mesmo número que a planilha.
 
-### 5.3 Dois ajustes que dependem do painel (não são código)
+### 5.3 Testes de tela com login no CI
 
-- **Supabase → Authentication → Policies:** ligar a *proteção contra senha vazada*, que
-  compara a senha nova com bases de senhas já vazadas. Está desligada.
-- **GitHub → Settings → Secrets:** cadastrar `E2E_EMAIL` e `E2E_PASSWORD`. Sem eles, os
-  testes de tela que exigem login ficam pulando no CI — só as telas públicas são cobertas.
+Além dos 130 testes de cálculo, existe um teste que **abre o sistema num navegador de
+verdade**, entra com e-mail e senha e passa por Início, Pedidos, DRE e Integridade
+conferindo que nenhuma tela quebrou. É o que pega uma falha do tipo "depois desta
+publicação, o DRE não abre mais".
+
+Ele precisa de quatro segredos em **GitHub → Settings → Secrets and variables → Actions**:
+
+| Segredo | Valor |
+|---|---|
+| `E2E_EMAIL` | e-mail de uma conta **Administrador** do sistema |
+| `E2E_PASSWORD` | a senha dessa conta |
+| `VITE_SUPABASE_URL` | `https://wdnontebtxnrsenvtucd.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | a chave publicável (`sb_publishable_…`) |
+
+Os dois `VITE_` são os mesmos da Vercel: sem eles o navegador do teste não tem banco
+para autenticar. A chave publicável não é segredo de verdade — ela já vai no navegador de
+qualquer visitante — mas fica no cofre para não nascer escrita dentro do repositório.
+
+**Faltando qualquer um dos quatro, o teste se pula sozinho e o CI continua verde.** Isso é
+de propósito: CI vermelho por falta de configuração não avisa nada, só ensina o time a
+ignorar a bolinha vermelha.
+
+Duas condições para a conta do teste:
+
+1. **Precisa ser Administrador**, porque o teste passa por DRE e Integridade — telas que os
+   outros perfis não enxergam. Foi decisão do cliente em 04/08/2026 seguir assim, ciente de
+   que é uma senha de acesso total guardada fora do sistema.
+2. **Não pode estar com senha provisória.** Entre com ela uma vez e defina a senha
+   definitiva antes de cadastrar o segredo — senha provisória para na tela de troca
+   obrigatória e nunca chega ao sistema. Se isso acontecer, o CI falha com essa frase
+   explicada, não com um tempo esgotado sem explicação.
+
+Quando um teste de tela falha, o CI guarda print e rastreio em **Artifacts →
+`playwright-report`** na página da execução, por 7 dias.
+
+### 5.4 Ajuste que depende do painel do Supabase
+
+**Authentication → Policies:** ligar a *proteção contra senha vazada*, que compara a senha
+nova com bases de senhas já vazadas. Está desligada.
 
 O alerta do Supabase sobre a função `rls_auto_enable` é falso positivo: ela é um mecanismo
 interno da própria plataforma (liga RLS em tabela nova), não é do projeto e não roda via API.

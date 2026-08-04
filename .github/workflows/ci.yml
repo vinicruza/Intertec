@@ -36,5 +36,32 @@ jobs:
       - name: Instalar Chromium para E2E
         run: npx playwright install --with-deps chromium
 
-      - name: Smoke tests E2E públicos
+      # Os testes de tela sobem o app e abrem um navegador de verdade.
+      #
+      # Os públicos (tela de login) rodam sempre. Os que exigem entrar no
+      # sistema só rodam se os quatro segredos abaixo existirem no
+      # repositório — sem eles o teste se pula sozinho, e o CI continua
+      # verde. Ver docs/06-Carga-e-Deploy.md §5.3.
+      #
+      # VITE_* apontam o app para o Supabase real; sem eles o navegador
+      # não tem banco para autenticar. A chave é a publicável, a mesma que
+      # já vai no navegador de qualquer visitante — não é segredo de
+      # verdade, mas fica no cofre para não nascer escrita no repositório.
+      - name: Smoke tests E2E
         run: npm run test:e2e
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Guardar evidência de falha de tela
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
