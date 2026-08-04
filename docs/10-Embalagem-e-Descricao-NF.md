@@ -102,7 +102,37 @@ Três efeitos que valem registro, porque parecem erro e não são — saem diret
 
 Catálogo completo: **324 produtos, 243 descrições distintas**, nenhum em branco.
 
-### 4.2 Por que existe a marca de origem
+### 4.2 A regra virou cadastro (mesmo dia, terceira rodada)
+
+As duas primeiras rodadas deixaram a regra numa tabela fixa dentro de
+`lib/nomenclatura/descricaoNF.ts`. Funcionava, mas com um custo: trocar o nome fiscal de uma
+família — que reescreve dezenas de produtos de uma vez — exigia mudar código e publicar. O
+cliente perguntou onde ajustaria isso sozinho, e a resposta honesta era "não dá".
+
+Agora existe **Cadastros → Nomenclatura NF**. Cada linha é uma família: o começo do nome no
+catálogo, o nome que vale na nota, o que deve sumir (gramatura, TNT, SMS, origem — em caixinhas
+separadas, porque **não é igual para todos**), as trocas de palavra e a ordem de teste. As
+famílias são testadas de cima para baixo e a primeira que casar vence, então a genérica
+("Campo", "Avental") precisa ficar embaixo das específicas.
+
+**O que NÃO mudou, e é o ponto mais importante:** a regra continua sendo aplicada em TypeScript,
+por uma função pura e testada. O banco guarda a configuração; `descricaoNFdoProduto` continua
+sendo quem traduz. Reimplementar a regra em SQL para o banco "saber" nomear criaria duas cópias
+que divergem com o tempo — e a divergência sairia impressa na nota fiscal antes de alguém
+perceber. A função passou a receber as famílias por parâmetro; quem carrega do banco é a tela.
+
+**Salvar não aplica.** Salvar uma família guarda a regra. Aplicar ao catálogo é um segundo botão,
+e antes dele a tela mostra a prévia: quantos produtos mudariam, quantos já estão certos, quantos
+estão protegidos por ajuste manual, e a lista de antes/depois item a item. Mudar uma linha mexe
+em dezenas de produtos; ninguém deve descobrir isso depois.
+
+Migrar a regra do código para o banco não podia alterar nenhuma das 324 descrições já em
+produção. Foi conferido produto a produto: o motor lendo a configuração produz **as 324 descrições
+idênticas** às que o motor antigo produzia — zero divergências. Os 79 testes de nomenclatura
+rodam contra `lib/nomenclatura/familiasIniciais.ts`, que é a mesma configuração que a migração
+semeia no banco.
+
+### 4.3 Por que existe a marca de origem
 
 A regra vai rodar de novo — quando um produto novo for cadastrado, ou uma família ganhar nome
 fiscal diferente. Se ela simplesmente reescrevesse tudo, apagaria em silêncio qualquer texto que a Intertech tivesse
@@ -110,7 +140,7 @@ corrigido à mão. Por isso cada descrição guarda **como foi escrita** (`nf_de
 `regra` ou `manual`. A regra só mexe no que é dela; o que uma pessoa ajustou fica marcado
 "ajustada à mão" na lista de produtos e é intocável.
 
-### 4.3 Onde isso aparece
+### 4.4 Onde isso aparece
 
 Coluna **Descrição NF** na lista de Produtos (e na busca — dá para procurar pelo nome fiscal).
 Na tela de editar produto o campo continua editável e passa a mostrar, abaixo dele, o texto
@@ -152,7 +182,11 @@ na nota fiscal antes de alguém perceber.
 | Peso de custo por item do kit (motor) | `lib/calculations/kits.ts` (`custoKitCompleto` → `linhasProdutos`, `linhasEmbalagem`), golden test T11e |
 | Peso de custo por item do kit (simulador) | `app/lib/sim/kitNoPedido.ts`, `app/pages/SimuladorPage.tsx` (`PesoDeCustoDoKit`) |
 | Peso de custo por item do kit (tela de Kits) | `app/pages/KitFormPage.tsx` |
-| Regra de nomenclatura de NF | `lib/nomenclatura/descricaoNF.ts`, testes em `tests/nomenclatura/descricaoNF.test.ts` |
+| Regra de nomenclatura de NF (motor puro) | `lib/nomenclatura/descricaoNF.ts`, testes em `tests/nomenclatura/descricaoNF.test.ts` |
+| Configuração de partida (semente + fixture dos testes) | `lib/nomenclatura/familiasIniciais.ts` |
+| Prévia do que mudaria no catálogo | `lib/nomenclatura/previa.ts`, testes em `tests/nomenclatura/previa.test.ts` |
+| Aba Nomenclatura NF | `app/pages/AbaNomenclaturaNF.tsx`, `app/lib/db/nomenclaturaNF.ts` |
+| Migração (tabela da regra + semente + aplicar ao catálogo) | `supabase/migrations/20260804000500_nomenclatura_nf_editavel.sql` |
 | Migração (marca de origem + carga dos 216 campos) | `supabase/migrations/20260804000300_nomenclatura_nf_campos.sql` |
 | Migração (carga dos 108 restantes) | `supabase/migrations/20260804000400_nomenclatura_nf_resto_do_catalogo.sql` |
 | Coluna Descrição NF na lista | `app/pages/ProdutosPage.tsx` |

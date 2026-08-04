@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { descricaoNFdoProduto, origemDaDescricaoNF } from "../../lib/nomenclatura/descricaoNF";
+import { descricaoNFdoProduto, origemDaDescricaoNF, type FamiliaNF } from "../../lib/nomenclatura/descricaoNF";
+import { FAMILIAS_INICIAIS } from "../../lib/nomenclatura/familiasIniciais";
+
+// Toda a suíte roda contra a configuração de partida — a mesma que a migração
+// semeia em nf_naming_rules. Se a tela alterar a regra, é a tela que muda o
+// resultado; aqui fica travado o comportamento combinado com o cliente.
+const F = FAMILIAS_INICIAIS;
+const descricao = (nome: string, familias: FamiliaNF[] = F) => descricaoNFdoProduto(nome, familias);
 
 // Todos os nomes de entrada abaixo são nomes reais do catálogo da Intertech,
 // um por regra combinada em 04/08/2026. Se algum deles quebrar, a nota fiscal
@@ -50,18 +57,49 @@ describe("descrição de NF dos campos cirúrgicos", () => {
     ["Campo de Mayo Não Estéril", "Campo Cirúrgico de Mayo Não Estéril"],
     ["Campo 1,60 x 2,00 Laminado Fenestra U", "Campo Cirúrgico 1,60 x 2,00 Laminado Fenestra U"],
   ])("%s → %s", (nome, esperado) => {
-    expect(descricaoNFdoProduto(nome)).toBe(esperado);
+    expect(descricao(nome)).toBe(esperado);
   });
 
   it("nome vazio não tem descrição", () => {
-    expect(descricaoNFdoProduto("")).toBeNull();
-    expect(descricaoNFdoProduto("   ")).toBeNull();
+    expect(descricao("")).toBeNull();
+    expect(descricao("   ")).toBeNull();
   });
 
   it("família específica vence a genérica", () => {
     // Se "Campo" genérico fosse testado antes, viraria "Campo Cirúrgico Simples…".
-    expect(descricaoNFdoProduto("Campo Simples 0,40 x 0,40 GR40")).toBe(
+    expect(descricao("Campo Simples 0,40 x 0,40 GR40")).toBe(
       "Campo Cirúrgico Sem Fenestra 0,40 x 0,40"
+    );
+  });
+
+  it("quem manda na prioridade é a ordem, não a posição na lista", () => {
+    // A tela devolve as famílias na ordem que quiser; o campo "ordem" é a
+    // verdade. Embaralhada, a genérica continua perdendo para a específica.
+    const embaralhada = [...F].reverse();
+    expect(descricao("Campo Simples 0,40 x 0,40 GR40", embaralhada)).toBe(
+      "Campo Cirúrgico Sem Fenestra 0,40 x 0,40"
+    );
+  });
+
+  it("mudar o nome fiscal de uma família muda só os produtos dela", () => {
+    // É isto que a tela de Cadastros faz — a regra não está mais no código.
+    const outra = F.map((f) =>
+      f.comeco === "Campo de Mesa" ? { ...f, nomeNF: "Campo Cirúrgico Reforçado" } : f
+    );
+    expect(descricao("Campo de Mesa 0,70 x 0,70", outra)).toBe(
+      "Campo Cirúrgico Reforçado 0,70 x 0,70"
+    );
+    expect(descricao("Campo Simples 0,40 x 0,40 GR40", outra)).toBe(
+      "Campo Cirúrgico Sem Fenestra 0,40 x 0,40"
+    );
+  });
+
+  it("uma troca com destino vazio apaga a palavra", () => {
+    const semLaminado = F.map((f) =>
+      f.comeco === "Campo" ? { ...f, trocas: [{ de: "Laminado", para: "" }] } : f
+    );
+    expect(descricao("Campo Inferior Laminado 1,60 x 2,00", semLaminado)).toBe(
+      "Campo Cirúrgico Inferior 1,60 x 2,00"
     );
   });
 
@@ -73,10 +111,10 @@ describe("descrição de NF dos campos cirúrgicos", () => {
       "Campo Lasik Binocular 1,00 X 1,20 2 Bags GR 30 Não Estéril",
     ];
     for (const nome of nomes) {
-      const descricao = descricaoNFdoProduto(nome)!;
-      expect(descricao).not.toMatch(/\bGR\s?\d+\b/i);
-      expect(descricao).not.toMatch(/\bTNT\b|\bSMS\b|\bChina\b/i);
-      expect(descricao).not.toMatch(/\s{2,}/);
+      const saida = descricao(nome)!;
+      expect(saida).not.toMatch(/\bGR\s?\d+\b/i);
+      expect(saida).not.toMatch(/\bTNT\b|\bSMS\b|\bChina\b/i);
+      expect(saida).not.toMatch(/\s{2,}/);
     }
   });
 });
@@ -116,7 +154,7 @@ describe("descrição de NF do resto do catálogo", () => {
     ["Compressa Wiper", "Toalha de Mão"],
     ["Compressa Wiper Não Estéril", "Toalha de Mão Não Estéril"],
   ])("%s → %s", (nome, esperado) => {
-    expect(descricaoNFdoProduto(nome)).toBe(esperado);
+    expect(descricao(nome)).toBe(esperado);
   });
 
   it.each([
@@ -134,25 +172,25 @@ describe("descrição de NF do resto do catálogo", () => {
     "Perneira Não Estéril",
     "Saco 0,60 x 0,90 Estéril",
   ])("o restante se mantém igual: %s", (nome) => {
-    expect(descricaoNFdoProduto(nome)).toBe(nome);
+    expect(descricao(nome)).toBe(nome);
   });
 
   it("o TNT do Conjunto continua na nota — a remoção é só dos aventais", () => {
-    expect(descricaoNFdoProduto("Conjunto P/M TNT")).toBe("Conjunto P/M TNT");
-    expect(descricaoNFdoProduto("Avental TNT Sem Manga")).toBe("Avental Cirúrgico Sem Manga");
+    expect(descricao("Conjunto P/M TNT")).toBe("Conjunto P/M TNT");
+    expect(descricao("Avental TNT Sem Manga")).toBe("Avental Cirúrgico Sem Manga");
   });
 
   it("'Kit Universal Com Avental' é kit, não avental", () => {
     // A família casa pelo começo do nome; "Avental" no meio não conta.
-    expect(descricaoNFdoProduto("Kit Universal Sem Avental")).toBe("Kit Universal Sem Avental");
+    expect(descricao("Kit Universal Sem Avental")).toBe("Kit Universal Sem Avental");
   });
 
   it("nenhuma descrição de avental mantém gramatura ou TNT", () => {
     const nomes = ["Avental TNT 30g ML", "Avental TNT 40g ML Não Estéril", "Avental TNT Sem Manga"];
     for (const nome of nomes) {
-      const descricao = descricaoNFdoProduto(nome)!;
-      expect(descricao).not.toMatch(/\bTNT\b/i);
-      expect(descricao).not.toMatch(/\b\d+\s?g\b|\bGR\s?\d+\b/i);
+      const saida = descricao(nome)!;
+      expect(saida).not.toMatch(/\bTNT\b/i);
+      expect(saida).not.toMatch(/\b\d+\s?g\b|\bGR\s?\d+\b/i);
     }
   });
 });
@@ -161,14 +199,14 @@ describe("origem da descrição de NF", () => {
   const nome = "Campo Simples 1,00 x 1,20 GR40";
 
   it("texto igual ao da regra é 'regra'", () => {
-    expect(origemDaDescricaoNF(nome, "Campo Cirúrgico Sem Fenestra 1,00 x 1,20")).toBe("regra");
+    expect(origemDaDescricaoNF(nome, "Campo Cirúrgico Sem Fenestra 1,00 x 1,20", F)).toBe("regra");
   });
 
   it("texto ajustado à mão é 'manual' e não será sobrescrito", () => {
-    expect(origemDaDescricaoNF(nome, "Campo Cirúrgico Sem Fenestra 100x120cm")).toBe("manual");
+    expect(origemDaDescricaoNF(nome, "Campo Cirúrgico Sem Fenestra 100x120cm", F)).toBe("manual");
   });
 
   it("texto vazio não tem origem", () => {
-    expect(origemDaDescricaoNF(nome, "   ")).toBeNull();
+    expect(origemDaDescricaoNF(nome, "   ", F)).toBeNull();
   });
 });

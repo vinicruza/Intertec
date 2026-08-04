@@ -38,3 +38,30 @@ Lista as categorias de produto já existentes, cada uma com seu **prefixo** de c
 editável, mostrado como referência) e um campo **Prefixo no ERP** — o começo numérico do código
 que será enviado ao sistema de faturamento, quando essa funcionalidade for ligada em
 [Configurações](14-configuracoes.md). Edite o campo e clique em **Salvar**.
+
+## Nomenclatura NF
+
+O nome que sai na **nota fiscal**, por família de produto. O nome do catálogo não muda — é ele
+que sustenta CMV, ficha técnica e histórico; aqui você define o nome paralelo, o fiscal.
+
+Cada linha é uma família: **Começa com** (o começo do nome no catálogo, ex.: `Campo de Mesa`),
+**Nome na nota fiscal** (ex.: `Campo Cirúrgico com Reforço`) e **Ordem**. As famílias são
+testadas de cima para baixo e a primeira que casar vence — por isso a genérica (`Campo`,
+`Avental`) precisa ficar **embaixo** das específicas, senão ela engole todas. Produto que não
+casa com nenhuma família sai na nota com o próprio nome do catálogo.
+
+As caixinhas **Apagar do nome** tiram do nome fiscal o que não pode variar a nota: gramatura
+(`GR30`, `30g`), `TNT`, `SMS` e origem (`China`). Elas são por família de propósito — nos campos
+somem TNT e SMS, nos aventais some só o TNT porque o SMS continua aparecendo na nota.
+
+As **trocas de palavra** substituem um termo por outro dentro do nome (`Tag` vira `Toalha`,
+`Grande` vira `G`). Deixe o segundo campo vazio para simplesmente apagar a palavra.
+
+**Salvar não muda o catálogo.** Salvar guarda a regra. No alto da aba fica a **prévia**: quantos
+produtos mudariam de nome, quantos já estão certos e quantos estão protegidos por ajuste manual —
+com um "Ver o que mudaria" que lista produto por produto o antes e o depois. Só o botão **Aplicar
+ao catálogo** grava. Mexer numa linha reescreve dezenas de produtos de uma vez; a prévia existe
+para você ver isso antes, e não depois de a nota sair.
+
+Produtos com a descrição **ajustada à mão** (marcados assim na lista de Produtos) nunca são
+tocados, por mais que a regra tenha opinião diferente.

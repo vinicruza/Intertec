@@ -18,6 +18,7 @@ import {
   listarCategoriasProduto,
 } from "../lib/db/produtos";
 import { descricaoNFdoProduto } from "../../lib/nomenclatura/descricaoNF";
+import { familiasAtivas, listarFamiliasNF } from "../lib/db/nomenclaturaNF";
 import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais, percentual } from "../lib/format";
@@ -51,6 +52,9 @@ export default function ProdutoFormPage() {
   const categoriasQuery = useQuery({ queryKey: ["categorias-produto"], queryFn: listarCategoriasProduto });
   const baseQuery = useQuery({ queryKey: ["baseCascata", id ?? "novo"], queryFn: () => carregarBaseCascata(id ?? null) });
   const produtoQuery = useQuery({ queryKey: ["produto", id], queryFn: () => obterProduto(id!), enabled: editando });
+  // A regra de nomenclatura é cadastro (Cadastros → Nomenclatura NF), não
+  // código: a tela carrega as famílias e as entrega para a função pura.
+  const familiasQuery = useQuery({ queryKey: ["familiasNF"], queryFn: listarFamiliasNF });
 
   useEffect(() => {
     const p = produtoQuery.data;
@@ -79,7 +83,8 @@ export default function ProdutoFormPage() {
   // que for escrito à mão fica marcado como manual e a salvo da regra.
   const nomeAtual = watch("name");
   const nfDescriptionAtual = watch("nfDescription");
-  const sugestaoNF = useMemo(() => descricaoNFdoProduto(nomeAtual), [nomeAtual]);
+  const familias = useMemo(() => familiasAtivas(familiasQuery.data ?? []), [familiasQuery.data]);
+  const sugestaoNF = useMemo(() => descricaoNFdoProduto(nomeAtual, familias), [nomeAtual, familias]);
 
   // Prévia ao vivo do CMV e participação (cálculo no motor). Só computa quando
   // todos os componentes têm referência escolhida; senão, mostra pendente.
@@ -105,7 +110,7 @@ export default function ProdutoFormPage() {
 
   const salvar = useMutation({
     mutationFn: async (form: ProdutoForm) => {
-      await salvarProduto(id ?? null, form);
+      await salvarProduto(id ?? null, form, familias);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });

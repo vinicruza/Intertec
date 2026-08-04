@@ -13,6 +13,7 @@ import {
   type TabelaSegmento,
 } from "../lib/db/cadastros";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import AbaNomenclaturaNF from "./AbaNomenclaturaNF";
 
 // ============================================================
 // Cadastros — listas de referência do sistema
@@ -22,13 +23,14 @@ import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 // sugerida: a Intertech ainda não fechou nenhuma dessas listas. Esta tela
 // existe para que a decisão não dependa de mexer no banco.
 
-type Aba = "tipos" | "areas" | "motivos" | "categorias";
+type Aba = "tipos" | "areas" | "motivos" | "categorias" | "nomenclatura";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "tipos", rotulo: "Tipos de cliente" },
   { id: "areas", rotulo: "Áreas de atuação" },
   { id: "motivos", rotulo: "Motivos de perda" },
   { id: "categorias", rotulo: "Categorias de produto" },
+  { id: "nomenclatura", rotulo: "Nomenclatura NF" },
 ];
 
 export default function CadastrosPage() {
@@ -77,6 +79,7 @@ export default function CadastrosPage() {
       )}
       {aba === "motivos" && <AbaMotivos />}
       {aba === "categorias" && <AbaCategorias />}
+      {aba === "nomenclatura" && <AbaNomenclaturaNF />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { Decimal, resolverQuantidade, type InsumoCascata, type ProdutoCascata, type Quantidade } from "@calc";
-import { origemDaDescricaoNF, type OrigemDescricaoNF } from "../../../lib/nomenclatura/descricaoNF";
+import { origemDaDescricaoNF, type FamiliaNF, type OrigemDescricaoNF } from "../../../lib/nomenclatura/descricaoNF";
 import { supabase } from "../supabase";
 
 export type ProdutoLinha = {
@@ -182,7 +182,13 @@ function componentesParaBanco(form: ProdutoForm) {
 
 // Cria/atualiza produto + ficha. A validação de referência circular é do banco
 // (trigger) e do motor; aqui o erro do banco sobe para a tela.
-export async function salvarProduto(id: string | null, form: ProdutoForm): Promise<string> {
+// As famílias vêm de quem chama (a tela já as carregou) porque a regra é uma
+// função pura: ela não busca no banco, recebe a configuração pronta.
+export async function salvarProduto(
+  id: string | null,
+  form: ProdutoForm,
+  familias: FamiliaNF[]
+): Promise<string> {
   const campos = {
     code: form.code?.trim() ?? "",
     name: form.name.trim(),
@@ -194,7 +200,7 @@ export async function salvarProduto(id: string | null, form: ProdutoForm): Promi
     nf_description: form.nfDescription.trim() || null,
     // Marca se o texto ainda é o da regra ou se alguém o ajustou — é o que
     // impede uma futura rodada da regra de apagar o ajuste.
-    nf_description_source: origemDaDescricaoNF(form.name, form.nfDescription),
+    nf_description_source: origemDaDescricaoNF(form.name, form.nfDescription, familias),
   };
 
   const linhas = componentesParaBanco(form);
