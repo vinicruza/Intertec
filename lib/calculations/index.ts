@@ -10,5 +10,6 @@ export * from "./allocation";
 export * from "./order";
 export * from "./cascade";
 export * from "./ficha";
+export * from "./fichaPedido";
 export * from "./kits";
 export * from "./consumption";
