@@ -270,6 +270,25 @@ A partir das vendas conciliadas, o sistema explode a composição até o insumo 
 
 Código numérico **paralelo** ao código semântico, com total de dígitos e dígitos de categoria configuráveis, e prefixo numérico por categoria. Desligado por padrão: o limite real do ERP ainda não foi confirmado pela Intertech, e foi levantado em reunião que os atributos do produto podem não caber no código. A geração é manual, só do Administrador, e nunca altera código já emitido.
 
+### 6.14 Cadastro de clientes e ficha do pedido (novo — formulário 05/08/2026)
+
+O formulário de papel que acompanha o pedido até a mesa da conferência pede 24 campos; o sistema
+tinha 6. Entram agora os que não encostam em cálculo:
+
+- **Cadastro do cliente** (tela nova — até aqui só existia a categorização): CNPJ/CPF com
+  conferência de dígito verificador, CEP de faturamento, CEP de entrega, contato, telefone,
+  e-mail. Documento duplicado é bloqueado, com o nome do cliente que já o tem.
+- **Expedição do pedido**: transportadora (lista editável em Cadastros), peso, volumes e CEP de
+  entrega deste pedido — que sobrepõe o do cadastro sem alterá-lo, e sai destacado na ficha
+  quando difere. Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
+- **Condições**: prazo de pagamento em dias e observação, ambos congelados no fechamento.
+- **Ficha impressa** redesenhada no formato do formulário: cabeçalho do cliente, valor total por
+  linha e subtotal, bloco de expedição e rodapé. Campo em branco vira linha para preencher à mão,
+  porque os 13 mil clientes herdados da planilha ainda não têm cadastro completo.
+
+**Fora deste escopo, por dependerem de decisão do cliente:** o bloco fiscal do formulário (ST,
+FCP em linha própria e o TOTAL a cobrar). Ver Calculations.md §12.
+
 ## 11. Fora de escopo da v1
 
 Cálculo automático de legislação tributária (alíquotas são tabelas editáveis, como na planilha); integração com ERP/emissão de NF; controle de estoque; multi-tenant funcional; app mobile.

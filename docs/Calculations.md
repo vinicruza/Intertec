@@ -247,6 +247,21 @@ Cliente Unimed Salto Itu, UF **BA**, item: Avental TNT Sem Manga Não Estéril, 
 
 O mesmo pedido exibe três "margens" diferentes (39,82%, 9,33% implícita, 44,85%). Ver Seção 10, decisão 1.
 
+### 6.1 Ficha impressa do pedido (05/08/2026)
+
+O formulário de papel que vai para a mesa da conferência tem uma coluna `VALOR TOTAL` por linha e
+um `SUBTOTAL` embaixo:
+
+```
+total_linha = preco_unitario × quantidade
+subtotal    = Σ total_linha            ← é a MESMA receita bruta acima, com outro nome
+```
+
+Implementado em `lib/calculations/fichaPedido.ts`, e não dentro da tela, porque multiplicar preço
+por quantidade em JSX é o caminho mais curto para o dinheiro virar float e a soma das linhas
+impressas não bater com o subtotal impresso — que é exatamente o que a conferência confere à mão.
+Sem arredondamento por linha (§9.9): arredondar antes de somar daria um subtotal diferente.
+
 ---
 
 ## 7. Tabelas de parâmetros
@@ -380,3 +395,55 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T15 | sinal da margem | margem −320,85 sobre RL −217,50 | −147,52% e faixa "Negativa" (nunca "Boa") |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
+
+---
+
+## 12. Pendências fiscais do formulário de pedido (05/08/2026)
+
+O formulário de papel da Intertech tem, na coluna da direita, um bloco que **não existe no
+sistema** e que não foi implementado por depender de decisão do cliente:
+
+```
+SUBTOTAL
+FRETE
+ST          ← não existe no sistema
+DIFAL
+FCP         ← hoje embutido no DIFAL, sem linha própria
+DIFAL+FCP
+TOTAL       ← soma que sugere cobrança do cliente
+```
+
+### 12.1 DIFAL e FCP: custo da Intertech ou cobrança do cliente?
+
+**Hoje o sistema trata o DIFAL como custo da Intertech**: ele sai da receita e reduz a margem
+(§6, §10 D1). No formulário, DIFAL e FCP aparecem numa coluna que soma até o `TOTAL`, o que
+sugere o contrário — que são cobrados do cliente.
+
+São tratamentos opostos, e a diferença é grande: no pedido-fixture (BA, R$ 16.800, DIFAL 13,5%)
+são **R$ 2.268** de margem. Se o cliente paga o DIFAL e o sistema o desconta, a margem de todo
+pedido para fora do estado está subestimada.
+
+**Resposta do cliente em 05/08/2026: "depende".** A regra que decide — provavelmente contribuinte
+contra consumidor final, ou algo por cliente — **ainda não foi definida**. O sistema já tem
+`channels.applies_difal` (D4), que resolve o "quando", mas não o "para que lado".
+
+**Enquanto não houver definição, nada mudou no cálculo.** A cascata continua exatamente como
+está, e os golden tests T6/T7 continuam valendo. O que mudou foi só a **exibição**: DIFAL passou
+a ter linha própria na ficha, separada de "Impostos sobre venda", e a folha diz em letras que
+aqueles valores são deduções da receita, não acréscimos à cobrança — para ninguém somar a coluna
+e ler a ficha como se fosse uma fatura.
+
+**Quando a regra chegar,** mexer nisso altera a margem de todo pedido: exige mudança nesta seção,
+revisão dos golden tests e conferência contra um pedido real antes de publicar.
+
+### 12.2 ST
+
+Não existe em lugar nenhum do sistema. Falta saber se é calculado por regra (MVA, alíquota por
+UF, como as tabelas de §7) ou digitado à mão no pedido. **Em confirmação com a Intertech.**
+
+### 12.3 O que foi implementado
+
+Tudo o que não encosta em cálculo: dados cadastrais do cliente (CNPJ/CPF, CEP de faturamento,
+CEP de entrega, contato, telefone, e-mail), expedição do pedido (transportadora, peso, volumes,
+CEP de entrega do pedido), condições (prazo de pagamento, observação) e a ficha impressa
+redesenhada no formato do formulário. Nenhum desses campos entra na cascata de margem.

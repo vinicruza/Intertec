@@ -32,7 +32,23 @@
 
 **`suppliers`** — id, tenant_id, name, contato básico, active.
 
-**`customers`** — id, tenant_id, name, uf, notas, active.
+**`customers`** — id, tenant_id, name, uf, notas, active. Desde 05/08/2026, os dados do
+formulário de pedido: `tax_id` (CNPJ 14 ou CPF 11 dígitos), `billing_zip`, `shipping_zip`,
+`contact_name`, `phone`, `email`.
+
+> **Documento, CEP e telefone são guardados SÓ COM DÍGITOS**, com CHECK de formato. A máscara é
+> aplicada na exibição (`lib/cadastro/documentos.ts`). Guardar a pontuação faria
+> "11.222.333/0001-81" e "11222333000181" virarem dois cadastros do mesmo cliente — a mesma
+> classe de erro que a planilha tinha com nomes (Calculations.md §9.4), aqui evitável de verdade
+> porque documento é chave e nome não é. Índice único **parcial** em `(tenant_id, tax_id)`: os
+> 13 mil cadastros herdados estão sem documento e continuam válidos.
+>
+> O dígito verificador do CNPJ/CPF é conferido em TypeScript, não em SQL — reimplementar módulo
+> 11 nos dois lugares criaria duas cópias da regra que divergem.
+
+**`carriers`** — id, tenant_id, name, `requires_name boolean` (a opção "Outra", que faz a tela
+pedir o nome), sort_order, active. Tabela editável em Cadastros, não enum: transportadora se
+troca por preço de frete, e trocar não pode exigir publicar código.
 
 ### 2.2 Insumos e produtos
 
@@ -79,6 +95,21 @@
 ### 2.5 Pedidos (D7 — snapshot imutável)
 
 **`orders`** — id, tenant_id, `status` (`simulation | closed`), customer_id → customers, `uf char(2)`, seller_id → sellers, channel_id → channels (copiado do vendedor no momento), `freight numeric`, `freight_paid_by_customer boolean`, `commission_rate numeric` (default do canal; override auditado), closed_at, closed_by → profiles, created_by, created_at.
+
+Expedição e condições do formulário de pedido (05/08/2026): `carrier_id` → carriers,
+`carrier_other`, `weight_kg`, `volumes`, `shipping_zip` (desvio do CEP do cadastro, só para
+**este** pedido), `payment_term_days`, `order_notes`. Nenhum entra na cascata de margem.
+
+> **Exceção verificada na imutabilidade (D7).** Peso, volume, transportadora, CEP de entrega e
+> observação podem ser alterados **depois do fechamento** — só existem quando alguém embala a
+> caixa, e no papel de hoje é isso que se escreve à mão nessa hora. O gatilho
+> `protect_closed_order` compara as duas linhas coluna a coluna: se a alteração tocou qualquer
+> campo fora dessa lista, continua recusada, e a alteração aceita vira registro em `audit_logs`
+> (`update_expedicao`). Não dá para contrabandear frete junto com peso. `payment_term_days` fica
+> **de fora** da exceção: prazo é condição combinada na venda, e congela com o resto.
+>
+> A porta é a função `update_order_shipping`, `security definer` com checagem de perfil própria —
+> pela RLS só o Administrador altera pedido fechado, e quem embala a caixa não é Administrador.
 - Totais do pedido (receita, impostos, DIFAL, comissão, receita líquida, margens da cascata D1) são calculados pelo motor; ao **fechar**, são persistidos em colunas `*_snapshot` (precisão total + versão arredondada a 2 casas).
 - Reabrir exige Admin, gera novo snapshot e trilha em `audit_logs`.
 
