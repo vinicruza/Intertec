@@ -223,7 +223,10 @@ export default function PedidoFichaPage() {
                     formulário o pede separado, e a conferência precisa
                     enxergá-lo isolado para conversar com o contador. */}
                 <Linha rotulo="(−) Impostos sobre venda" valor={t.impostos} />
-                <Linha rotulo="(−) DIFAL" valor={t.difal} />
+                <Linha
+                  rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
+                  valor={t.difal}
+                />
                 <Linha rotulo="(−) Frete" valor={t.frete} />
                 <Linha rotulo="(−) Comissão" valor={t.comissao} />
                 <Linha rotulo="= Receita líquida" valor={t.receita_liquida} negrito />
@@ -232,11 +235,14 @@ export default function PedidoFichaPage() {
               </tbody>
             </table>
             {/* Sem esta frase, alguém soma as linhas de imposto ao subtotal e
-                lê como o que se cobra do cliente. São coisas diferentes. */}
+                lê como o que se cobra do cliente. São coisas diferentes —
+                confirmado com a Intertech em 05/08/2026: DIFAL é recolhido
+                pela Intertech ao estado, não cobrado do cliente. */}
             <p className="mt-2 text-xs">
               Impostos e DIFAL acima são <strong>deduções da receita da Intertech</strong>, não
-              valores acrescentados à cobrança do cliente. O tratamento de DIFAL, FCP e ST na
-              cobrança está pendente de definição.
+              valores acrescentados à cobrança do cliente — DIFAL é recolhido pela Intertech ao
+              estado quando o cliente não é contribuinte (FCP já incluído na alíquota). O
+              tratamento de ST na cobrança ainda está pendente de confirmação com a Intertech.
             </p>
           </div>
         )}

@@ -23,7 +23,8 @@
 
 **`channels`** (D4) — parametrizam o cálculo por canal:
 - id, tenant_id, name (Interno, Marketplace, Externos, Revendas, Descpro)
-- `applies_difal boolean` (Revendas: false)
+- `applies_difal boolean` — PADRÃO do canal (Revendas: false, venda a contribuinte, confirmado
+  correto em 05/08/2026). `orders.applies_difal` pode sobrescrever por pedido (ver abaixo).
 - `tax_source` (`icsm_table` para todos na carga inicial; Descpro migra de 10% fixo para a tabela — o relatório de importação quantifica a diferença)
 - `default_commission_rate numeric` (0,025 padrão; Externos 0,061)
 - `freight_model` (`manual | uf_percent`) — `uf_percent` usa a tabela Portal (canais marketplace)
@@ -94,7 +95,14 @@ troca por preço de frete, e trocar não pode exigir publicar código.
 
 ### 2.5 Pedidos (D7 — snapshot imutável)
 
-**`orders`** — id, tenant_id, `status` (`simulation | closed`), customer_id → customers, `uf char(2)`, seller_id → sellers, channel_id → channels (copiado do vendedor no momento), `freight numeric`, `freight_paid_by_customer boolean`, `commission_rate numeric` (default do canal; override auditado), closed_at, closed_by → profiles, created_by, created_at.
+**`orders`** — id, tenant_id, `status` (`simulation | closed`), customer_id → customers, `uf char(2)`, seller_id → sellers, channel_id → channels (copiado do vendedor no momento), `freight numeric`, `freight_paid_by_customer boolean`, `commission_rate numeric` (default do canal; override auditado), `applies_difal boolean` (05/08/2026 — default do canal, override por pedido; mesmo padrão de `commission_rate`; ver Calculations.md §12.1), closed_at, closed_by → profiles, created_by, created_at.
+
+> **DIFAL: pedido é a fonte da verdade, não o canal.** `close_order_with_snapshots` recalcula o
+> DIFAL a partir de `orders.applies_difal`, não de `channels.applies_difal` — o canal é só o valor
+> sugerido na hora de montar o pedido. Um defeito real foi pego revisando esta migração: a
+> validação de fechamento ainda lia direto do canal, o que teria recusado o fechamento de
+> qualquer pedido com override (totais calculados no navegador com o override não batiam com os
+> recalculados no banco sem ele). Corrigido antes de publicar.
 
 Expedição e condições do formulário de pedido (05/08/2026): `carrier_id` → carriers,
 `carrier_other`, `weight_kg`, `volumes`, `shipping_zip` (desvio do CEP do cadastro, só para

@@ -28,6 +28,12 @@ export type EntradaSimulacao = {
   freteManual: EntradaDecimal; // usado quando o canal é frete manual
   fretePorContaCliente: boolean;
   comissao: EntradaDecimal | null; // override; null = padrão do canal
+  // Override por pedido; null = padrão do canal (Decisão D4 estendida,
+  // 05/08/2026 — ver Calculations.md §12). DIFAL é devido pela Intertech
+  // quando o cliente é NÃO CONTRIBUINTE; contribuinte não gera DIFAL. Isso
+  // varia pedido a pedido dentro do mesmo canal/vendedor, então precisa de
+  // override aqui — igual à comissão (D6), não só configuração fixa de canal.
+  aplicaDifal?: boolean | null;
   canal: CanalRegras;
   uf: TabelasUF;
 };
@@ -37,6 +43,7 @@ export type Simulacao = {
   freteUsado: Decimal;
   comissaoUsada: Decimal;
   difalAplicado: Decimal;
+  aplicaDifalUsado: boolean;
   avisos: string[];
 };
 
@@ -46,9 +53,11 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
   // Comissão: padrão do canal, com override auditável (Decisão D6).
   const comissaoUsada = dec(entrada.comissao ?? entrada.canal.comissaoPadrao);
 
-  // DIFAL: canal decide se aplica; a UF fornece a alíquota.
-  const difalAplicado = entrada.canal.aplicaDifal ? dec(entrada.uf.difalFinal) : new Decimal(0);
-  if (entrada.canal.aplicaDifal && difalAplicado.isZero()) {
+  // DIFAL: padrão do canal, com override por pedido (05/08/2026). A UF
+  // fornece a alíquota (já com FCP embutido, Calculations.md §7.2).
+  const aplicaDifalUsado = entrada.aplicaDifal ?? entrada.canal.aplicaDifal;
+  const difalAplicado = aplicaDifalUsado ? dec(entrada.uf.difalFinal) : new Decimal(0);
+  if (aplicaDifalUsado && difalAplicado.isZero()) {
     avisos.push("DIFAL aplicável e zerado para esta UF — confira a tabela (PRD §7).");
   }
 
@@ -80,7 +89,7 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     aliquotaComissao: comissaoUsada,
   });
 
-  return { resultado, freteUsado, comissaoUsada, difalAplicado, avisos };
+  return { resultado, freteUsado, comissaoUsada, difalAplicado, aplicaDifalUsado, avisos };
 }
 
 // Faixas de status da margem de contribuição (PRD §5.5), vindas de margin_rules.

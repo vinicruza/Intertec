@@ -337,7 +337,7 @@ A margem de contribuição coincide numericamente com a margem que a planilha j�
 
 **D3 — Alocação de despesa com vigência mensal.** Cada mês tem seu total de despesa e produções estimadas (tabela versionada). Na importação, validar se os R$ 450.000 são mensais comparando com a despesa fixa real de um mês; se anuais, dividir por 12 na carga. **Regra do DRE:** o DRE da empresa usa a despesa fixa REAL do mês; a soma dos rateios dos pedidos serve para análise por produto/kit, e a diferença entre os dois é exibida como "variação de absorção". Nunca somar rateios como se fossem a despesa do mês.
 
-**D4 — Tributação e comissão viram parâmetros de canal.** Canal define: aplica DIFAL (sim/não), fonte de alíquota de imposto, comissão padrão, modelo de frete (manual ou % por UF). Migração: Revendas = sem DIFAL (venda a contribuinte); Descpro = abandona o 10% fixo e passa a usar a tabela ICSM por UF (o relatório de importação quantifica a diferença nos pedidos existentes); Mari/Temporária = frete por % da tabela Portal.
+**D4 — Tributação e comissão viram parâmetros de canal.** Canal define: aplica DIFAL (sim/não) como PADRÃO, fonte de alíquota de imposto, comissão padrão, modelo de frete (manual ou % por UF). Migração: Revendas = sem DIFAL (venda a contribuinte, **confirmado correto** em 05/08/2026 — §12.1); Descpro = abandona o 10% fixo e passa a usar a tabela ICSM por UF (o relatório de importação quantifica a diferença nos pedidos existentes); Mari/Temporária = frete por % da tabela Portal. **Extensão de 05/08/2026:** DIFAL ganhou override por pedido, igual à comissão (D6) — o padrão do canal decide "sem se digitar nada", mas o vendedor pode ligar/desligar caso a caso, porque contribuinte × não contribuinte varia pedido a pedido dentro do mesmo canal (§12.1).
 
 **D5 — Tabela DIFAL: migrar a coluna final vigente como está**, incluindo os 4 valores que não batem com Pobreza+Alíquota (AL, MA, PI, RN) — presume-se ajuste consciente de FCP. Tabela editável em Configurações; as 4 UFs entram sinalizadas no relatório de importação para confirmação do contador.
 
@@ -398,52 +398,72 @@ Sugestão: importar a planilha e rodar um teste de reconciliação em massa — 
 
 ---
 
-## 12. Pendências fiscais do formulário de pedido (05/08/2026)
+## 12. Pendências fiscais do formulário de pedido (05/08/2026, resolvido em parte por áudio da Intertech no mesmo dia)
 
-O formulário de papel da Intertech tem, na coluna da direita, um bloco que **não existe no
-sistema** e que não foi implementado por depender de decisão do cliente:
+O formulário de papel da Intertech tem, na coluna da direita, um bloco que o sistema não tinha:
 
 ```
 SUBTOTAL
 FRETE
-ST          ← não existe no sistema
+ST          ← ainda não existe no sistema (§12.2)
 DIFAL
-FCP         ← hoje embutido no DIFAL, sem linha própria
+FCP         ← já embutido no DIFAL, sem linha própria (§12.1)
 DIFAL+FCP
-TOTAL       ← soma que sugere cobrança do cliente
+TOTAL       ← soma informativa do papel; não é cobrança do cliente (§12.1)
 ```
 
-### 12.1 DIFAL e FCP: custo da Intertech ou cobrança do cliente?
+### 12.1 DIFAL e FCP — RESOLVIDO: custo da Intertech, não cobrança do cliente
 
-**Hoje o sistema trata o DIFAL como custo da Intertech**: ele sai da receita e reduz a margem
-(§6, §10 D1). No formulário, DIFAL e FCP aparecem numa coluna que soma até o `TOTAL`, o que
-sugere o contrário — que são cobrados do cliente.
+**Confirmado pela Intertech (áudio, 05/08/2026):** *"se o cliente é não contribuinte, a gente tem
+que pagar DIFAL"*. É a Intertech quem recolhe a diferença de alíquota ao estado de destino — não
+o cliente que paga a mais. **A fórmula que já estava no sistema (§6, §10 D1: DIFAL como dedução
+da receita) está correta e não mudou.** O `TOTAL` do formulário de papel é uma soma informativa
+para o preenchimento — não é o valor cobrado do cliente.
 
-São tratamentos opostos, e a diferença é grande: no pedido-fixture (BA, R$ 16.800, DIFAL 13,5%)
-são **R$ 2.268** de margem. Se o cliente paga o DIFAL e o sistema o desconta, a margem de todo
-pedido para fora do estado está subestimada.
+**A regra do "depende" (pergunta em aberto desde a primeira versão desta seção): contribuinte ×
+não contribuinte.** Cliente não contribuinte → Intertech paga DIFAL. Cliente contribuinte (vai
+revender e recolher o próprio ICMS) → sem DIFAL. Isso **confirma como correta** uma linha que
+esta seção já registrava como incerta (§8, tabela de divergências): o canal Revendas com
+`applies_difal = false` não era um bug nem uma pendência — revenda é venda a contribuinte.
 
-**Resposta do cliente em 05/08/2026: "depende".** A regra que decide — provavelmente contribuinte
-contra consumidor final, ou algo por cliente — **ainda não foi definida**. O sistema já tem
-`channels.applies_difal` (D4), que resolve o "quando", mas não o "para que lado".
+**FCP não precisa de linha própria no cálculo.** Já está embutido no valor final da tabela
+`difal_rates` (§7.2: Pobreza/FCP + Alíquota → DIFAL final). A folha impressa não separa FCP do
+DIFAL porque o sistema nunca calculou os dois separados — só a soma que já vale hoje.
 
-**Enquanto não houver definição, nada mudou no cálculo.** A cascata continua exatamente como
-está, e os golden tests T6/T7 continuam valendo. O que mudou foi só a **exibição**: DIFAL passou
-a ter linha própria na ficha, separada de "Impostos sobre venda", e a folha diz em letras que
-aqueles valores são deduções da receita, não acréscimos à cobrança — para ninguém somar a coluna
-e ler a ficha como se fosse uma fatura.
+**O que faltava, e foi implementado em 05/08/2026: o DIFAL virou override por pedido, não só
+configuração fixa de canal.** O mesmo vendedor, no mesmo canal, vende tanto para contribuinte
+quanto para não contribuinte — a decisão de aplicar ou não é por PEDIDO. Pedido da própria
+Intertech (áudio): *"você pode deixar uma opção de clique que habilita e desabilita [...] o DIFAL
+na hora de ela montar o pedido"*.
 
-**Quando a regra chegar,** mexer nisso altera a margem de todo pedido: exige mudança nesta seção,
-revisão dos golden tests e conferência contra um pedido real antes de publicar.
+```
+aplica_difal_pedido = override do pedido, se marcado; senão o padrão do canal   (mesmo padrão da comissão, D6)
+DIFAL                = aplica_difal_pedido ? alíquota_UF × receita_pedido : 0
+```
 
-### 12.2 ST
+A fórmula do DIFAL em si (`alíquota × receita`) **não mudou uma vírgula** — só passou a existir
+mais um lugar (o pedido) que pode decidir se ela roda, além do canal. `lib/calculations/order.ts`
+e os golden tests T1–T15 continuam intocados; a mudança inteira mora na camada de parâmetros
+(`app/lib/sim/params.ts`) e no banco (coluna `orders.applies_difal`).
 
-Não existe em lugar nenhum do sistema. Falta saber se é calculado por regra (MVA, alíquota por
-UF, como as tabelas de §7) ou digitado à mão no pedido. **Em confirmação com a Intertech.**
+**Achado ao implementar:** a validação de fechamento (`close_order_with_snapshots`) recalculava o
+DIFAL lendo `channels.applies_difal` direto do canal, ignorando o override do pedido. Sem
+corrigir, o primeiro pedido com override seria recusado no fechamento por "totais não
+reconciliam" — o navegador calcula com o override, o banco recalculava sem ele. Corrigido na
+mesma migração: a fonte da verdade do DIFAL no fechamento passa a ser `orders.applies_difal`.
+Testado contra Postgres real nos dois sentidos (override ligando e desligando) e confirmado que a
+validação continua recusando um DIFAL que não bate com o pedido.
+
+### 12.2 ST — ainda pendente
+
+Os áudios da Intertech (05/08/2026) definem o termo (substituição tributária) mas não explicam
+como se calcula. Falta saber se é calculado por regra (MVA, alíquota por UF, como as tabelas de
+§7) ou digitado à mão no pedido. **Em confirmação com a Intertech.**
 
 ### 12.3 O que foi implementado
 
-Tudo o que não encosta em cálculo: dados cadastrais do cliente (CNPJ/CPF, CEP de faturamento,
-CEP de entrega, contato, telefone, e-mail), expedição do pedido (transportadora, peso, volumes,
-CEP de entrega do pedido), condições (prazo de pagamento, observação) e a ficha impressa
-redesenhada no formato do formulário. Nenhum desses campos entra na cascata de margem.
+Dados cadastrais do cliente (CNPJ/CPF, CEP de faturamento, CEP de entrega, contato, telefone,
+e-mail), expedição do pedido (transportadora, peso, volumes, CEP de entrega do pedido), condições
+(prazo de pagamento, observação), a ficha impressa redesenhada no formato do formulário, e o
+override de DIFAL por pedido (§12.1). Fora o DIFAL — que já era cálculo e continua sendo, só que
+mais preciso —, nenhum desses campos entra na cascata de margem.

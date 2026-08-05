@@ -68,6 +68,9 @@ export type PedidoCompleto = {
   freight: string | null;
   freight_paid_by_customer: boolean;
   commission_rate: string | null;
+  // DIFAL: resolvido no pedido (05/08/2026), override do padrão do canal —
+  // ver Calculations.md §12.
+  applies_difal: boolean;
   channel_id: string | null;
   seller_id: string | null;
   created_at: string;
@@ -118,7 +121,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_days, order_notes, carriers(name, requires_name), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_days, order_notes, carriers(name, requires_name), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -265,6 +268,7 @@ export async function simularPedidoComCustosVigentes(
     freteManual: pedido.freight ?? "0",
     fretePorContaCliente: pedido.freight_paid_by_customer,
     comissao: pedido.commission_rate,
+    aplicaDifal: pedido.applies_difal,
     canal: vendedor.regras,
     uf: tabela,
   });

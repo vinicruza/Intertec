@@ -248,6 +248,11 @@ export type DadosSimulacao = {
   frete: string;
   fretePorContaCliente: boolean;
   comissao: string; // fração efetivamente usada
+  // DIFAL: fração efetivamente usada (05/08/2026) — igual à comissão acima,
+  // já resolvida (override do pedido ou padrão do canal). Ver
+  // Calculations.md §12: devido pela Intertech quando o cliente é não
+  // contribuinte; contribuinte não gera DIFAL.
+  aplicaDifal: boolean;
   itens: ItemSimulacao[];
   // Expedição e condições do formulário de pedido (05/08/2026). Nada aqui
   // entra em cálculo: é o que a expedição lê para despachar e o financeiro
@@ -290,6 +295,7 @@ export async function salvarCotacao(
       freight: d.frete.trim().replace(",", "."),
       freight_paid_by_customer: d.fretePorContaCliente,
       commission_rate: d.comissao,
+      applies_difal: d.aplicaDifal,
       carrier_id: d.transportadoraId,
       carrier_other: d.transportadoraOutra,
       weight_kg: numeroOuVazio(d.pesoKg),

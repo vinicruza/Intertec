@@ -120,6 +120,11 @@ export default function SimuladorPage() {
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
   const [frete, setFrete] = useState("0");
   const [freteCliente, setFreteCliente] = useState(false);
+  // DIFAL (05/08/2026): padrão do canal, com override por pedido — o mesmo
+  // vendedor vende tanto para contribuinte (sem DIFAL) quanto para não
+  // contribuinte (com DIFAL), então precisa poder trocar pedido a pedido.
+  // null = usa o padrão do canal.
+  const [aplicaDifalOverride, setAplicaDifalOverride] = useState<boolean | null>(null);
   const [linhas, setLinhas] = useState<LinhaItem[]>([LINHA_VAZIA]);
   // Expedição e condições do formulário de pedido (05/08/2026). Nada disso
   // entra na cascata: é o que a expedição lê para despachar e o financeiro
@@ -194,6 +199,7 @@ export default function SimuladorPage() {
         freteManual: frete.trim().replace(",", ".") || "0",
         fretePorContaCliente: freteCliente,
         comissao: comissao ? comissao.trim().replace(",", ".") : null,
+        aplicaDifal: aplicaDifalOverride,
         canal: vendedor.regras,
         uf: tabela,
       });
@@ -202,7 +208,7 @@ export default function SimuladorPage() {
       if (e instanceof ErroCalculoBloqueante) return { estado: "bloqueado" as const, msg: e.message };
       return { estado: "bloqueado" as const, msg: "Não foi possível calcular." };
     }
-  }, [ctx, vendedor, uf, linhas, resolvidas, frete, freteCliente, comissao]);
+  }, [ctx, vendedor, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -262,6 +268,7 @@ export default function SimuladorPage() {
         frete: simulacao.freteUsado.toString(),
         fretePorContaCliente: freteCliente,
         comissao: simulacao.comissaoUsada.toString(),
+        aplicaDifal: simulacao.aplicaDifalUsado,
         itens,
         transportadoraId: transportadoraId || null,
         transportadoraOutra: transportadoraPedeNome ? transportadoraOutra : null,
@@ -346,7 +353,7 @@ export default function SimuladorPage() {
               className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
               value={vendedorId}
               disabled={vendedoresDisponiveis.length <= 1}
-              onChange={(e) => { setVendedorId(e.target.value); setComissao(null); }}
+              onChange={(e) => { setVendedorId(e.target.value); setComissao(null); setAplicaDifalOverride(null); }}
             >
               <option value="">Selecione…</option>
               {vendedoresDisponiveis.map((v) => (
@@ -415,7 +422,27 @@ export default function SimuladorPage() {
             />
             Frete por conta do cliente
           </label>
+          <label className="flex items-end gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={aplicaDifalOverride ?? vendedor?.regras.aplicaDifal ?? true}
+              onChange={(e) => setAplicaDifalOverride(e.target.checked)}
+            />
+            Aplica DIFAL neste pedido
+          </label>
         </div>
+
+        {/* DIFAL: devido pela Intertech quando o cliente é NÃO CONTRIBUINTE
+            (consumidor final); contribuinte não gera DIFAL — confirmado com a
+            Intertech em 05/08/2026 (Calculations.md §12). O canal já vem com
+            um padrão, mas o mesmo vendedor pode vender para os dois tipos de
+            cliente, então a caixa acima decide pedido a pedido. */}
+        {vendedor && (aplicaDifalOverride ?? vendedor.regras.aplicaDifal) !== vendedor.regras.aplicaDifal && (
+          <p className="text-xs text-amber-700">
+            Diferente do padrão do canal ({vendedor.regras.aplicaDifal ? "aplica" : "não aplica"} DIFAL) —
+            registrado no pedido.
+          </p>
+        )}
 
         {/* Cadastro incompleto não impede de cotar — impede de imprimir uma
             ficha completa. O aviso aparece cedo, com o caminho para resolver. */}

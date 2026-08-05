@@ -67,4 +67,38 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     const s = simular({ ...entrada, comissao: "0.061" });
     expect(toMoney(s.resultado.comissao)).toBe("1024.80"); // 6,1% × 16.800
   });
+
+  // Override de DIFAL por pedido (05/08/2026): o canal decide o padrão, mas
+  // dentro do MESMO canal um pedido pode ser para contribuinte e outro não —
+  // então o vendedor precisa poder ligar/desligar caso a caso (áudio da
+  // Intertech, 05/08/2026). Confirmado: DIFAL é devido pela Intertech quando
+  // o cliente é NÃO CONTRIBUINTE; contribuinte não gera DIFAL. A fórmula em
+  // si (alíquota × receita) não muda — só quem decide se ela roda.
+  it("override desliga o DIFAL mesmo com o canal aplicando por padrão", () => {
+    const s = simular({ ...entrada, aplicaDifal: false });
+    expect(s.aplicaDifalUsado).toBe(false);
+    expect(toMoney(s.difalAplicado)).toBe("0.00"); // alíquota usada, zerada
+    expect(toMoney(s.resultado.difal)).toBe("0.00"); // valor em R$
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("12487.50"); // igual ao canal Revendas
+  });
+
+  it("override liga o DIFAL mesmo com o canal não aplicando por padrão", () => {
+    const s = simular({
+      ...entrada,
+      canal: { ...entrada.canal, aplicaDifal: false },
+      aplicaDifal: true,
+    });
+    expect(s.aplicaDifalUsado).toBe(true);
+    expect(s.difalAplicado.toString()).toBe("0.135"); // alíquota usada
+    expect(toMoney(s.resultado.difal)).toBe("2268.00"); // valor em R$
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10219.50"); // igual ao padrão
+  });
+
+  it("sem override (null/undefined), usa o padrão do canal — comportamento antigo preservado", () => {
+    const semOverride = simular(entrada);
+    const comOverrideNulo = simular({ ...entrada, aplicaDifal: null });
+    expect(semOverride.aplicaDifalUsado).toBe(true);
+    expect(comOverrideNulo.aplicaDifalUsado).toBe(true);
+    expect(toMoney(comOverrideNulo.difalAplicado)).toBe(toMoney(semOverride.difalAplicado));
+  });
 });
