@@ -300,8 +300,8 @@ function AbaCodigoErp() {
         <strong>Aguardando confirmação do formato.</strong> A reunião pediu um código numérico para
         o sistema de faturamento, mas o limite real dele não foi confirmado — e foi levantado que os
         atributos do produto podem não caber no código. Por isso este código é{" "}
-        <strong>paralelo</strong>: o código semântico atual (PC-0001) continua sendo a identidade
-        interna, e nada do catálogo é recodificado. Confirme o formato com o {atual.target_system} e
+        <strong>paralelo</strong>: o código semântico atual (ex.: PA0001) continua sendo a identidade
+        interna, e nada do catálogo é recodificado por aqui. Confirme o formato com o {atual.target_system} e
         só então ligue a geração.
       </div>
 

@@ -74,7 +74,7 @@ export default function VendasConsumoPage() {
           <textarea
             className="h-40 w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 font-mono text-xs"
             value={texto}
-            placeholder={"Codigo;Descricao;Quantidade;Valor\nPC-0001;Avental GG;4000;16.800,00"}
+            placeholder={"Codigo;Descricao;Quantidade;Valor\nPA0001;Avental GG;4000;16.800,00"}
             onChange={(e) => {
               setTexto(e.target.value);
               setLeitura(e.target.value.trim() ? lerRelatorioDeVendas(e.target.value) : null);

@@ -51,7 +51,7 @@ Clique em **Salvar**. O botão fica desabilitado se nenhum perfil aprovador esti
 
 ## Aba "Código para o ERP"
 
-Configura um código numérico **paralelo** ao código semântico do produto (ex.: PC-0001), pensado
+Configura um código numérico **paralelo** ao código semântico do produto (ex.: PA0001), pensado
 para o sistema de faturamento. Um aviso amarelo explica que o formato ainda não foi confirmado com
 a Intertech — por isso esse recurso vem **desligado por padrão**.
 
