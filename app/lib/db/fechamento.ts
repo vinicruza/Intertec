@@ -77,7 +77,26 @@ export type PedidoCompleto = {
   revised_from_order_id: string | null;
   revision_reason: string | null;
   totals_display: Record<string, string> | null;
-  customers: { name: string } | null;
+  // Expedição e condições do formulário de pedido (05/08/2026).
+  carrier_id: string | null;
+  carrier_other: string | null;
+  weight_kg: string | null;
+  volumes: number | null;
+  shipping_zip: string | null;
+  payment_term_days: number | null;
+  order_notes: string | null;
+  carriers: { name: string; requires_name: boolean } | null;
+  // O cabeçalho da ficha impressa sai daqui: é o cadastro do cliente que
+  // preenche CNPJ, CEPs e contato, não uma digitação por pedido.
+  customers: {
+    name: string;
+    tax_id: string | null;
+    billing_zip: string | null;
+    shipping_zip: string | null;
+    contact_name: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
   sellers: { name: string } | null;
   revisoes: Array<{ id: string; status: "simulation" | "closed"; cancelled_at: string | null; created_at: string }>;
   itens: Array<{
@@ -99,7 +118,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, customers(name), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_days, order_notes, carriers(name, requires_name), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -125,11 +144,47 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     cmv_unit_snapshot: item.cmv_unit_snapshot == null ? null : String(item.cmv_unit_snapshot),
     expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
   }));
+  const bruto = pedido as unknown as Omit<PedidoCompleto, "itens" | "revisoes">;
   return {
-    ...(pedido as unknown as Omit<PedidoCompleto, "itens" | "revisoes">),
+    ...bruto,
+    // Peso vem numeric do banco: normalizado a texto como o resto dos números,
+    // para não passear como float pela tela.
+    weight_kg: bruto.weight_kg == null ? null : String(bruto.weight_kg),
     itens: itensNormalizados as unknown as PedidoCompleto["itens"],
     revisoes: (revisoes ?? []) as PedidoCompleto["revisoes"],
   };
+}
+
+// ---------- Expedição (formulário de pedido, 05/08/2026) ----------
+//
+// Separada do resto porque tem um ciclo de vida diferente: peso e volume só
+// existem quando alguém embala a caixa, o que costuma ser DEPOIS de o pedido
+// ter sido ganho. O banco abre exatamente esta exceção — e só ela — na regra
+// de imutabilidade (migração 20260805001100), com registro em auditoria.
+export type DadosExpedicao = {
+  carrierId: string | null;
+  carrierOutra: string | null;
+  pesoKg: string | null;
+  volumes: string | null;
+  cepEntrega: string | null;
+  observacao: string | null;
+};
+
+export async function salvarExpedicao(orderId: string, d: DadosExpedicao): Promise<void> {
+  const numero = (v: string | null) => {
+    const limpo = (v ?? "").trim().replace(",", ".");
+    return limpo === "" ? null : limpo;
+  };
+  const { error } = await supabase.rpc("update_order_shipping", {
+    p_order_id: orderId,
+    p_carrier_id: d.carrierId || null,
+    p_carrier_other: d.carrierOutra?.trim() || null,
+    p_weight_kg: numero(d.pesoKg),
+    p_volumes: numero(d.volumes),
+    p_shipping_zip: d.cepEntrega?.replace(/\D/g, "") || null,
+    p_order_notes: d.observacao?.trim() || null,
+  });
+  if (error) throw error;
 }
 
 // ---------- Fechamento (D7) ----------

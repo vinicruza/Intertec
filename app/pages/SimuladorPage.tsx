@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
 import {
@@ -18,6 +19,7 @@ import {
 import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { reais, percentual } from "../lib/format";
+import { formatarCep } from "../../lib/cadastro/documentos";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
 // "__kit_novo__" abre o montador de kit dentro do próprio pedido. Decisão da
@@ -119,6 +121,17 @@ export default function SimuladorPage() {
   const [frete, setFrete] = useState("0");
   const [freteCliente, setFreteCliente] = useState(false);
   const [linhas, setLinhas] = useState<LinhaItem[]>([LINHA_VAZIA]);
+  // Expedição e condições do formulário de pedido (05/08/2026). Nada disso
+  // entra na cascata: é o que a expedição lê para despachar e o financeiro
+  // lê para cobrar. Peso e volume podem ficar em branco aqui e ser
+  // preenchidos depois, na hora de embalar.
+  const [transportadoraId, setTransportadoraId] = useState("");
+  const [transportadoraOutra, setTransportadoraOutra] = useState("");
+  const [pesoKg, setPesoKg] = useState("");
+  const [volumes, setVolumes] = useState("");
+  const [cepEntrega, setCepEntrega] = useState("");
+  const [prazoPagamento, setPrazoPagamento] = useState("");
+  const [observacao, setObservacao] = useState("");
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<{ quote_number: string; version: number } | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
@@ -250,6 +263,13 @@ export default function SimuladorPage() {
         fretePorContaCliente: freteCliente,
         comissao: simulacao.comissaoUsada.toString(),
         itens,
+        transportadoraId: transportadoraId || null,
+        transportadoraOutra: transportadoraPedeNome ? transportadoraOutra : null,
+        pesoKg,
+        volumes,
+        cepEntrega,
+        prazoPagamentoDias: prazoPagamento,
+        observacao,
       }, foto);
     },
     onSuccess: (r) => {
@@ -292,6 +312,21 @@ export default function SimuladorPage() {
   }
 
   const freteAutomatico = vendedor?.regras.modeloFrete === "uf_percent";
+  const transportadora = ctx.transportadoras.find((t) => t.id === transportadoraId) ?? null;
+  const transportadoraPedeNome = transportadora?.pedeNome ?? false;
+  const clienteEscolhido = ctx.clientes.find((c) => c.id === clienteId) ?? null;
+  // O que falta no cadastro do cliente para a ficha sair completa. Avisar
+  // aqui, e não na hora de imprimir, é o que dá tempo de resolver antes de o
+  // papel chegar à mesa da conferência.
+  const faltaNoCadastro = clienteEscolhido
+    ? ([
+        !clienteEscolhido.tax_id && "CNPJ/CPF",
+        !clienteEscolhido.billing_zip && "CEP de faturamento",
+        !clienteEscolhido.shipping_zip && "CEP de entrega",
+        !clienteEscolhido.contact_name && "contato",
+        !clienteEscolhido.phone && "telefone",
+      ].filter(Boolean) as string[])
+    : [];
 
   return (
     <div className="space-y-4">
@@ -380,6 +415,102 @@ export default function SimuladorPage() {
             />
             Frete por conta do cliente
           </label>
+        </div>
+
+        {/* Cadastro incompleto não impede de cotar — impede de imprimir uma
+            ficha completa. O aviso aparece cedo, com o caminho para resolver. */}
+        {faltaNoCadastro.length > 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            O cadastro de <strong>{clienteEscolhido?.name}</strong> está sem{" "}
+            {faltaNoCadastro.join(", ")}. A ficha do pedido vai sair com o cabeçalho incompleto.{" "}
+            <Link to={`/clientes/${clienteEscolhido?.id}`} className="font-semibold underline">
+              Completar o cadastro
+            </Link>
+          </p>
+        )}
+      </Card>
+
+      {/* ------------------------------------------------------------------
+          Expedição e condições — o bloco de baixo do formulário de papel.
+          Nenhum destes campos entra na cascata de margem.
+          ------------------------------------------------------------------ */}
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Expedição e condições</h2>
+          <p className="text-sm text-[var(--cor-texto-suave)]">
+            O que a expedição precisa para despachar e o financeiro para cobrar. Peso e volume
+            podem ficar em branco agora e ser preenchidos na hora de embalar, na tela do pedido.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div>
+            <Label>Transportadora</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={transportadoraId}
+              onChange={(e) => setTransportadoraId(e.target.value)}
+            >
+              <option value="">—</option>
+              {ctx.transportadoras.map((t) => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
+          {transportadoraPedeNome && (
+            <div>
+              <Label>Qual transportadora</Label>
+              <Input
+                value={transportadoraOutra}
+                onChange={(e) => setTransportadoraOutra(e.target.value)}
+                placeholder="Nome da transportadora"
+              />
+            </div>
+          )}
+          <div>
+            <Label>Peso (kg)</Label>
+            <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />
+          </div>
+          <div>
+            <Label>Volumes</Label>
+            <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
+          </div>
+          <div>
+            <Label>Pagamento (dias)</Label>
+            <Input
+              value={prazoPagamento}
+              onChange={(e) => setPrazoPagamento(e.target.value)}
+              placeholder="ex.: 30"
+            />
+          </div>
+          <div>
+            <Label>CEP de entrega</Label>
+            <Input
+              value={cepEntrega}
+              onChange={(e) => setCepEntrega(e.target.value)}
+              placeholder={
+                clienteEscolhido?.shipping_zip
+                  ? formatarCep(clienteEscolhido.shipping_zip)
+                  : "00000-000"
+              }
+            />
+            {/* Só se digita aqui quando a entrega foge do endereço de sempre.
+                Em branco, vale o do cadastro — e o cadastro não é alterado. */}
+            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+              {clienteEscolhido?.shipping_zip
+                ? "Em branco, vale o do cadastro do cliente."
+                : "O cliente não tem CEP de entrega no cadastro."}
+            </p>
+          </div>
+        </div>
+        <div>
+          <Label>Observação</Label>
+          <textarea
+            className="w-full rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
+            rows={2}
+            value={observacao}
+            onChange={(e) => setObservacao(e.target.value)}
+            placeholder="Sai impressa na ficha do pedido."
+          />
         </div>
       </Card>
 

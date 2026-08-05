@@ -112,3 +112,46 @@ export async function salvarPrefixoErp(id: string, prefixo: string): Promise<voi
   });
   if (error) throw error;
 }
+
+// ---------- Transportadoras (formulário de pedido, 05/08/2026) ----------
+//
+// A lista nasce igual à do formulário de papel. Vira cadastro, e não lista
+// fixa no código, porque transportadora se troca por preço de frete — e
+// trocar não pode exigir publicar uma versão do sistema.
+
+export type Transportadora = {
+  id: string;
+  name: string;
+  requires_name: boolean;
+  sort_order: number;
+  active: boolean;
+};
+
+export async function listarTransportadorasCadastro(): Promise<Transportadora[]> {
+  const { data, error } = await supabase
+    .from("carriers")
+    .select("id, name, requires_name, sort_order, active")
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as Transportadora[];
+}
+
+export async function salvarTransportadora(item: {
+  id: string | null;
+  name: string;
+  sort_order: number;
+  active: boolean;
+}): Promise<void> {
+  const { error } = await supabase.rpc("save_carrier", {
+    p_id: item.id,
+    p_name: item.name.trim(),
+    p_sort_order: item.sort_order,
+    p_active: item.active,
+  });
+  if (error) throw error;
+}
+
+export async function excluirTransportadora(id: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_carrier", { p_id: id });
+  if (error) throw error;
+}

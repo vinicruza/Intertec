@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  excluirTransportadora,
+  listarTransportadorasCadastro,
+  salvarTransportadora,
+  type Transportadora,
   excluirMotivo,
   excluirSegmento,
   listarCategoriasProduto,
@@ -23,7 +27,7 @@ import AbaNomenclaturaNF from "./AbaNomenclaturaNF";
 // sugerida: a Intertech ainda não fechou nenhuma dessas listas. Esta tela
 // existe para que a decisão não dependa de mexer no banco.
 
-type Aba = "tipos" | "areas" | "motivos" | "categorias" | "nomenclatura";
+type Aba = "tipos" | "areas" | "motivos" | "categorias" | "nomenclatura" | "transportadoras";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "tipos", rotulo: "Tipos de cliente" },
@@ -31,6 +35,7 @@ const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "motivos", rotulo: "Motivos de perda" },
   { id: "categorias", rotulo: "Categorias de produto" },
   { id: "nomenclatura", rotulo: "Nomenclatura NF" },
+  { id: "transportadoras", rotulo: "Transportadoras" },
 ];
 
 export default function CadastrosPage() {
@@ -80,6 +85,7 @@ export default function CadastrosPage() {
       {aba === "motivos" && <AbaMotivos />}
       {aba === "categorias" && <AbaCategorias />}
       {aba === "nomenclatura" && <AbaNomenclaturaNF />}
+      {aba === "transportadoras" && <AbaTransportadoras />}
     </div>
   );
 }
@@ -412,6 +418,121 @@ function LinhaCategoria({
       <Button disabled={!mudou || salvando} onClick={() => aoSalvar(prefixo)}>
         Salvar
       </Button>
+    </Card>
+  );
+}
+
+// ---------- Transportadoras (formulário de pedido, 05/08/2026) ----------
+
+function AbaTransportadoras() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["transportadorasCadastro"],
+    queryFn: listarTransportadorasCadastro,
+  });
+  const [erro, setErro] = useState<string | null>(null);
+  const [novo, setNovo] = useState("");
+
+  const invalidar = () => {
+    setErro(null);
+    queryClient.invalidateQueries({ queryKey: ["transportadorasCadastro"] });
+    // O simulador carrega a lista junto com o resto do contexto.
+    queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+  };
+  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+
+  const salvar = useMutation({
+    mutationFn: salvarTransportadora,
+    onSuccess: () => { invalidar(); setNovo(""); },
+    onError: aoErrar,
+  });
+  const excluir = useMutation({ mutationFn: excluirTransportadora, onSuccess: invalidar, onError: aoErrar });
+
+  if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[var(--cor-texto-suave)]">
+        Aparecem no bloco de expedição do pedido e saem impressas na ficha. A lista começou igual
+        à do formulário de papel — troque à vontade conforme mudar de transportadora.
+      </p>
+      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+
+      {(data ?? []).map((t) => (
+        <LinhaTransportadora
+          key={t.id}
+          item={t}
+          salvando={salvar.isPending}
+          aoSalvar={(name, sort_order, active) => salvar.mutate({ id: t.id, name, sort_order, active })}
+          aoExcluir={() => {
+            if (window.confirm(`Excluir "${t.name}"? Só é possível se nenhum pedido usou.`)) {
+              excluir.mutate(t.id);
+            }
+          }}
+        />
+      ))}
+
+      <Card className="flex flex-wrap items-end gap-3">
+        <div className="min-w-64 flex-1">
+          <Label>Nova transportadora</Label>
+          <Input value={novo} onChange={(e) => setNovo(e.target.value)} placeholder="ex.: Azul Cargo" />
+        </div>
+        <Button
+          disabled={!novo.trim() || salvar.isPending}
+          onClick={() =>
+            salvar.mutate({ id: null, name: novo, sort_order: ((data ?? []).length + 1) * 10, active: true })
+          }
+        >
+          Adicionar
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+function LinhaTransportadora({
+  item,
+  salvando,
+  aoSalvar,
+  aoExcluir,
+}: {
+  item: Transportadora;
+  salvando: boolean;
+  aoSalvar: (name: string, sort_order: number, active: boolean) => void;
+  aoExcluir: () => void;
+}) {
+  const [name, setName] = useState(item.name);
+  const [ordem, setOrdem] = useState(String(item.sort_order));
+  const [active, setActive] = useState(item.active);
+  const mudou = name !== item.name || Number(ordem) !== item.sort_order || active !== item.active;
+
+  return (
+    <Card className="flex flex-wrap items-end gap-3">
+      <div className="min-w-64 flex-1">
+        <Label>Transportadora</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} />
+        {/* A linha "Outra" não é uma transportadora: é o pedido para escrever
+            qual, quando quem leva a caixa não está na lista. */}
+        {item.requires_name && (
+          <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+            Ao escolher esta opção no pedido, o sistema pede o nome da transportadora.
+          </p>
+        )}
+      </div>
+      <div>
+        <Label>Ordem</Label>
+        <Input className="w-24" value={ordem} onChange={(e) => setOrdem(e.target.value)} />
+      </div>
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        Ativa
+      </label>
+      <Button disabled={!mudou || salvando} onClick={() => aoSalvar(name, Number(ordem) || 0, active)}>
+        Salvar
+      </Button>
+      <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={aoExcluir}>
+        Excluir
+      </button>
     </Card>
   );
 }

@@ -20,6 +20,7 @@ const AprovacoesPage = lazyComRetry(() => import("./pages/AprovacoesPage"));
 const PedidoDetalhePage = lazyComRetry(() => import("./pages/PedidoDetalhePage"));
 const PedidoFichaPage = lazyComRetry(() => import("./pages/PedidoFichaPage"));
 const ClientesPage = lazyComRetry(() => import("./pages/ClientesPage"));
+const ClienteFormPage = lazyComRetry(() => import("./pages/ClienteFormPage"));
 const VendasConsumoPage = lazyComRetry(() => import("./pages/VendasConsumoPage"));
 const UsuariosPage = lazyComRetry(() => import("./pages/UsuariosPage"));
 const CadastrosPage = lazyComRetry(() => import("./pages/CadastrosPage"));
@@ -73,6 +74,14 @@ export default function App() {
               <Route
                 path="/clientes"
                 element={<ExigirAcesso caminho="/clientes"><ClientesPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/clientes/novo"
+                element={<ExigirAcesso caminho="/clientes"><ClienteFormPage /></ExigirAcesso>}
+              />
+              <Route
+                path="/clientes/:id"
+                element={<ExigirAcesso caminho="/clientes"><ClienteFormPage /></ExigirAcesso>}
               />
               <Route
                 path="/kits"

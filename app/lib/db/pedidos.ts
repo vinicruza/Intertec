@@ -39,7 +39,17 @@ export type ContextoSimulador = {
   // trg_orders_vendedor_do_acesso, no banco; aqui a lista já vem filtrada
   // para a pessoa não escolher errado e só descobrir ao salvar.
   meuVendedorId: string | null;
-  clientes: Array<{ id: string; name: string; uf: string | null }>;
+  clientes: Array<{
+    id: string;
+    name: string;
+    uf: string | null;
+    tax_id: string | null;
+    billing_zip: string | null;
+    shipping_zip: string | null;
+    contact_name: string | null;
+    phone: string | null;
+    email: string | null;
+  }>;
   ufs: string[]; // UFs com alíquota ICSM cadastrada
   tabelaPorUF: Map<string, TabelasUF>;
   itens: ItemVendavel[];
@@ -49,12 +59,17 @@ export type ContextoSimulador = {
   insumosEmbalagem: InsumoEmbalagem[];
   // Assinatura → kit existente, para avisar na hora que a composição já existe.
   kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string }>;
+  // Transportadoras do formulário de pedido (05/08/2026).
+  transportadoras: Array<{ id: string; nome: string; pedeNome: boolean }>;
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend] = await Promise.all([
+  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
-    supabase.from("customers").select("id, name, uf").eq("active", true).order("name"),
+    // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
+    // simulador só precisa saber quais já estão preenchidos, para avisar
+    // antes de o pedido chegar à conferência com o cabeçalho vazio.
+    supabase.from("customers").select("id, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
     supabase.from("difal_rates").select("uf, final_rate"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
@@ -68,8 +83,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       .order("name"),
     supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
     supabase.rpc("meu_vendedor"),
+    supabase.from("carriers").select("id, name, requires_name").eq("active", true).order("sort_order"),
   ]);
-  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend]) {
+  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp]) {
     if (r.error) throw r.error;
   }
 
@@ -179,7 +195,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
         },
       };
     }),
-    clientes: (cli.data ?? []) as Array<{ id: string; name: string; uf: string | null }>,
+    clientes: (cli.data ?? []) as ContextoSimulador["clientes"],
     ufs: [...tabelaPorUF.keys()].sort(),
     tabelaPorUF,
     itens: [...itensProdutos, ...itensKits],
@@ -198,6 +214,11 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       embalagem: (i.is_packaging as boolean | null) ?? false,
     })),
     kitPorAssinatura,
+    transportadoras: (transp.data ?? []).map((t) => ({
+      id: t.id as string,
+      nome: t.name as string,
+      pedeNome: (t.requires_name as boolean | null) ?? false,
+    })),
   };
 }
 
@@ -228,6 +249,16 @@ export type DadosSimulacao = {
   fretePorContaCliente: boolean;
   comissao: string; // fração efetivamente usada
   itens: ItemSimulacao[];
+  // Expedição e condições do formulário de pedido (05/08/2026). Nada aqui
+  // entra em cálculo: é o que a expedição lê para despachar e o financeiro
+  // lê para cobrar.
+  transportadoraId: string | null;
+  transportadoraOutra: string | null;
+  pesoKg: string | null;
+  volumes: string | null;
+  cepEntrega: string | null;
+  prazoPagamentoDias: string | null;
+  observacao: string | null;
 };
 
 // Salva a cotação e EMPILHA UMA VERSÃO (reunião 16/07/2026: "se ele faz 10
@@ -236,6 +267,12 @@ export type DadosSimulacao = {
 //
 // Passe `orderId` para revisar uma cotação existente; null cria uma nova.
 export type ResultadoCotacao = { id: string; version: number; quote_number: string };
+
+// Campo numérico vazio vira string vazia, que a função do banco trata como
+// nulo. Vírgula decimal do teclado brasileiro entra aqui: "12,5" é 12.5.
+function numeroOuVazio(valor: string | null | undefined): string {
+  return (valor ?? "").trim().replace(",", ".");
+}
 
 export async function salvarCotacao(
   orderId: string | null,
@@ -253,6 +290,13 @@ export async function salvarCotacao(
       freight: d.frete.trim().replace(",", "."),
       freight_paid_by_customer: d.fretePorContaCliente,
       commission_rate: d.comissao,
+      carrier_id: d.transportadoraId,
+      carrier_other: d.transportadoraOutra,
+      weight_kg: numeroOuVazio(d.pesoKg),
+      volumes: numeroOuVazio(d.volumes),
+      shipping_zip: d.cepEntrega,
+      payment_term_days: numeroOuVazio(d.prazoPagamentoDias),
+      order_notes: d.observacao,
     },
     p_items: d.itens.map((i) => ({
       product_id: i.tipo === "produto" ? i.refId : null,
@@ -277,6 +321,26 @@ export async function salvarCotacao(
   });
   if (error) throw error;
   return data as ResultadoCotacao;
+}
+
+// ---------- Transportadoras ativas ----------
+//
+// Lista enxuta para a tela do pedido. O simulador já recebe as mesmas
+// transportadoras dentro do contexto; aqui é para quem só precisa delas.
+export type TransportadoraOpcao = { id: string; nome: string; pedeNome: boolean };
+
+export async function listarTransportadoras(): Promise<TransportadoraOpcao[]> {
+  const { data, error } = await supabase
+    .from("carriers")
+    .select("id, name, requires_name")
+    .eq("active", true)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((t) => ({
+    id: t.id as string,
+    nome: t.name as string,
+    pedeNome: (t.requires_name as boolean | null) ?? false,
+  }));
 }
 
 // ---------- Desfecho da cotação ----------

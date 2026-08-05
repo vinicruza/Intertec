@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import {
   categorizarCliente,
   contarClientesSemCategoria,
@@ -7,7 +8,8 @@ import {
   listarClientes,
   listarTiposCliente,
 } from "../lib/db/clientes";
-import { Badge, Card, Input } from "@components/ui/primitives";
+import { formatarCnpjCpf, somenteDigitos } from "../../lib/cadastro/documentos";
+import { Badge, Button, Card, Input } from "@components/ui/primitives";
 
 // ============================================================
 // Clientes e categorização (reunião Intertech 16/07/2026)
@@ -17,10 +19,11 @@ import { Badge, Card, Input } from "@components/ui/primitives";
 // cadastros sem categoria — sem um lugar para fazer esse trabalho, a decisão
 // não sai do papel.
 
-type Filtro = "todos" | "sem_categoria";
+type Filtro = "todos" | "sem_categoria" | "sem_documento";
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [filtro, setFiltro] = useState<Filtro>("sem_categoria");
   const [busca, setBusca] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -47,24 +50,39 @@ export default function ClientesPage() {
 
   const clientes = useMemo(() => {
     const texto = busca.trim().toLocaleLowerCase("pt-BR");
+    const digitos = somenteDigitos(texto);
     return todos.filter((c) => {
       const semCategoria = !c.customer_type_id || !c.customer_specialty_id;
       if (filtro === "sem_categoria" && !semCategoria) return false;
-      if (texto && !`${c.code ?? ""} ${c.name}`.toLocaleLowerCase("pt-BR").includes(texto)) return false;
+      if (filtro === "sem_documento" && c.tax_id) return false;
+      if (texto) {
+        const porNome = `${c.code ?? ""} ${c.name}`.toLocaleLowerCase("pt-BR").includes(texto);
+        // Busca por documento aceita com ou sem máscara: quem copia um CNPJ
+        // de um e-mail cola com pontuação, quem digita não usa.
+        const porDocumento = digitos !== "" && (c.tax_id ?? "").includes(digitos);
+        if (!porNome && !porDocumento) return false;
+      }
       return true;
     });
   }, [todos, filtro, busca]);
+
+  // Quantos ainda estão sem CNPJ. É o número que diz quanto falta para a ficha
+  // impressa parar de sair com o cabeçalho pela metade.
+  const semDocumento = useMemo(() => todos.filter((c) => !c.tax_id).length, [todos]);
 
   const pendencia = pendenciaQuery.data;
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Clientes</h1>
-        <p className="text-sm text-[var(--cor-texto-suave)]">
-          O segmento fica no cliente, não no kit — o mesmo kit é vendido para hospital, veterinário
-          e oftalmologia. É daqui que sai a leitura de quantas cotações foram para cada segmento.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Clientes</h1>
+          <p className="text-sm text-[var(--cor-texto-suave)]">
+            O segmento fica no cliente, não no kit — o mesmo kit é vendido para hospital, veterinário
+            e oftalmologia. É daqui que sai a leitura de quantas cotações foram para cada segmento.
+          </p>
+        </div>
+        <Button onClick={() => navigate("/clientes/novo")}>Novo cliente</Button>
       </div>
 
       {pendencia && pendencia.total > 0 && (
@@ -88,13 +106,14 @@ export default function ClientesPage() {
           onChange={(e) => setFiltro(e.target.value as Filtro)}
         >
           <option value="sem_categoria">Só os sem categoria</option>
+          <option value="sem_documento">Só os sem CNPJ/CPF</option>
           <option value="todos">Todos os clientes</option>
         </select>
         <Input
           className="w-72"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Código ou nome do cliente"
+          placeholder="Código, nome ou CNPJ"
         />
         <span className="self-center text-sm text-[var(--cor-texto-suave)]">
           {clientes.length} de {todos.length}
@@ -121,6 +140,7 @@ export default function ClientesPage() {
               <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
                 <th className="px-4 py-3 font-medium">Código</th>
                 <th className="px-4 py-3 font-medium">Cliente</th>
+                <th className="px-4 py-3 font-medium">CNPJ/CPF</th>
                 <th className="px-4 py-3 font-medium">UF</th>
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Área</th>
@@ -132,7 +152,20 @@ export default function ClientesPage() {
                   <td className="px-4 py-2 font-mono text-xs">
                     {c.code ?? <Badge>sem código</Badge>}
                   </td>
-                  <td className="px-4 py-2 font-medium">{c.name}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <Link to={`/clientes/${c.id}`} className="hover:underline">
+                      {c.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2 font-mono text-xs">
+                    {c.tax_id ? (
+                      formatarCnpjCpf(c.tax_id)
+                    ) : (
+                      <Link to={`/clientes/${c.id}`} className="text-[var(--cor-primaria)] hover:underline">
+                        preencher
+                      </Link>
+                    )}
+                  </td>
                   <td className="px-4 py-2">{c.uf ?? "—"}</td>
                   <td className="px-4 py-2">
                     <select
@@ -182,6 +215,13 @@ export default function ClientesPage() {
         sequencial. Código já gerado não muda ao recategorizar — ele pode ter ido para documento
         ou planilha.
       </p>
+      {semDocumento > 0 && (
+        <p className="text-xs text-[var(--cor-texto-suave)]">
+          <strong>{semDocumento} cliente(s) ainda sem CNPJ/CPF.</strong> Enquanto o documento e os
+          CEPs não estiverem preenchidos, a ficha do pedido sai com o cabeçalho incompleto —
+          clique no nome do cliente para completar.
+        </p>
+      )}
     </div>
   );
 }
