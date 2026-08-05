@@ -80,6 +80,11 @@ export type PedidoCompleto = {
   revised_from_order_id: string | null;
   revision_reason: string | null;
   totals_display: Record<string, string> | null;
+  // Escalar, para reabrir no Simulador (05/08/2026): a relação `customers`
+  // abaixo só tem o que a FICHA precisa exibir (nome, CNPJ, CEPs...), não o
+  // id — que é o que o formulário de edição precisa para pré-selecionar o
+  // cliente no <select>.
+  customer_id: string | null;
   // Expedição e condições do formulário de pedido (05/08/2026).
   carrier_id: string | null;
   carrier_other: string | null;
@@ -114,6 +119,18 @@ export type PedidoCompleto = {
     item_code_snapshot: string | null;
     products: { name: string; code: string; nf_description: string | null } | null;
     kits: { name: string; code: string } | null;
+    // Kit montado NA HORA do pedido, ainda sem código de catálogo (reunião
+    // 16/07/2026). Só existe enquanto o pedido não fecha — o fechamento
+    // materializa em `kits` (materialize_ad_hoc_kits). Precisa vir junto para
+    // reabrir a linha no montador de kit ao editar.
+    ad_hoc_kit_composition: Array<{ product_id: string; quantity: string }> | null;
+    ad_hoc_kit_packaging: Array<{
+      input_id: string;
+      quantity_type: "direct" | "lot";
+      quantity: string | null;
+      lot_size: string | null;
+    }> | null;
+    ad_hoc_kit_label: string | null;
   }>;
 };
 
@@ -121,7 +138,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_days, order_notes, carriers(name, requires_name), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_days, order_notes, carriers(name, requires_name), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -130,7 +147,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: itens, error: e2 } = await supabase
     .from("order_items")
     .select(
-      "id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, products(name,code,nf_description), kits(name,code)"
+      "id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, ad_hoc_kit_composition, ad_hoc_kit_packaging, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code)"
     )
     .eq("order_id", id);
   if (e2) throw e2;

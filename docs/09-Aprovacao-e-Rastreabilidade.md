@@ -78,6 +78,21 @@ Agora está lá: um parágrafo explica que, depois de cada publicação, uma aba
 
 Decisão do cliente em 30/07/2026: **DRE mensal não aparece mais no menu**. A rota `/dre` continua existindo e protegida por perfil (Administrador e Financeiro) — só o link sumiu da navegação. Mecanismo novo e reutilizável: `ItemMenu.oculto` em `app/lib/roles.ts` — um item pode ficar fora do menu sem deixar de estar liberado para quem já tinha acesso, útil se outra tela precisar do mesmo tratamento no futuro.
 
+### 7.4 Editar um pedido, e o aviso da autoaprovação em linguagem simples (05/08/2026)
+
+Dois pedidos do cliente testando o sistema:
+
+1. *"Essa mensagem [explicando por que não pode aprovar a própria cotação] não deve aparecer. Pode ter um aviso tipo 'pedido enviado para aprovação', já que a vendedora também precisará imprimir o pedido e levá-lo até a admin no primeiro momento."*
+2. *"Verifique se realmente é possível editar um pedido duplicado. Não encontrei o botão de editar."*
+
+**O segundo pedido revelou um buraco maior do que parecia.** Não era só o botão de editar que faltava no pedido duplicado — **não existia botão de editar em lugar nenhum do sistema**, para nenhum pedido. `Duplicar como nova simulação` criava a linha no banco e mandava para a tela de detalhe, mas o Simulador nunca aprendeu a reabrir um pedido já existente: sempre partia em branco. Uma vez que se saía do Simulador, o pedido ficava congelado como estava, mesmo em rascunho.
+
+**Corrigido com uma rota nova: `/simulador/:id`.** A mesma tela do Simulador passa a aceitar um pedido existente e pré-carrega tudo — cliente, itens (inclusive kit montado na hora, ainda sem código de catálogo), frete, comissão, DIFAL, transportadora, condições. Salvar empilha mais uma versão, como sempre (Seção 6). O botão **Editar** aparece no detalhe do pedido só quando faz sentido usá-lo: rascunho ou recusado.
+
+**Por que não em qualquer estado — o achado que evitou um problema maior.** Antes de liberar o botão, testei o que `save_quote_revision` faria com um pedido **aguardando aprovação** ou **já aprovado**. A função só checava se o pedido estava em aberto (`simulation`), nunca o estado da aprovação — ia aceitar a edição calada. Isso teria aberto exatamente a brecha que a Seção 2 desta página existe para fechar: aprovar um número e, por baixo, trocá-lo depois. `save_quote_revision` agora recusa editar pedido `pendente` ou `aprovado`, com mensagem explicando o porquê. Editar um pedido **recusado** funciona e devolve ele para `rascunho` automaticamente, limpando quem decidiu e quando — a recusa valia para os números antigos, não para os novos, então tem que passar pela aprovação de novo. Testado contra Postgres real nos quatro estados antes de publicar.
+
+**O primeiro pedido simplificou o aviso, sem tocar na regra.** A trava de "quem enviou não aprova a própria cotação" (Seção 2) continua idêntica — o cliente foi claro que a regra está certa, só o texto que incomodava. Antes, o aviso só aparecia para quem **também era aprovador** e explicava por que o botão de aprovar tinha sumido — o que deixava a vendedora comum (que normalmente não é aprovadora) sem indicação nenhuma de que o pedido dela estava esperando alguém. Agora aparece para **quem enviou**, aprovador ou não, com status neutro e o lembrete prático do primeiro momento da operação: *"Pedido enviado para aprovação — imprima a ficha e leve até quem aprova."*, com atalho direto para a ficha.
+
 ## 8. Onde cada coisa mora
 
 | Peça | Arquivo |
@@ -92,3 +107,6 @@ Decisão do cliente em 30/07/2026: **DRE mensal não aparece mais no menu**. A r
 | Selo de margem na fila | `app/lib/db/aprovacao.ts` (`avaliarMargensPendentes`), `app/pages/AprovacoesPage.tsx` |
 | Erro conhecido explicado | `app/pages/IntegridadePage.tsx` |
 | Item de menu oculto (DRE) | `app/lib/roles.ts` (`ItemMenu.oculto`, `menuDoPerfil`) |
+| Editar pedido (trava de rascunho/pendente/aprovado/recusado) | `supabase/migrations/20260805200000_editar_pedido_em_aberto.sql` |
+| Editar pedido (carregar no Simulador) | `app/pages/SimuladorPage.tsx`, `app/lib/db/fechamento.ts` |
+| Status simplificado para quem enviou | `app/pages/PedidoDetalhePage.tsx` |

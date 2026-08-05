@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
 import {
@@ -16,6 +16,7 @@ import {
   type ContextoSimulador,
   type ItemSimulacao,
 } from "../lib/db/pedidos";
+import { obterPedidoCompleto } from "../lib/db/fechamento";
 import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { reais, percentual } from "../lib/format";
@@ -107,7 +108,18 @@ const CORES: Record<string, string> = {
 
 export default function SimuladorPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { perfil } = useAuth();
+  // Presença de :id na URL = reabrir um pedido em aberto para editar, em vez
+  // de montar um novo do zero (05/08/2026 — antes não existia NENHUM caminho
+  // de volta ao Simulador depois de sair dele, nem para o pedido criado por
+  // "Duplicar como nova simulação").
+  const { id: idParaEditar } = useParams();
+  const pedidoQuery = useQuery({
+    queryKey: ["pedidoParaEditar", idParaEditar],
+    queryFn: () => obterPedidoCompleto(idParaEditar!),
+    enabled: Boolean(idParaEditar),
+  });
   const ctxQuery = useQuery({ queryKey: ["ctxSimulador"], queryFn: carregarContextoSimulador });
   const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
   // Comercial vê a COR da margem, não o número (reunião 16/07/2026).
@@ -140,8 +152,76 @@ export default function SimuladorPage() {
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<{ quote_number: string; version: number } | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+  // Trava para o formulário ser preenchido uma vez só quando o pedido chega —
+  // sem isto, todo refetch (ex.: ao voltar de outra aba) apagaria o que a
+  // pessoa estava digitando.
+  const [carregado, setCarregado] = useState(false);
 
   const ctx = ctxQuery.data;
+  const pedidoParaEditar = pedidoQuery.data;
+  // Só pedido em aberto pode ser reaberto — o banco recusa o resto (D7:
+  // fechado é imutável; e enquanto aguarda ou já tem decisão de aprovação,
+  // editar por baixo invalidaria silenciosamente o que foi decidido).
+  const editavel =
+    !pedidoParaEditar
+      ? true
+      : pedidoParaEditar.status === "simulation" &&
+        !pedidoParaEditar.cancelled_at &&
+        (pedidoParaEditar.approval_status === "rascunho" || pedidoParaEditar.approval_status === "recusado");
+
+  useEffect(() => {
+    if (!idParaEditar || !pedidoParaEditar || !ctx || carregado) return;
+    setCarregado(true);
+    if (!editavel) return; // mostra o aviso, não preenche um formulário que não vai salvar
+
+    const p = pedidoParaEditar;
+    setCotacaoId(p.id);
+    setVendedorId(p.seller_id ?? "");
+    setUf(p.uf ?? "");
+    setClienteId(p.customer_id ?? "");
+    setComissao(p.commission_rate);
+    setFrete(p.freight ?? "0");
+    setFreteCliente(p.freight_paid_by_customer);
+    setAplicaDifalOverride(p.applies_difal);
+    setTransportadoraId(p.carrier_id ?? "");
+    setTransportadoraOutra(p.carrier_other ?? "");
+    setPesoKg(p.weight_kg ?? "");
+    setVolumes(p.volumes != null ? String(p.volumes) : "");
+    setCepEntrega(p.shipping_zip ?? "");
+    setPrazoPagamento(p.payment_term_days != null ? String(p.payment_term_days) : "");
+    setObservacao(p.order_notes ?? "");
+
+    const linhasCarregadas: LinhaItem[] = p.itens.map((item) => {
+      if (item.product_id || item.kit_id) {
+        return {
+          itemId: (item.product_id ?? item.kit_id) as string,
+          quantidade: item.quantity,
+          preco: item.unit_price,
+          kitNovo: null,
+        };
+      }
+      // Kit montado no próprio pedido, ainda sem código de catálogo — volta
+      // para o montador exatamente como foi deixado.
+      return {
+        itemId: KIT_NOVO,
+        quantidade: item.quantity,
+        preco: item.unit_price,
+        kitNovo: {
+          rotulo: item.ad_hoc_kit_label ?? "",
+          produtos: (item.ad_hoc_kit_composition ?? []).map((c) => ({
+            produtoId: c.product_id,
+            quantidade: String(c.quantity),
+          })),
+          embalagem: (item.ad_hoc_kit_packaging ?? []).map((e) => ({
+            insumoId: e.input_id,
+            modo: (e.quantity_type === "lot" ? "itensPorCaixa" : "porKit") as ModoEmbalagem,
+            quantidade: String(e.quantity_type === "lot" ? e.lot_size : e.quantity),
+          })),
+        },
+      };
+    });
+    setLinhas(linhasCarregadas.length > 0 ? linhasCarregadas : [LINHA_VAZIA]);
+  }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
   // Comercial lança pedido só para o vendedor vinculado ao acesso dele
   // (decisão de 04/08/2026). Administrador lança por qualquer um. A trava de
@@ -285,12 +365,41 @@ export default function SimuladorPage() {
       setErroSalvar(null);
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
       queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+      // Estava editando um pedido existente: o detalhe (e, se voltou a
+      // rascunho após recusado, a decisão de aprovação) precisa refletir a
+      // versão nova assim que a pessoa voltar para lá.
+      queryClient.invalidateQueries({ queryKey: ["pedido", r.id] });
+      queryClient.invalidateQueries({ queryKey: ["pedidoParaEditar", r.id] });
+      queryClient.invalidateQueries({ queryKey: ["cascataVigente", r.id] });
+      queryClient.invalidateQueries({ queryKey: ["versoes", r.id] });
     },
     onError: (e: unknown) => setErroSalvar(e instanceof Error ? e.message : "Erro ao salvar."),
   });
 
-  if (ctxQuery.isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
+  if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {
+    return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
+  }
   if (!ctx) return <p className="text-red-600">Erro ao carregar o simulador.</p>;
+  if (idParaEditar && !pedidoParaEditar) return <p className="text-red-600">Pedido não encontrado.</p>;
+  if (idParaEditar && pedidoParaEditar && !editavel) {
+    const motivo = pedidoParaEditar.cancelled_at
+      ? "está cancelado"
+      : pedidoParaEditar.status !== "simulation"
+        ? "já foi fechado"
+        : pedidoParaEditar.approval_status === "pendente"
+          ? "está aguardando aprovação"
+          : "já foi aprovado";
+    return (
+      <div className="mx-auto max-w-xl space-y-3">
+        <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-900">
+          Este pedido {motivo} — não é mais possível editar os itens ou valores por aqui.
+          {pedidoParaEditar.approval_status === "pendente" &&
+            " Se precisar mudar algo, peça para recusarem a aprovação primeiro; ao editar de novo, o pedido volta para rascunho."}
+        </p>
+        <Button onClick={() => navigate(`/pedidos/${pedidoParaEditar.id}`)}>Voltar ao pedido</Button>
+      </div>
+    );
+  }
 
   function atualizarLinha(i: number, campo: "itemId" | "quantidade" | "preco", valor: string) {
     setLinhas((a) =>
@@ -337,7 +446,19 @@ export default function SimuladorPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Simulador de pedido</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">
+          {pedidoParaEditar ? `Editando pedido ${pedidoParaEditar.quote_number ?? ""}` : "Simulador de pedido"}
+        </h1>
+        {pedidoParaEditar && (
+          <Button
+            className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
+            onClick={() => navigate(`/pedidos/${pedidoParaEditar.id}`)}
+          >
+            Voltar ao pedido
+          </Button>
+        )}
+      </div>
 
       <Card className="space-y-4">
         {semVendedorVinculado && (

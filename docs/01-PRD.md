@@ -176,7 +176,7 @@ Ações: salvar simulação, duplicar, **fechar pedido** (gera snapshot §5.3).
 
 ### 6.7 Histórico de Pedidos
 
-Lista com filtros (período, cliente, vendedor, canal, UF, produto/kit, status de margem). Ações: ver detalhes (com snapshot), duplicar como nova simulação, exportar.
+Lista com filtros (período, cliente, vendedor, canal, UF, produto/kit, status de margem). Ações: ver detalhes (com snapshot), **editar** (05/08/2026 — só rascunho ou recusado; reabre o Simulador com os dados carregados em `/simulador/:id`), duplicar como nova simulação, exportar.
 
 ### 6.8 DRE Gerencial Mensal (novo — razão de existir do sistema)
 

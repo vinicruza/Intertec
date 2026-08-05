@@ -95,6 +95,12 @@ export default function App() {
                 path="/simulador"
                 element={<ExigirAcesso caminho="/simulador"><SimuladorPage /></ExigirAcesso>}
               />
+              {/* Reabrir um pedido em aberto (rascunho ou recusado) para
+                  editar — mesma tela, com os dados pré-carregados. */}
+              <Route
+                path="/simulador/:id"
+                element={<ExigirAcesso caminho="/simulador"><SimuladorPage /></ExigirAcesso>}
+              />
               <Route
                 path="/pedidos"
                 element={<ExigirAcesso caminho="/pedidos"><PedidosPage /></ExigirAcesso>}

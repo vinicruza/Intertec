@@ -318,6 +318,18 @@ export default function PedidoDetalhePage() {
             Reabrir cotação
           </Button>
         )}
+        {/* Editar só existe enquanto ninguém decidiu nada sobre este pedido —
+            rascunho (nunca enviado) ou recusado (volta para a mesa). O banco
+            recusa fora disso (migração 20260805200000); a tela nem oferece o
+            botão para não anunciar uma ação que ia falhar. */}
+        {!fechado && !cancelado && !perdida && (aprovacao === "rascunho" || aprovacao === "recusado") && (
+          <Button
+            className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
+            onClick={() => navigate(`/simulador/${pedido.id}`)}
+          >
+            Editar
+          </Button>
+        )}
         <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" disabled={duplicar.isPending} onClick={() => duplicar.mutate()}>
           Duplicar como nova simulação
         </Button>
@@ -335,13 +347,22 @@ export default function PedidoDetalhePage() {
         <Button className="bg-transparent text-[var(--cor-texto-suave)]" onClick={() => setCancelando(false)}>Voltar</Button></div>
       </Card>}
 
-      {aprovacao === "pendente" && souAprovador && souRemetente && !cancelado && (
+      {/* Status para quem ENVIOU — nem sempre é aprovador (a vendedora, o
+          caso mais comum, normalmente não é). Sem explicar a regra de quem
+          pode decidir: só o status e o que fazer agora, porque no primeiro
+          momento a ficha impressa ainda precisa ir até a admin na mão. */}
+      {aprovacao === "pendente" && souRemetente && !cancelado && (
         <Card className="border-amber-200 bg-amber-50">
           <p className="text-sm text-amber-900">
-            <strong>Você enviou esta cotação para aprovação.</strong> Por isso não pode aprová-la —
-            peça a outra pessoa com perfil aprovador para decidir. É a mesma regra que o banco impõe;
-            aqui é só para explicar por quê o botão não aparece.
+            <strong>Pedido enviado para aprovação{pedido.submitted_at ? ` em ${dataCurta(pedido.submitted_at)}` : ""}.</strong>{" "}
+            Imprima a ficha do pedido e leve até quem aprova.
           </p>
+          <Button
+            className="mt-2 bg-transparent text-amber-900 underline hover:bg-transparent"
+            onClick={() => navigate(`/pedidos/${pedido.id}/ficha`)}
+          >
+            Abrir ficha do pedido
+          </Button>
         </Card>
       )}
 
