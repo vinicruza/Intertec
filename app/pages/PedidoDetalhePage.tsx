@@ -259,7 +259,11 @@ export default function PedidoDetalhePage() {
             <table className="w-full text-sm">
               <tbody>
                 <Linha rotulo="Receita bruta" valor={cascata.totals.receita_bruta} />
-                <Linha rotulo="(−) Impostos + DIFAL" valor={`${cascata.totals.impostos} + ${cascata.totals.difal}`} />
+                <Linha rotulo="(−) Impostos sobre venda" valor={cascata.totals.impostos} />
+                <Linha
+                  rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
+                  valor={cascata.totals.difal}
+                />
                 <Linha rotulo="= Receita líquida" valor={cascata.totals.receita_liquida} destaque />
                 <Linha rotulo="(−) CMV" valor={cascata.totals.cmv} />
                 <Linha rotulo="= MARGEM DE CONTRIBUIÇÃO" valor={cascata.totals.margem_contribuicao} destaque />
