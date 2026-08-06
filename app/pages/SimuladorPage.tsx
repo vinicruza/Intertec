@@ -56,6 +56,14 @@ function textoDeCampo(valor: unknown, padrao = ""): string {
   return String(valor);
 }
 
+function normalizarNome(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
 export default function SimuladorPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -183,7 +191,12 @@ export default function SimuladorPage() {
     if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, podeEscolherVendedor, soMeuVendedor]);
-  const vendedorIdEfetivo = vendedorId || (soMeuVendedor ? ctx?.meuVendedorId ?? "" : "");
+  const vendedorDoPerfil = useMemo(() => {
+    if (!ctx || !soMeuVendedor || !perfil?.nome) return null;
+    const nomePerfilLogado = normalizarNome(perfil.nome);
+    return ctx.vendedores.find((v) => normalizarNome(v.name) === nomePerfilLogado) ?? null;
+  }, [ctx, soMeuVendedor, perfil?.nome]);
+  const vendedorIdEfetivo = vendedorId || (soMeuVendedor ? ctx?.meuVendedorId ?? vendedorDoPerfil?.id ?? "" : "");
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
@@ -223,9 +236,13 @@ export default function SimuladorPage() {
   // Simulação ao vivo: monta os itens e chama o motor. Erro bloqueante (CMV
   // zerado, item sem custo) aparece como erro — nunca zero silencioso.
   const simulacao = useMemo(() => {
-    if (!ctx || !vendedor || !uf) return { estado: "incompleto" as const };
+    const pendencias: string[] = [];
+    if (!ctx) return { estado: "incompleto" as const, pendencias };
+    if (!vendedor) pendencias.push("vendedor");
+    if (!uf) pendencias.push("UF de destino");
+    if (!vendedor || pendencias.length > 0) return { estado: "incompleto" as const, pendencias };
     const tabela = ctx.tabelaPorUF.get(uf);
-    if (!tabela) return { estado: "incompleto" as const };
+    if (!tabela) return { estado: "incompleto" as const, pendencias: ["UF de destino"] };
     const preparados = montarItensParaMotor(linhas, resolvidas);
     if (preparados.estado !== "ok") return preparados;
 
@@ -693,6 +710,12 @@ export default function SimuladorPage() {
           );
         })}
       </Card>
+
+      {simulacao.estado === "incompleto" && linhas.some((l) => l.itemId && l.quantidade && l.preco) && (
+        <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
+          Para calcular a cascata, falta preencher: {"pendencias" in simulacao ? simulacao.pendencias.join(", ") : "dados do pedido"}.
+        </p>
+      )}
 
       {simulacao.estado === "bloqueado" && (
         <p className="rounded-md bg-red-50 px-3 py-3 text-sm text-red-700">🛑 {simulacao.msg}</p>
