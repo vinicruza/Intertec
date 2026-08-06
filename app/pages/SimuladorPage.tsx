@@ -372,6 +372,24 @@ export default function SimuladorPage() {
     setSalvo(null);
   }
 
+  function adicionarItem() {
+    setLinhas((a) => [...a, LINHA_VAZIA]);
+    setSalvo(null);
+  }
+
+  function adicionarKitMontado() {
+    setLinhas((a) => [
+      ...a,
+      {
+        itemId: KIT_NOVO,
+        quantidade: "1",
+        preco: "",
+        kitNovo: { rotulo: "", produtos: [{ produtoId: "", quantidade: "1" }], embalagem: [] },
+      },
+    ]);
+    setSalvo(null);
+  }
+
   function atualizarKitNovo(i: number, muda: (k: KitNovoEdicao) => KitNovoEdicao) {
     setLinhas((a) => a.map((l, idx) => (idx === i && l.kitNovo ? { ...l, kitNovo: muda(l.kitNovo) } : l)));
     setSalvo(null);
@@ -633,7 +651,7 @@ export default function SimuladorPage() {
       <Card className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Itens</h2>
-          <Button type="button" onClick={() => setLinhas((a) => [...a, LINHA_VAZIA])}>
+          <Button type="button" onClick={adicionarItem}>
             Adicionar item
           </Button>
         </div>
@@ -659,21 +677,12 @@ export default function SimuladorPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <EscolhaComBusca
-                      valor={l.itemId}
-                      opcoes={opcoesDeItem}
-                      aoEscolher={(id) => atualizarLinha(i, "itemId", id)}
-                      placeholder="Digite o código ou o nome…"
-                    />
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs font-medium text-[var(--cor-primaria)] hover:underline"
-                      onClick={() => atualizarLinha(i, "itemId", KIT_NOVO)}
-                    >
-                      ➕ montar kit
-                    </button>
-                  </div>
+                  <EscolhaComBusca
+                    valor={l.itemId}
+                    opcoes={opcoesDeItem}
+                    aoEscolher={(id) => atualizarLinha(i, "itemId", id)}
+                    placeholder="Digite o código ou o nome…"
+                  />
                 )}
               </div>
               <div>
@@ -709,6 +718,15 @@ export default function SimuladorPage() {
             </div>
           );
         })}
+        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--cor-borda)] pt-4">
+          <Button
+            type="button"
+            className="bg-white text-[var(--cor-primaria)] ring-1 ring-[var(--cor-primaria)] hover:bg-[var(--cor-primaria-clara)]"
+            onClick={adicionarKitMontado}
+          >
+            + Montar kit
+          </Button>
+        </div>
       </Card>
 
       {simulacao.estado === "incompleto" && linhas.some((l) => l.itemId && l.quantidade && l.preco) && (
