@@ -1,5 +1,6 @@
 import { Decimal, custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc";
 import { supabase } from "../supabase";
+import type { CatalogoParaKit } from "../sim/kitNoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
@@ -58,7 +59,10 @@ export type ContextoSimulador = {
   produtos: Array<{ id: string; nome: string; codigo: string; cmv: string | null }>;
   insumosEmbalagem: InsumoEmbalagem[];
   // Assinatura → kit existente, para avisar na hora que a composição já existe.
-  kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string }>;
+  // Inclui kit inativo (`ativo: false`): a assinatura é única no banco
+  // independentemente do status, então a composição igual à de um kit inativo
+  // não ganha código novo — cai no kit inativo.
+  kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string; ativo: boolean }>;
   // Transportadoras do formulário de pedido (05/08/2026).
   transportadoras: Array<{ id: string; nome: string; pedeNome: boolean }>;
 };
@@ -76,10 +80,12 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
     supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
     supabase.from("product_costs").select("product_id, cmv, cmv_without_labor"),
+    // Sem filtro de status: o kit INATIVO não pode ser vendido (ele não entra
+    // na lista de itens abaixo), mas a assinatura dele continua ocupando o
+    // índice único — precisa aparecer no aviso de "esta composição já existe".
     supabase
       .from("kits")
-      .select("id, code, name, signature, kit_items(product_id, quantity), kit_packaging(quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
-      .eq("status", "active")
+      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
       .order("name"),
     supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
     supabase.rpc("meu_vendedor"),
@@ -118,7 +124,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
 
   // Kit: CMV = soma ponderada dos produtos + embalagem/esterilização do kit
   // (Calculations.md §4 — envelope e caixa são consumidos UMA vez por kit).
-  const itensKits: ItemVendavel[] = (kits.data ?? []).map((k) => {
+  const itensKits: ItemVendavel[] = (kits.data ?? []).filter((k) => k.status === "active").map((k) => {
     const composicao = (k.kit_items as Array<{ product_id: string; quantity: string }>).map((i) => ({
       produtoId: i.product_id,
       quantidade: i.quantity,
@@ -154,7 +160,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
 
   // Assinatura → kit já cadastrado. Serve para o simulador avisar, enquanto a
   // pessoa monta, que aquela composição já existe e tem código.
-  const kitPorAssinatura = new Map<string, { id: string; codigo: string; nome: string }>();
+  const kitPorAssinatura = new Map<string, { id: string; codigo: string; nome: string; ativo: boolean }>();
   for (const k of kits.data ?? []) {
     const assinatura = k.signature as string | null;
     if (assinatura) {
@@ -162,6 +168,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
         id: k.id as string,
         codigo: (k.code as string | null) ?? "—",
         nome: k.name as string,
+        ativo: k.status === "active",
       });
     }
   }
@@ -219,6 +226,25 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       nome: t.name as string,
       pedeNome: (t.requires_name as boolean | null) ?? false,
     })),
+  };
+}
+
+// Catálogo no formato que o montador de kit espera (custo por produto, preço
+// dos insumos de embalagem e as assinaturas já cadastradas). Fica aqui, e não
+// na tela, porque três lugares precisam dele: o simulador, a pré-visualização
+// de quem aprova e o fechamento.
+export function montarCatalogoDeKit(ctx: ContextoSimulador): CatalogoParaKit {
+  return {
+    custoPorProduto: new Map<string, CustoProdutoKit>(
+      ctx.produtos.filter((p) => p.cmv !== null).map((p) => [p.id, { cmv: p.cmv as string }])
+    ),
+    insumoPorId: new Map(
+      ctx.insumosEmbalagem.map((i) => [
+        i.id,
+        { nome: i.nome, precoSemImposto: i.precoSemImposto, maoDeObra: i.maoDeObra },
+      ])
+    ),
+    kitPorAssinatura: ctx.kitPorAssinatura,
   };
 }
 

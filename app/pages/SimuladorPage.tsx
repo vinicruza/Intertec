@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ErroCalculoBloqueante, toMoney, type CustoProdutoKit, type ItemPedido } from "@calc";
+import { ErroCalculoBloqueante, toMoney } from "@calc";
 import { simular, statusMargem } from "../lib/sim/params";
+import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
-  resolverKitDoPedido,
-  type CatalogoParaKit,
-  type LinhaCustoEmbalagemKit,
-  type LinhaCustoKit,
-  type ModoEmbalagem,
-} from "../lib/sim/kitNoPedido";
+  KIT_NOVO,
+  montarItensDaCotacao,
+  montarItensParaMotor,
+  resolverLinhaDoPedido,
+  type KitNovoEdicao,
+  type LinhaItem,
+  type LinhaResolvida,
+} from "../lib/sim/itensDoPedido";
 import {
   carregarContextoSimulador,
+  montarCatalogoDeKit,
   salvarCotacao,
   type ContextoSimulador,
-  type ItemSimulacao,
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
 import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
@@ -23,81 +26,11 @@ import { reais, percentual } from "../lib/format";
 import { formatarCep } from "../../lib/cadastro/documentos";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
-// "__kit_novo__" abre o montador de kit dentro do próprio pedido. Decisão da
-// reunião de 16/07/2026: a pessoa monta o kit aqui, não numa tela separada.
-const KIT_NOVO = "__kit_novo__";
-
-type KitNovoEdicao = {
-  rotulo: string;
-  produtos: Array<{ produtoId: string; quantidade: string }>;
-  embalagem: Array<{ insumoId: string; modo: ModoEmbalagem; quantidade: string }>;
-};
-
-type LinhaItem = {
-  itemId: string;
-  quantidade: string;
-  preco: string;
-  kitNovo: KitNovoEdicao | null;
-};
+// O montador de kit dentro do pedido, a resolução de cada linha e a montagem
+// dos itens vivem em lib/sim/itensDoPedido.ts — regra do projeto: nada de
+// cálculo dentro de componente de tela, e o que fica na tela não é testável.
 
 const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", kitNovo: null };
-
-// O que a linha representa depois de resolvida: nome, CMV unitário e, quando é
-// kit montado na hora, a assinatura e o kit de catálogo que já tem essa mesma
-// composição (para avisar em vez de duplicar).
-type LinhaResolvida = {
-  nome: string;
-  cmvUnitario: string | null;
-  assinatura: string | null;
-  kitExistente: { id: string; codigo: string; nome: string } | null;
-  erro: string | null;
-  // Peso de custo por produto/embalagem — só existe quando a linha é um kit
-  // montado na hora. Pedido do cliente em 30/07/2026, ver kitNoPedido.ts.
-  linhasProdutos: LinhaCustoKit[];
-  linhasEmbalagem: LinhaCustoEmbalagemKit[];
-};
-
-// Catálogo derivado do contexto, no formato que o módulo de cálculo espera.
-function montarCatalogo(ctx: ContextoSimulador): CatalogoParaKit {
-  return {
-    custoPorProduto: new Map<string, CustoProdutoKit>(
-      ctx.produtos.filter((p) => p.cmv !== null).map((p) => [p.id, { cmv: p.cmv as string }])
-    ),
-    insumoPorId: new Map(
-      ctx.insumosEmbalagem.map((i) => [i.id, { nome: i.nome, precoSemImposto: i.precoSemImposto, maoDeObra: i.maoDeObra }])
-    ),
-    kitPorAssinatura: ctx.kitPorAssinatura,
-  };
-}
-
-function resolverLinha(l: LinhaItem, ctx: ContextoSimulador, catalogo: CatalogoParaKit): LinhaResolvida | null {
-  if (l.itemId && l.itemId !== KIT_NOVO) {
-    const item = ctx.itens.find((i) => i.id === l.itemId);
-    if (!item) return null;
-    return {
-      nome: item.nome,
-      cmvUnitario: item.cmvUnitario,
-      assinatura: null,
-      kitExistente: null,
-      erro: null,
-      linhasProdutos: [],
-      linhasEmbalagem: [],
-    };
-  }
-
-  if (l.itemId !== KIT_NOVO || !l.kitNovo) return null;
-
-  const r = resolverKitDoPedido(l.kitNovo.produtos, l.kitNovo.embalagem, catalogo);
-  return {
-    nome: l.kitNovo.rotulo.trim() || "Kit montado no pedido",
-    cmvUnitario: r.cmvUnitario,
-    assinatura: r.assinatura || null,
-    kitExistente: r.kitExistente,
-    erro: r.erro,
-    linhasProdutos: r.linhasProdutos,
-    linhasEmbalagem: r.linhasEmbalagem,
-  };
-}
 
 const CORES: Record<string, string> = {
   green: "bg-green-100 text-green-800",
@@ -244,11 +177,11 @@ export default function SimuladorPage() {
     }
   }, [vendedoresDisponiveis, vendedorId]);
 
-  const catalogo = useMemo(() => (ctx ? montarCatalogo(ctx) : null), [ctx]);
+  const catalogo = useMemo(() => (ctx ? montarCatalogoDeKit(ctx) : null), [ctx]);
 
   // Cada linha resolvida uma vez só: nome, CMV e detecção de kit já existente.
   const resolvidas = useMemo(
-    () => (ctx && catalogo ? linhas.map((l) => resolverLinha(l, ctx, catalogo)) : []),
+    () => (ctx && catalogo ? linhas.map((l) => resolverLinhaDoPedido(l, ctx.itens, catalogo)) : []),
     [ctx, catalogo, linhas]
   );
 
@@ -258,24 +191,12 @@ export default function SimuladorPage() {
     if (!ctx || !vendedor || !uf) return { estado: "incompleto" as const };
     const tabela = ctx.tabelaPorUF.get(uf);
     if (!tabela) return { estado: "incompleto" as const };
-    const escolhidas = linhas
-      .map((l, i) => ({ linha: l, resolvida: resolvidas[i] }))
-      .filter((x) => x.resolvida && x.linha.quantidade && x.linha.preco);
-    if (escolhidas.length === 0) return { estado: "incompleto" as const };
-
-    const comErro = escolhidas.find((x) => x.resolvida!.erro);
-    if (comErro) return { estado: "bloqueado" as const, msg: comErro.resolvida!.erro! };
+    const preparados = montarItensParaMotor(linhas, resolvidas);
+    if (preparados.estado !== "ok") return preparados;
 
     try {
-      const itens: ItemPedido[] = escolhidas.map(({ linha, resolvida }) => ({
-        nome: resolvida!.nome,
-        precoVenda: linha.preco.trim().replace(",", "."),
-        quantidade: linha.quantidade.trim().replace(",", "."),
-        cmvUnitario: resolvida!.cmvUnitario ?? "0", // 0 dispara o erro bloqueante no motor
-        despesaUnitaria: "0",
-      }));
       const s = simular({
-        itens,
+        itens: preparados.itens,
         freteManual: frete.trim().replace(",", ".") || "0",
         fretePorContaCliente: freteCliente,
         comissao: comissao ? comissao.trim().replace(",", ".") : null,
@@ -294,39 +215,7 @@ export default function SimuladorPage() {
     mutationFn: async () => {
       if (simulacao.estado !== "ok" || !vendedor || !ctx) throw new Error("Cotação incompleta.");
 
-      const itens: ItemSimulacao[] = linhas.flatMap((l, i): ItemSimulacao[] => {
-        const r = resolvidas[i];
-        if (!r || !l.quantidade || !l.preco) return [];
-
-        // Kit montado na hora cuja composição já existe: usa o kit de catálogo
-        // em vez de criar outro igual (o código é o mesmo, por decisão).
-        if (l.itemId === KIT_NOVO && r.kitExistente) {
-          return [{ tipo: "kit", refId: r.kitExistente.id, quantidade: l.quantidade, precoVenda: l.preco }];
-        }
-
-        if (l.itemId === KIT_NOVO && l.kitNovo && r.assinatura) {
-          return [{
-            tipo: "kitNovo",
-            refId: "",
-            quantidade: l.quantidade,
-            precoVenda: l.preco,
-            kitNovo: {
-              assinatura: r.assinatura,
-              rotulo: r.nome,
-              composicao: l.kitNovo.produtos
-                .filter((p) => p.produtoId && p.quantidade.trim() !== "")
-                .map((p) => ({ produtoId: p.produtoId, quantidade: p.quantidade.trim().replace(",", ".") })),
-              embalagem: l.kitNovo.embalagem
-                .filter((e) => e.insumoId && e.quantidade.trim() !== "")
-                .map((e) => ({ insumoId: e.insumoId, modo: e.modo, quantidade: e.quantidade.trim().replace(",", ".") })),
-            },
-          }];
-        }
-
-        const item = ctx.itens.find((it) => it.id === l.itemId);
-        if (!item) return [];
-        return [{ tipo: item.tipo, refId: item.id, quantidade: l.quantidade, precoVenda: l.preco }];
-      });
+      const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
 
       // A foto da cotação vai junto na versão, para a análise do que não vingou.
       const foto = {
@@ -837,6 +726,14 @@ function MontadorKit({
           ⚠️ Esta composição já existe: <strong>{resolvida.kitExistente.codigo}</strong>{" "}
           ({resolvida.kitExistente.nome}). Ao salvar, o pedido usará esse kit — o código é o mesmo,
           não será criado um duplicado.
+          {resolvida.kitExistente.ativo === false && (
+            <>
+              {" "}
+              <strong>Atenção:</strong> esse kit está <strong>inativo</strong> no catálogo. Ele
+              continua valendo para este pedido; se isso não for o esperado, peça a um
+              Administrador para reativá-lo ou mude a composição.
+            </>
+          )}
         </p>
       )}
       {resolvida?.erro && (

@@ -6,6 +6,7 @@ import {
   type ItemEmbalagem,
   type Quantidade,
 } from "@calc";
+import { numeroDigitado } from "../format";
 
 // ============================================================
 // Kit montado dentro do pedido (reunião Intertech 16/07/2026)
@@ -40,8 +41,12 @@ export type CatalogoParaKit = {
   custoPorProduto: Map<string, CustoProdutoKit>;
   // Preço sem imposto e flag de mão de obra de cada insumo de embalagem.
   insumoPorId: Map<string, { nome: string; precoSemImposto: string | null; maoDeObra: boolean }>;
-  // Assinatura → kit já cadastrado.
-  kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string }>;
+  // Assinatura → kit já cadastrado. Inclui kit INATIVO de propósito: a
+  // assinatura é única no banco independentemente do status, então uma
+  // composição igual à de um kit inativo não gera código novo — vai cair no
+  // kit inativo de qualquer jeito. Melhor o vendedor saber disso na hora do
+  // que descobrir depois de ganhar o pedido.
+  kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string; ativo?: boolean }>;
 };
 
 // Peso de cada produto no custo do kit — pedido do cliente em 30/07/2026:
@@ -73,7 +78,7 @@ export type KitResolvido = {
   // de "nunca zero silencioso" vale para a participação.
   linhasProdutos: LinhaCustoKit[];
   linhasEmbalagem: LinhaCustoEmbalagemKit[];
-  kitExistente: { id: string; codigo: string; nome: string } | null;
+  kitExistente: { id: string; codigo: string; nome: string; ativo?: boolean } | null;
   erro: string | null;
 };
 
@@ -82,7 +87,7 @@ export type KitResolvido = {
 function limpar<T extends { quantidade: string }>(linhas: T[], chave: keyof T): T[] {
   return linhas
     .filter((l) => String(l[chave] ?? "").trim() !== "" && l.quantidade.trim() !== "")
-    .map((l) => ({ ...l, quantidade: l.quantidade.trim().replace(",", ".") }));
+    .map((l) => ({ ...l, quantidade: numeroDigitado(l.quantidade) }));
 }
 
 export function resolverKitDoPedido(
