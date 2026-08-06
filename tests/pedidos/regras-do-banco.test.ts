@@ -206,3 +206,27 @@ describe("comercial lança pedido em nome próprio", () => {
     expect(TODAS).toMatch(/before insert or update of seller_id,\s*channel_id,\s*commission_rate on public\.orders/i);
   });
 });
+
+describe("visibilidade de pedidos por perfil", () => {
+  const visibilidade = readFileSync(
+    join(DIR, "20260806000600_comercial_ve_apenas_pedidos_proprios.sql"),
+    "utf8"
+  );
+
+  it("Admin e Financeiro veem todos os pedidos do tenant", () => {
+    expect(visibilidade).toMatch(/create policy orders_select/i);
+    expect(visibilidade).toMatch(/current_user_role\(\) in \('admin', 'financeiro'\)/i);
+  });
+
+  it("Comercial só vê pedidos do próprio vendedor", () => {
+    expect(visibilidade).toMatch(/current_user_role\(\) = 'comercial'/i);
+    expect(visibilidade).toMatch(/seller_id = public\.meu_vendedor\(\)/i);
+  });
+
+  it("itens e versões seguem a mesma visibilidade do pedido pai", () => {
+    expect(visibilidade).toMatch(/create policy order_items_select/i);
+    expect(visibilidade).toMatch(/o\.id = order_items\.order_id[\s\S]*o\.seller_id = public\.meu_vendedor\(\)/i);
+    expect(visibilidade).toMatch(/create policy order_versions_select/i);
+    expect(visibilidade).toMatch(/o\.id = order_versions\.order_id[\s\S]*o\.seller_id = public\.meu_vendedor\(\)/i);
+  });
+});

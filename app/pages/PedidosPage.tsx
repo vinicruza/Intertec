@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { dec } from "@calc";
+import { useAuth } from "../auth/AuthProvider";
 import { listarPedidos, type PedidoResumo } from "../lib/db/fechamento";
 import { listarRegrasMargem } from "../lib/db/configuracoes";
 import { statusMargem, type RegraMargem } from "../lib/sim/params";
@@ -30,6 +31,8 @@ function rotuloStatus(p: PedidoResumo): string {
 
 export default function PedidosPage() {
   const navigate = useNavigate();
+  const { perfil } = useAuth();
+  const veEquipe = perfil?.perfil === "admin" || perfil?.perfil === "financeiro";
   const [status, setStatus] = useState<StatusFiltro>("todos");
   const [periodo, setPeriodo] = useState("");
   const [texto, setTexto] = useState("");
@@ -96,7 +99,7 @@ export default function PedidosPage() {
         }}>{exportando ? "Gerando…" : "Exportar Excel"}</Button>
       </div>
 
-      <Card className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-9">
+      <Card className={`grid gap-3 p-4 md:grid-cols-3 ${veEquipe ? "xl:grid-cols-9" : "xl:grid-cols-7"}`}>
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as StatusFiltro)}>
           <option value="todos">Todos os status</option><option value="rascunho">Em cotação</option>
           <option value="pendente">Enviados para aprovação</option><option value="aprovado">Aprovados</option>
@@ -105,12 +108,16 @@ export default function PedidosPage() {
         </select>
         <Input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Período" />
         <Input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Nº do orçamento, cliente ou item" />
-        <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={vendedor} onChange={(e) => setVendedor(e.target.value)}>
-          <option value="">Todos vendedores</option>{opcoes.vendedores.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
-        <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={canal} onChange={(e) => setCanal(e.target.value)}>
-          <option value="">Todos canais</option>{opcoes.canais.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        {veEquipe && (
+          <>
+            <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={vendedor} onChange={(e) => setVendedor(e.target.value)}>
+              <option value="">Todos vendedores</option>{opcoes.vendedores.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+            <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={canal} onChange={(e) => setCanal(e.target.value)}>
+              <option value="">Todos canais</option>{opcoes.canais.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </>
+        )}
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={uf} onChange={(e) => setUf(e.target.value)}>
           <option value="">Todas UFs</option>{opcoes.ufs.map((x) => <option key={x}>{x}</option>)}
         </select>
