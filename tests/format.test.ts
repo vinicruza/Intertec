@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { haQuanto, percentual, reais } from "../app/lib/format";
+import { fracaoParaPercentual, haQuanto, numeroDigitado, percentual, reais } from "../app/lib/format";
 
 describe("formatação defensiva de valores do Supabase", () => {
   it.each([
@@ -20,6 +20,13 @@ describe("formatação defensiva de valores do Supabase", () => {
     ["inválido", "—"],
   ])("formata percentual %j", (entrada, esperado) => {
     expect(percentual(entrada)).toBe(esperado);
+  });
+});
+
+describe("normalização numérica defensiva", () => {
+  it("aceita número vindo do banco onde a tela espera string", () => {
+    expect(numeroDigitado(12.5)).toBe("12.5");
+    expect(fracaoParaPercentual(0.025)).toBe("2,5");
   });
 });
 

@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import type { CatalogoParaKit } from "../sim/kitNoPedido";
 import type { KitParaCopiar } from "../sim/itensDoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
+import { numeroDigitado } from "../format";
 
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
 
@@ -325,8 +326,12 @@ export type ResultadoCotacao = { id: string; version: number; quote_number: stri
 
 // Campo numérico vazio vira string vazia, que a função do banco trata como
 // nulo. Vírgula decimal do teclado brasileiro entra aqui: "12,5" é 12.5.
-function numeroOuVazio(valor: string | null | undefined): string {
-  return (valor ?? "").trim().replace(",", ".");
+function textoOuVazio(valor: unknown): string {
+  return valor == null ? "" : String(valor);
+}
+
+function numeroOuVazio(valor: unknown): string {
+  return numeroDigitado(textoOuVazio(valor));
 }
 
 export async function salvarCotacao(
@@ -338,11 +343,11 @@ export async function salvarCotacao(
     p_order_id: orderId,
     p_order: {
       customer_id: d.clienteId,
-      customer_name: d.clienteNovoNome?.trim() || null,
+      customer_name: textoOuVazio(d.clienteNovoNome).trim() || null,
       uf: d.uf,
       seller_id: d.vendedorId,
       channel_id: d.channelId,
-      freight: d.frete.trim().replace(",", "."),
+      freight: numeroOuVazio(d.frete),
       freight_paid_by_customer: d.fretePorContaCliente,
       commission_rate: d.comissao,
       applies_difal: d.aplicaDifal,
@@ -357,8 +362,8 @@ export async function salvarCotacao(
     p_items: d.itens.map((i) => ({
       product_id: i.tipo === "produto" ? i.refId : null,
       kit_id: i.tipo === "kit" ? i.refId : null,
-      quantity: i.quantidade.trim().replace(",", "."),
-      unit_price: i.precoVenda.trim().replace(",", "."),
+      quantity: numeroOuVazio(i.quantidade),
+      unit_price: numeroOuVazio(i.precoVenda),
       ad_hoc_kit_signature: i.kitNovo?.assinatura ?? null,
       ad_hoc_kit_composition: i.kitNovo
         ? i.kitNovo.composicao.map((c) => ({ product_id: c.produtoId, quantity: c.quantidade }))

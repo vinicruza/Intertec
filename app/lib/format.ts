@@ -17,8 +17,8 @@ export type ValorNumerico = string | number | null | undefined;
 // Quando há vírgula, o ponto só pode ser separador de milhar — some. Sem
 // vírgula, o ponto continua sendo a casa decimal ("4.20" segue valendo 4,20),
 // porque é assim que o valor volta do banco para a tela de edição.
-export function numeroDigitado(valor: string): string {
-  const limpo = valor.trim();
+export function numeroDigitado(valor: ValorNumerico): string {
+  const limpo = valor == null ? "" : String(valor).trim();
   return limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
 }
 
@@ -29,8 +29,8 @@ export function numeroDigitado(valor: string): string {
 //
 // Devolve o aviso quando há risco real (ponto seguido de exatamente 3 dígitos,
 // sem vírgula: 1.000, 12.500) e null no resto dos casos.
-export function interpretacaoDoNumero(valor: string): string | null {
-  const limpo = valor.trim();
+export function interpretacaoDoNumero(valor: ValorNumerico): string | null {
+  const limpo = valor == null ? "" : String(valor).trim();
   // Só o padrão de milhar sem vírgula: 1.000, 12.500, 1.000.000.
   if (!/^\d{1,3}(\.\d{3})+$/.test(limpo)) return null;
   const semPontos = limpo.replace(/\./g, "");
@@ -49,8 +49,8 @@ export function interpretacaoDoNumero(valor: string): string | null {
 // porcentagem (2,5%). Pedir a fração no campo é pedir para alguém digitar
 // 0,25 achando que são 2,5% — e 25% de comissão passaria sem nenhum aviso.
 
-export function fracaoParaPercentual(fracao: string | null | undefined): string {
-  if (fracao === null || fracao === undefined || fracao.trim() === "") return "";
+export function fracaoParaPercentual(fracao: ValorNumerico): string {
+  if (fracao === null || fracao === undefined || String(fracao).trim() === "") return "";
   try {
     // Sem casas decimais sobrando: 0,025 vira "2,5" e não "2,50".
     return dec(numeroDigitado(fracao)).times(100).toString().replace(".", ",");

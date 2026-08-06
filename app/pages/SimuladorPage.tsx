@@ -29,6 +29,7 @@ import { useAuth } from "../auth/AuthProvider";
 import {
   fracaoParaPercentual,
   interpretacaoDoNumero,
+  numeroDigitado,
   percentual,
   percentualParaFracao,
   reais,
@@ -49,6 +50,11 @@ const CORES: Record<string, string> = {
   orange: "bg-orange-100 text-orange-800",
   red: "bg-red-100 text-red-800",
 };
+
+function textoDeCampo(valor: unknown, padrao = ""): string {
+  if (valor === null || valor === undefined) return padrao;
+  return String(valor);
+}
 
 export default function SimuladorPage() {
   const queryClient = useQueryClient();
@@ -120,27 +126,27 @@ export default function SimuladorPage() {
 
     const p = pedidoParaEditar;
     setCotacaoId(p.id);
-    setVendedorId(p.seller_id ?? "");
-    setUf(p.uf ?? "");
-    setClienteId(p.customer_id ?? "");
-    setComissao(p.commission_rate);
-    setFrete(p.freight ?? "0");
+    setVendedorId(textoDeCampo(p.seller_id));
+    setUf(textoDeCampo(p.uf));
+    setClienteId(textoDeCampo(p.customer_id));
+    setComissao(p.commission_rate == null ? null : textoDeCampo(p.commission_rate));
+    setFrete(textoDeCampo(p.freight, "0"));
     setFreteCliente(p.freight_paid_by_customer);
     setAplicaDifalOverride(p.applies_difal);
-    setTransportadoraId(p.carrier_id ?? "");
-    setTransportadoraOutra(p.carrier_other ?? "");
-    setPesoKg(p.weight_kg ?? "");
-    setVolumes(p.volumes != null ? String(p.volumes) : "");
-    setCepEntrega(p.shipping_zip ?? "");
-    setPrazoPagamento(p.payment_term_days != null ? String(p.payment_term_days) : "");
-    setObservacao(p.order_notes ?? "");
+    setTransportadoraId(textoDeCampo(p.carrier_id));
+    setTransportadoraOutra(textoDeCampo(p.carrier_other));
+    setPesoKg(textoDeCampo(p.weight_kg));
+    setVolumes(textoDeCampo(p.volumes));
+    setCepEntrega(textoDeCampo(p.shipping_zip));
+    setPrazoPagamento(textoDeCampo(p.payment_term_days));
+    setObservacao(textoDeCampo(p.order_notes));
 
     const linhasCarregadas: LinhaItem[] = p.itens.map((item) => {
       if (item.product_id || item.kit_id) {
         return {
           itemId: (item.product_id ?? item.kit_id) as string,
-          quantidade: item.quantity,
-          preco: item.unit_price,
+          quantidade: textoDeCampo(item.quantity, "1"),
+          preco: textoDeCampo(item.unit_price),
           kitNovo: null,
         };
       }
@@ -148,18 +154,18 @@ export default function SimuladorPage() {
       // para o montador exatamente como foi deixado.
       return {
         itemId: KIT_NOVO,
-        quantidade: item.quantity,
-        preco: item.unit_price,
+        quantidade: textoDeCampo(item.quantity, "1"),
+        preco: textoDeCampo(item.unit_price),
         kitNovo: {
-          rotulo: item.ad_hoc_kit_label ?? "",
+          rotulo: textoDeCampo(item.ad_hoc_kit_label),
           produtos: (item.ad_hoc_kit_composition ?? []).map((c) => ({
             produtoId: c.product_id,
-            quantidade: String(c.quantity),
+            quantidade: textoDeCampo(c.quantity, "1"),
           })),
           embalagem: (item.ad_hoc_kit_packaging ?? []).map((e) => ({
             insumoId: e.input_id,
             modo: (e.quantity_type === "lot" ? "itensPorCaixa" : "porKit") as ModoEmbalagem,
-            quantidade: String(e.quantity_type === "lot" ? e.lot_size : e.quantity),
+            quantidade: textoDeCampo(e.quantity_type === "lot" ? e.lot_size : e.quantity, "1"),
           })),
         },
       };
@@ -221,9 +227,9 @@ export default function SimuladorPage() {
     try {
       const s = simular({
         itens: preparados.itens,
-        freteManual: frete.trim().replace(",", ".") || "0",
+        freteManual: numeroDigitado(frete) || "0",
         fretePorContaCliente: freteCliente,
-        comissao: comissao ? comissao.trim().replace(",", ".") : null,
+        comissao: comissao ? numeroDigitado(comissao) : null,
         aplicaDifal: aplicaDifalOverride,
         canal: vendedor.regras,
         uf: tabela,
