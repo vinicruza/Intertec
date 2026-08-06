@@ -185,8 +185,24 @@ export default function PedidoDetalhePage() {
             {pedido.itens.map((i) => (
               <tr key={i.id} className="border-b border-[var(--cor-borda)] last:border-0">
                 <td className="px-4 py-3 font-medium">
-                  <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">{i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? ""}</div>
-                  {i.products?.name ?? (i.kits ? `[Kit] ${i.kits.name}` : "—")}
+                  <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">
+                    {i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
+                      (i.ad_hoc_kit_composicao ? "código ao ganhar" : "")}
+                  </div>
+                  {/* Kit montado dentro deste pedido: ainda não tem código de
+                      catálogo (ele nasce quando o pedido é ganho), mas tem
+                      nome e composição — e é isso que a conferência lê. */}
+                  {i.products?.name ??
+                    (i.kits
+                      ? `[Kit] ${i.kits.name}`
+                      : i.ad_hoc_kit_composicao
+                        ? `[Kit] ${i.ad_hoc_kit_label?.trim() || "Kit montado no pedido"}`
+                        : "—")}
+                  {i.ad_hoc_kit_composicao && (
+                    <div className="mt-1 text-xs font-normal text-[var(--cor-texto-suave)]">
+                      {i.ad_hoc_kit_composicao.map((c) => `${c.quantidade}× ${c.nome}`).join(" · ")}
+                    </div>
+                  )}
                   {/* Nome fiscal ao lado do nome do catálogo — só quando os
                       dois diferem, para não repetir a mesma linha. */}
                   {i.products?.nf_description && i.products.nf_description !== i.products.name && (

@@ -2,7 +2,8 @@ import { type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
 import { simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
-import { carregarContextoSimulador, type ContextoSimulador } from "./pedidos";
+import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
+import { carregarContextoSimulador, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
 
 // ---------- Histórico ----------
 
@@ -36,6 +37,9 @@ export type PedidoResumo = {
   order_items: Array<{
     item_name_snapshot: string | null;
     item_code_snapshot: string | null;
+    // Kit montado no pedido e ainda sem código de catálogo: sem o rótulo, a
+    // linha aparecia vazia na lista e na busca do histórico.
+    ad_hoc_kit_label: string | null;
     // nf_description: o nome que sai na nota, ao lado do nome do catálogo.
     // Kits não têm — a nota do kit sai da composição, item por item.
     products: { name: string; code: string; nf_description: string | null } | null;
@@ -47,7 +51,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, products(name,code,nf_description), kits(name,code))"
+      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -131,6 +135,11 @@ export type PedidoCompleto = {
       lot_size: string | null;
     }> | null;
     ad_hoc_kit_label: string | null;
+    // Composição do kit montado no pedido já com o NOME de cada produto, para
+    // a tela e a ficha impressa mostrarem o que vai dentro do kit antes de ele
+    // virar kit de catálogo. Sem isto o item aparecia como "—" no detalhe e no
+    // papel que vai para a conferência.
+    ad_hoc_kit_composicao: Array<{ nome: string; quantidade: string }> | null;
   }>;
 };
 
@@ -157,13 +166,42 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     .eq("revised_from_order_id", id)
     .order("created_at", { ascending: false });
   if (e3) throw e3;
-  const itensNormalizados = (itens ?? []).map((item) => ({
-    ...item,
-    quantity: String(item.quantity),
-    unit_price: String(item.unit_price),
-    cmv_unit_snapshot: item.cmv_unit_snapshot == null ? null : String(item.cmv_unit_snapshot),
-    expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
-  }));
+  // Nome dos produtos que só existem dentro de um kit montado no pedido (esses
+  // não têm product_id na linha, então não vêm pela relação `products`).
+  const idsAdHoc = [
+    ...new Set(
+      (itens ?? []).flatMap((item) =>
+        ((item.ad_hoc_kit_composition ?? []) as Array<{ product_id: string }>).map((c) => c.product_id)
+      )
+    ),
+  ];
+  const nomePorProdutoAdHoc = new Map<string, string>();
+  if (idsAdHoc.length > 0) {
+    const { data: prods, error: e4 } = await supabase
+      .from("products")
+      .select("id, name")
+      .in("id", idsAdHoc);
+    if (e4) throw e4;
+    for (const p of prods ?? []) nomePorProdutoAdHoc.set(p.id as string, p.name as string);
+  }
+
+  const itensNormalizados = (itens ?? []).map((item) => {
+    const composicao = (item.ad_hoc_kit_composition ?? []) as Array<{ product_id: string; quantity: string }>;
+    return {
+      ...item,
+      quantity: String(item.quantity),
+      unit_price: String(item.unit_price),
+      cmv_unit_snapshot: item.cmv_unit_snapshot == null ? null : String(item.cmv_unit_snapshot),
+      expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
+      ad_hoc_kit_composicao:
+        composicao.length === 0
+          ? null
+          : composicao.map((c) => ({
+              nome: nomePorProdutoAdHoc.get(c.product_id) ?? c.product_id,
+              quantidade: String(c.quantity),
+            })),
+    };
+  });
   const bruto = pedido as unknown as Omit<PedidoCompleto, "itens" | "revisoes">;
   return {
     ...bruto,
@@ -254,16 +292,28 @@ export async function simularPedidoComCustosVigentes(
     }
   }
 
+  // Kit montado no pedido e ainda não materializado (o código oficial só nasce
+  // quando o pedido é ganho): não tem product_id nem kit_id, então não está em
+  // ctx.itens. Sem isto o item entrava com CMV 0 e derrubava a conta inteira —
+  // e quem sentia era justamente quem ia APROVAR, que via "CMV zerado" no
+  // lugar da margem que foi chamado para conferir.
+  const catalogoKit = montarCatalogoDeKit(ctx);
+  const nomePorProduto = new Map(ctx.produtos.map((p) => [p.id, p.nome]));
+
   // Monta itens do motor e do snapshot com os custos vigentes.
   const itensMotor: ItemPedido[] = [];
   const itensSnapshot: ItemParaSnapshot[] = [];
   for (const item of pedido.itens) {
+    const adHoc = !item.product_id && !item.kit_id && item.ad_hoc_kit_composition
+      ? resolverKitAdHocDoPedido(item, catalogoKit, nomePorProduto)
+      : null;
+
     const refId = (item.product_id ?? item.kit_id) as string;
-    const vendavel = custoPorItemVendavel.get(refId);
-    const cmv = vendavel?.cmvUnitario ?? "0"; // 0 → erro bloqueante no motor
+    const vendavel = adHoc ? null : custoPorItemVendavel.get(refId);
+    const cmv = (adHoc ? adHoc.cmvUnitario : vendavel?.cmvUnitario) ?? "0"; // 0 → erro bloqueante no motor
     const despesa = vendavel?.despesaUnitaria ?? "0";
     itensMotor.push({
-      nome: vendavel?.nome ?? refId,
+      nome: adHoc?.nome ?? vendavel?.nome ?? refId,
       precoVenda: item.unit_price,
       quantidade: item.quantity,
       cmvUnitario: cmv,
@@ -275,7 +325,11 @@ export async function simularPedidoComCustosVigentes(
       quantidade: item.quantity,
       cmvUnitario: cmv,
       despesaUnitaria: despesa,
-      composicaoKit: item.kit_id ? composicaoPorKit.get(item.kit_id) ?? null : null,
+      composicaoKit: adHoc
+        ? adHoc.composicao
+        : item.kit_id
+          ? composicaoPorKit.get(item.kit_id) ?? null
+          : null,
     });
   }
 

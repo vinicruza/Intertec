@@ -54,7 +54,11 @@ export default function PedidosPage() {
       if (canal && p.channels?.id !== canal) return false;
       if (motivoPerda && p.loss_reasons?.id !== motivoPerda) return false;
       if (segmento && p.customers?.customer_types?.id !== segmento) return false;
-      const nomesItens = p.order_items.map((i) => i.item_name_snapshot ?? i.products?.name ?? i.kits?.name ?? "").join(" ");
+      // O kit montado no pedido ainda não é kit de catálogo: quem procura por
+      // ele digita o rótulo que o vendedor deu, não um nome de produto.
+      const nomesItens = p.order_items
+        .map((i) => i.item_name_snapshot ?? i.products?.name ?? i.kits?.name ?? i.ad_hoc_kit_label ?? "")
+        .join(" ");
       const alvo = `${p.quote_number ?? ""} ${p.customers?.name ?? ""} ${nomesItens}`;
       if (busca && !alvo.toLocaleLowerCase("pt-BR").includes(busca)) return false;
       if (faixa) {

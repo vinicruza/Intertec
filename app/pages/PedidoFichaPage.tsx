@@ -129,11 +129,21 @@ export default function PedidoFichaPage() {
             </thead>
             <tbody>
               {pedido.itens.map((i, idx) => {
-                const codigo = i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ?? "—";
-                const nome = i.products?.name ?? (i.kits ? i.kits.name : "—");
+                // Kit montado neste pedido só ganha código quando o pedido é
+                // ganho — até lá a folha diz isso, em vez de imprimir "—".
+                const adHoc = i.ad_hoc_kit_composicao;
+                const codigo =
+                  i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
+                  (adHoc ? "kit novo" : "—");
+                const nome =
+                  i.products?.name ??
+                  i.kits?.name ??
+                  (adHoc ? i.ad_hoc_kit_label?.trim() || "Kit montado no pedido" : "—");
                 // O kit sai DESCRITO ITEM POR ITEM: é dessa lista que sai o
-                // lançamento da nota, pedido explícito na reunião.
-                const composicao = i.kit_composition_snapshot as ComposicaoKit | null;
+                // lançamento da nota, pedido explícito na reunião. Fechado, sai
+                // da composição congelada; em aberto, da composição montada.
+                const composicao =
+                  (i.kit_composition_snapshot as ComposicaoKit | null) ?? adHoc ?? null;
                 return (
                   <tr key={i.id} className="border-t border-black/10 align-top">
                     <td className="py-2">
