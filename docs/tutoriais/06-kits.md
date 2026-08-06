@@ -26,6 +26,17 @@ Abra **Kits** no menu. Cada linha mostra:
 
 Clique em uma linha para abrir os detalhes e editar.
 
+## Kit que nasceu de um pedido ganho: a composição não muda mais
+
+Se o kit nasceu do fechamento de um pedido, o código dele já foi para o papel, para a nota e para
+a fábrica — e o sistema inteiro é construído sobre "um código, uma composição". Por isso a
+composição e a embalagem desses kits aparecem **só para leitura**: mudá-las faria o código deixar
+de valer para quem já o recebeu, e mudaria por baixo o custo de cotações em aberto que usam o kit.
+
+**Nome e descrição continuam editáveis.** Para uma composição diferente, monte um kit novo no
+Simulador — ele ganha código próprio, e a assinatura única impede duplicidade. Kits cadastrados
+manualmente (selo "cadastro manual") seguem totalmente editáveis.
+
 ## Editando um kit existente
 
 Ao abrir um kit você vê primeiro um card de **origem**: quem criou, quando, e — se o kit nasceu de
@@ -35,11 +46,11 @@ um pedido — um link direto para o orçamento de origem (o link só aparece se 
 Abaixo, o formulário permite ajustar:
 
 - **Nome** e **Descrição** (o **código** não é editável).
-- **Composição**: adicione produtos com o botão **Adicionar produto** (escolha o produto e a
-  quantidade que entra em 1 kit), ou remova uma linha com **Remover**.
+- **Composição**: adicione produtos com o botão **Adicionar produto** (o campo tem busca por
+  código ou nome; informe a quantidade que entra em 1 kit), ou remova uma linha com **Remover**.
 - **Embalagem e esterilização**: adicione com **Adicionar embalagem**. O envelope normalmente é
   lançado como **"Unidades por kit"**; a caixa de esterilização, que atende vários kits, deve usar
-  **"Itens por caixa (rateia)"** — informe quantos kits aquela caixa atende, e o sistema divide o
+  **"Kits por caixa (rateia)"** — informe quantos kits cabem naquela caixa, e o sistema divide o
   custo automaticamente. Se o insumo que você procura não aparecer, marque **"Não achei o insumo —
   mostrar todos os insumos do catálogo"**.
 - Uma prévia ao vivo mostra o **CMV do kit** (separado em produtos e embalagem) e a

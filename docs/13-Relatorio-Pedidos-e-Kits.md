@@ -12,7 +12,7 @@
 
 A lógica de cálculo do pedido está correta e bem defendida: nada é calculado com custo zero, a
 mesma composição nunca ganha dois códigos, e a cascata de margem bate número a número com o
-fixture da Patricia. **Foram criados 70 testes automatizados novos** (de 260 para 330 no total),
+fixture da Patricia. **Foram criados 95 testes automatizados novos** (de 260 para 355 no total),
 cobrindo o caminho inteiro do vendedor: escolher itens, montar kit na hora, ser avisado de kit
 repetido, salvar a cotação e congelar o snapshot no fechamento.
 
@@ -21,21 +21,23 @@ pedido com kit montado na hora **quebrava a tela de quem aprova** — em vez da 
 via um erro. Ou seja, o caminho mais novo do produto (montar o kit dentro do pedido) era
 justamente o que não chegava inteiro na aprovação.
 
-Sobre a criação de kits ser confusa: **sim, há confusão, mas ela não vem de misturar kit e produto
-na mesma tela** — essa mistura é o acerto do desenho atual. A confusão vem de três coisas
-menores e concretas, listadas na Seção 5.
+Sobre a criação de kits ser confusa: **sim, havia confusão, mas ela não vinha de misturar kit e
+produto na mesma tela** — essa mistura é o acerto do desenho atual. Vinha de rótulo e de
+ergonomia. Diagnóstico e correções na Seção 5; todas foram implementadas em 06/08/2026, com o
+aval do cliente.
 
 ---
 
 ## 2. A bateria de testes criada
 
-Três arquivos novos, 70 testes, todos verdes junto com os 260 que já existiam.
+Quatro arquivos novos, 95 testes, todos verdes junto com os 260 que já existiam.
 
 | Arquivo | Testes | O que garante |
 |---|---|---|
 | `tests/pedidos/fluxo-do-vendedor.test.ts` | 30 | O pedido inteiro, ponta a ponta: produto individual, kit de catálogo, kit montado na hora e os três juntos na mesma cotação. Cascata, faixa de margem, bloqueios, escolhas do vendedor (frete do cliente, DIFAL, comissão, canal marketplace) e o snapshot do fechamento. |
 | `tests/pedidos/itensDoPedido.test.ts` | 22 | A tradução "o que o vendedor digitou" → "itens gravados no banco", peça por peça. É onde mora a decisão de virar produto, kit de catálogo ou kit novo. |
-| `tests/pedidos/regras-do-banco.test.ts` | 18 | As regras que só existem em SQL: assinatura única, formato do código do kit (KC + 4 dígitos), reaproveitamento do código na materialização, "um item é produto OU kit OU kit novo", e cotação ganha não pode ser reescrita. |
+| `tests/pedidos/regras-do-banco.test.ts` | 20 | As regras que só existem em SQL: assinatura única, formato do código do kit (KC + 4 dígitos), reaproveitamento do código na materialização, "um item é produto OU kit OU kit novo", composição de kit ganho imutável, e cotação ganha não pode ser reescrita. |
+| `tests/pedidos/montagem-de-kit.test.ts` | 23 | As ajudas de montagem criadas na Seção 5: nome obrigatório e sugerido, frase de conferência, partir de um kit existente, comissão em %, aviso do ponto ambíguo e a busca por código/nome. |
 
 Por que o terceiro arquivo lê as migrações em vez de falar com o banco: o projeto não sobe um
 Postgres na verificação automática. Esses testes não substituem um teste contra o banco de
@@ -147,44 +149,62 @@ está negociando um pedido, não cadastrando catálogo. Separar as telas de novo
 A confusão que existe é outra, e é de rótulo e de ergonomia, não de conceito. São três pontos,
 por ordem de impacto:
 
-### 5.2 Três problemas concretos (sugestões, não implementadas — dependem do seu aval)
+> **Atualização de 06/08/2026 — tudo desta seção foi implementado**, com o aval do cliente. O texto
+> abaixo está mantido como registro do diagnóstico; o que foi feito em cada ponto está marcado em
+> **Feito:**.
+
+### 5.2 Três problemas concretos
 
 **(a) A lista de 324 produtos é uma caixa de seleção comum, sem busca.** Este é, de longe, o maior
 atrito da criação de pedido — e piora dentro do montador de kit, onde a pessoa repete a operação
-uma vez por produto do kit. Sugestão: campo com busca por código e por nome (digita "catarata",
-filtra). É a melhoria de maior retorno da tela inteira, e vale tanto para o item do pedido quanto
-para o kit.
+uma vez por produto do kit.
 
-**(b) O mesmo número tem três nomes.** No montador do Simulador, a opção se chama "itens por
-caixa", a legenda embaixo do campo diz "kits por caixa" e o texto explicativo diz "quantos kits
-ela atende". Na tela de Kits, o rótulo é "Itens por caixa" e o texto diz "quantos itens cabem
+**Feito:** campo com busca por código e por nome nos três lugares (item do pedido, produto do kit,
+tela de Kits). Digita "catarata" ou "CS0007" e a lista filtra. A busca é a do próprio navegador
+(`<datalist>`) — sem biblioteca nova e sem menu próprio para dar manutenção. O rótulo começa pelo
+código, que é o que a pessoa tem em mãos quando vem com um pedido de papel. Itens sem custo
+vigente aparecem marcados na lista.
+
+**Feito também:** "montar um kit novo" era a primeira opção de uma lista de 324 produtos — uma
+**ação** escondida dentro de um catálogo. Virou um botão ao lado do campo.
+
+**(b) O mesmo número tem três nomes.** No montador do Simulador, a opção se chamava "itens por
+caixa", a legenda embaixo do campo dizia "kits por caixa" e o texto explicativo dizia "quantos kits
+ela atende". Na tela de Kits, o rótulo era "Itens por caixa" e o texto dizia "quantos itens cabem
 nela". O número correto é **quantos kits a caixa atende** — "itens" induz ao erro de contar peças
-em vez de kits, e o erro multiplica o custo da caixa. Sugestão: padronizar em
-**"Quantos kits cabem na caixa"** nos dois lugares, e nada mais.
+em vez de kits, e o erro multiplica o custo da caixa.
+
+**Feito:** "kits por caixa" nos dois lugares, no rótulo, na opção e no texto de apoio.
 
 **(c) Duas quantidades a poucos centímetros uma da outra.** Em cima, "Quantidade de kits" (a
-venda); embaixo, "Qtd. no kit" (a receita do kit). Os textos de apoio já avisam, mas o risco de
-trocar 100 por 2 permanece. Sugestão: recuar o montador com uma barra lateral e um título
-**"Receita de 1 kit"**, e mostrar uma frase-resumo acima da cascata: *"1 kit = 2× Avental + 1×
-Campo · vendendo 100 kits"*.
+venda); embaixo, "Qtd. no kit" (a receita do kit). Os textos de apoio já avisavam, mas o risco de
+trocar 100 por 2 permanecia.
 
-### 5.3 Outras sugestões, em ordem de utilidade
+**Feito:** o montador ficou recuado, com barra à esquerda e o título **"Receita de 1 kit"**, e
+ganhou uma frase de conferência que se atualiza enquanto a pessoa monta: *"1 kit = 2× Avental TNT
+40g + 1× Campo Cirúrgico Catarata · vendendo 100 kits"*.
 
-1. **"Partir de um kit existente".** Hoje, montar "o kit catarata mais uma compressa" obriga a
-   escolher tudo de novo. Um botão que carrega a composição de um kit do catálogo no montador
-   resolveria — e o aviso de composição repetida cuida do resto.
-2. **Exigir o nome do kit.** O campo é opcional e, sem ele, o kit entra no catálogo como "Kit do
-   pedido". Com o tempo, o catálogo enche de kits com o mesmo nome. Sugestão: exigir o nome, ou
-   sugerir um automático a partir da composição.
-3. **Avisar qual código nasceu.** Ao ganhar o pedido, o sistema cria os kits e gera os códigos,
-   mas não conta isso a ninguém — a informação já existe (a função do banco devolve quantos foram
-   criados) e é descartada. Sugestão: ao fechar, mostrar *"2 kits novos criados: KC0004, KC0005"*.
-4. **Comissão é digitada como fração** (`0,025` para 2,5%), sem limite. Um `0,25` digitado por
-   engano vira 25% de comissão e passa. Sugestão: campo em porcentagem, com aviso acima de um
-   teto configurável.
-5. **Quantidade "1.000" sem vírgula.** Continua sendo lida como 1 — é ambíguo por natureza
-   (`4.20` precisa continuar valendo 4,20). Sugestão: máscara no campo de quantidade, que resolve
-   a ambiguidade na digitação em vez de adivinhar depois.
+### 5.3 Outras melhorias, em ordem de utilidade — todas implementadas
+
+1. **"Partir de um kit existente".** Montar "o kit catarata mais uma compressa" obrigava a escolher
+   tudo de novo. Agora um campo no montador carrega a composição e a embalagem de um kit do
+   catálogo, para ajustar. O nome **não** é copiado (dois kits com o mesmo nome ficam
+   indistinguíveis na lista), e se nada mudar o aviso de composição repetida cuida do resto.
+2. **Nome do kit virou obrigatório.** Sem ele, o kit entrava no catálogo como "Kit do pedido" e,
+   alguns pedidos depois, ninguém sabia qual era qual. O botão de salvar fica bloqueado e a tela
+   diz qual item corrigir; um botão **"usar a sugestão"** preenche um nome montado a partir da
+   composição ("Kit 2× Avental TNT 40g + 1× Campo Cirúrgico Catarata").
+3. **A tela passa a dizer qual código nasceu.** Ao ganhar o pedido, o sistema mostra os kits
+   materializados com código, nome e link — e diz quando o código foi reaproveitado porque a
+   composição já existia. A função do banco agora devolve a lista, não só a contagem.
+4. **Comissão em porcentagem.** O campo pedia a fração (`0,025` para 2,5%) — pedir a fração é pedir
+   para alguém digitar `0,25` achando que são 2,5%, e 25% de comissão passava sem aviso. Agora o
+   campo é em %, e acima de 20% aparece um alerta em vermelho (avisa, não bloqueia: caso fora da
+   curva existe, e quem decide é quem aprova).
+5. **Ponto ambíguo na quantidade.** `4.20` é quatro reais e vinte; `1.000` quase sempre é mil — é a
+   mesma escrita, e não dá para adivinhar sem arriscar errar a quantidade de um pedido inteiro. Em
+   vez de adivinhar, a tela mostra embaixo do campo o que entendeu: *"Entendi 1. Se quis dizer
+   1000, digite sem o ponto."*
 
 ### 5.4 Um risco que merece decisão sua
 
@@ -194,9 +214,11 @@ cotação em aberto que usa esse kit passa a valer outro custo, sem aviso; (ii) 
 anotou no papel deixa de corresponder à composição que ele viu. Isso não afeta pedidos já
 fechados, que guardam o custo congelado.
 
-Sugestão: bloquear a edição de composição para kits que nasceram de um pedido ganho (montar um kit
-novo, com código novo, é barato e a assinatura única impede duplicidade), deixando nome e
-descrição editáveis. **Não implementei** porque muda regra de negócio e depende da sua decisão.
+**Feito (aprovado pelo cliente em 06/08/2026):** a composição e a embalagem de kits que nasceram de
+pedido ganho ficaram imutáveis — no banco (a gravação recusa, com mensagem que explica o porquê e
+cita o código) e na tela (os campos aparecem só para leitura, com o caminho para montar um kit novo
+no Simulador). **Nome e descrição continuam editáveis**, e kits cadastrados manualmente seguem
+totalmente editáveis: o que trava é o que o código promete.
 
 ---
 
@@ -212,6 +234,10 @@ descrição editáveis. **Não implementei** porque muda regra de negócio e dep
 | `app/lib/format.ts`, `app/lib/sim/kitNoPedido.ts` | Separador de milhar do teclado brasileiro. |
 | `app/lib/db/kits.ts`, `app/pages/KitFormPage.tsx` | Aviso de duplicidade com código e status. |
 | `supabase/migrations/20260805210000_…sql` | `save_kit_with_items` devolve o código do kit. |
-| `tests/pedidos/*` | 70 testes novos. |
+| `components/ui/EscolhaComBusca.tsx` | **Novo.** Campo de escolha com busca por código ou nome, usado nas três listas grandes. |
+| `app/pages/KitFormPage.tsx` | Busca no produto, "kits por caixa", composição só para leitura em kit nascido de pedido ganho. |
+| `app/pages/PedidoDetalhePage.tsx` | Mostra os códigos de kit que nasceram no fechamento. |
+| `supabase/migrations/20260806000100_…sql` | Composição de kit ganho imutável; materialização devolve quais kits nasceram. |
+| `tests/pedidos/*` | 95 testes novos. |
 
-Verificação: tipos, lint, 330 testes e build — todos verdes.
+Verificação: tipos, lint, 355 testes e build — todos verdes.

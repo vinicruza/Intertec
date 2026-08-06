@@ -51,6 +51,10 @@ conferência, veja a seção abaixo) e **Voltar**.
 
 - A tela mostra "Custos congelados no fechamento (snapshot imutável)" e a **Cascata congelada**
   com os valores exatos do momento da venda.
+- Se o pedido tinha algum **kit montado na hora**, é neste momento que ele ganha o **código
+  oficial** — e a tela mostra logo em seguida quais códigos nasceram (ex.: *"KC0004 — Kit catarata
+  Hospital de Manaus"*), com link para o kit. Quando a composição já existia no catálogo, o aviso
+  diz isso: o código é reaproveitado, não nasce um duplicado.
 - **Criar revisão (Admin)** — só o perfil Administrador vê este botão. Ele não recalcula o pedido
   fechado (que permanece intacto e imutável): cria uma **nova simulação vinculada**, para registrar
   uma revisão sem apagar o histórico do pedido original. Um aviso de confirmação explica isso antes

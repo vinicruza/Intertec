@@ -88,15 +88,29 @@ describe("gravar kit pela tela de Kits", () => {
   it("a corrida entre duas pessoas gravando a mesma composição vira aviso, não erro cru", () => {
     expect(salvar).toMatch(/when unique_violation then/i);
   });
+
+  it("composição de kit que nasceu de pedido ganho não muda mais", () => {
+    // O código já foi para o papel e para a nota: se a composição mudar, ele
+    // deixa de valer para quem o recebeu, e cotações em aberto que usam o kit
+    // passam a valer outro custo sem aviso. Nome e descrição seguem livres.
+    expect(salvar).toMatch(/source_order_id is not null[\s\S]*signature is distinct from p_signature/i);
+    expect(salvar).toMatch(/nasceu de um pedido ganho/);
+  });
 });
 
 describe("kit montado dentro do pedido", () => {
   const materializar = definicaoVigente("materialize_ad_hoc_kits");
 
   it("o código oficial só nasce no fechamento, reaproveitando o kit que já existe", () => {
-    // Procura a assinatura ANTES de inserir: se achou, usa o kit existente.
-    expect(materializar).toMatch(/select id into v_kit_id from public\.kits/i);
-    expect(materializar).toMatch(/if not found then[\s\S]*insert into public\.kits/i);
+    // A ordem é a regra: procura a assinatura, e só insere se NÃO achou. Se
+    // achou, usa o kit que já existe — "se vender esse mesmo kit futuramente
+    // vai ser o mesmo código" (reunião 16/07/2026).
+    const consulta = materializar.search(/select id into v_kit_id from public\.kits/i);
+    const guarda = materializar.search(/not found/i);
+    const insercao = materializar.search(/insert into public\.kits/i);
+    expect(consulta).toBeGreaterThanOrEqual(0);
+    expect(guarda).toBeGreaterThan(consulta);
+    expect(insercao).toBeGreaterThan(guarda);
   });
 
   it("kit nascido de pedido guarda de qual pedido veio (rastreabilidade, 30/07/2026)", () => {
@@ -114,6 +128,13 @@ describe("kit montado dentro do pedido", () => {
 
   it("a embalagem do kit vai junto, com o modo de consumo (envelope × caixa rateada)", () => {
     expect(materializar).toMatch(/insert into public\.kit_packaging[\s\S]*quantity_type/i);
+  });
+
+  it("devolve QUAIS kits nasceram, não só quantos — para a tela dizer o código", () => {
+    // Sem isto, quem fecha o pedido tem de ir procurar na tela de Kits o
+    // código do que acabou de criar.
+    expect(materializar).toMatch(/'code',\s*\(select code from public\.kits/i);
+    expect(materializar).toMatch(/'novo',\s*v_novo/i);
   });
 });
 
