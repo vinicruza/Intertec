@@ -98,10 +98,15 @@ export type KitForm = {
 };
 
 export type ResultadoSalvarKit =
-  | { tipo: "criado"; id: string }
-  | { tipo: "atualizado"; id: string }
-  // Dedupe (PRD §6.5): já existe kit com a mesma composição — oferecer reutilizar.
-  | { tipo: "duplicado"; kitExistente: { id: string; name: string } };
+  | { tipo: "criado"; id: string; code: string | null }
+  | { tipo: "atualizado"; id: string; code: string | null }
+  // Dedupe (PRD §6.5): já existe kit com a mesma composição — oferecer
+  // reutilizar. O CÓDIGO vem junto: é ele que identifica o kit no pedido, na
+  // nota e na fábrica; nome de kit não identifica nada.
+  | {
+      tipo: "duplicado";
+      kitExistente: { id: string; name: string; code: string | null; status: "active" | "inactive" };
+    };
 
 export async function salvarKit(id: string | null, form: KitForm): Promise<ResultadoSalvarKit> {
   const embalagem = form.embalagem ?? [];

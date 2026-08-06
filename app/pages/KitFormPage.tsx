@@ -28,7 +28,9 @@ export default function KitFormPage() {
   const [itens, setItens] = useState<ItemEdicao[]>([{ produtoId: "", quantidade: "1" }]);
   const [embalagem, setEmbalagem] = useState<EmbalagemEdicao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  const [duplicado, setDuplicado] = useState<{ id: string; name: string } | null>(null);
+  const [duplicado, setDuplicado] = useState<
+    { id: string; name: string; code: string | null; status: "active" | "inactive" } | null
+  >(null);
   // Nem todo insumo de embalagem já foi marcado como tal (é o Administrador
   // quem marca, na tela de Insumos) — sem este escape, quem monta o kit e não
   // acha o insumo certo na lista filtrada ficaria travado.
@@ -406,11 +408,14 @@ export default function KitFormPage() {
 
         {duplicado && (
           <div className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
-            Já existe um kit com exatamente esta composição: <strong>{duplicado.name}</strong>.{" "}
+            Já existe um kit com exatamente esta composição:{" "}
+            <strong className="font-mono">{duplicado.code ?? "sem código"}</strong> —{" "}
+            {duplicado.name}
+            {duplicado.status === "inactive" && <> (kit <strong>inativo</strong> no catálogo)</>}.
+            Use esse código no pedido em vez de criar outro igual.{" "}
             <Link className="font-medium underline" to={`/kits/${duplicado.id}`}>
               Abrir o kit existente
-            </Link>{" "}
-            em vez de duplicar.
+            </Link>
           </div>
         )}
         {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
