@@ -61,8 +61,8 @@ export async function listarCategoriasProduto(): Promise<CategoriaProduto[]> {
   return (data ?? []) as CategoriaProduto[];
 }
 
-function num(texto: string): string {
-  const limpo = (texto ?? "").trim().replace(",", ".");
+function num(texto: unknown): string {
+  const limpo = String(texto ?? "").trim().replace(",", ".");
   return limpo === "" ? "0" : limpo;
 }
 

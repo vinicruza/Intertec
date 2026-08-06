@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   calcularFicha,
-  ErroCalculoBloqueante,
   type ComponenteRef,
   type ProdutoCascata,
 } from "@calc";
@@ -30,6 +29,8 @@ const COMPONENTE_VAZIO: ComponenteForm = {
   tipo: "insumo", refId: "", quantity_type: "direct",
   quantity: "1", width: "", length: "", yield_rate: "0.99", lot_size: "",
 };
+
+const textoCampo = (valor: unknown): string => String(valor ?? "");
 
 export default function ProdutoFormPage() {
   const { id } = useParams();
@@ -69,8 +70,8 @@ export default function ProdutoFormPage() {
             tipo: c.component_input_id ? "insumo" : "produto",
             refId: c.component_input_id ?? c.component_product_id ?? "",
             quantity_type: c.quantity_type,
-            quantity: c.quantity ?? "", width: c.width ?? "", length: c.length ?? "",
-            yield_rate: c.yield_rate ?? "", lot_size: c.lot_size ?? "",
+            quantity: textoCampo(c.quantity), width: textoCampo(c.width), length: textoCampo(c.length),
+            yield_rate: textoCampo(c.yield_rate), lot_size: textoCampo(c.lot_size),
           }))
         : [COMPONENTE_VAZIO],
     });
@@ -103,7 +104,7 @@ export default function ProdutoFormPage() {
       const r = calcularFicha(idAtual, base.insumos, produtos);
       return { estado: "ok" as const, ...r };
     } catch (e) {
-      const msg = e instanceof ErroCalculoBloqueante ? e.message : "Não foi possível calcular a ficha.";
+      const msg = e instanceof Error && e.message ? e.message : "Não foi possível calcular a ficha.";
       return { estado: "erro" as const, msg };
     }
   }, [componentes, baseQuery.data, idAtual]);
@@ -157,7 +158,7 @@ export default function ProdutoFormPage() {
               Guardado aqui para não depender de decorar ou copiar de outro lugar na hora de
               faturar. O sistema ainda não emite nota fiscal — isso continua manual, fora daqui.
             </p>
-            {sugestaoNF && sugestaoNF !== nfDescriptionAtual.trim() && (
+            {sugestaoNF && sugestaoNF !== textoCampo(nfDescriptionAtual).trim() && (
               <p className="mt-2 text-xs">
                 <span className="text-[var(--cor-texto-suave)]">Pela regra de nomenclatura: </span>
                 <strong>{sugestaoNF}</strong>{" "}
