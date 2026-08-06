@@ -347,7 +347,11 @@ export async function simularPedidoComCustosVigentes(
   return { sim, snap: montarSnapshot(sim, tabela.aliquotaIcsm, itensSnapshot) };
 }
 
-export async function fecharPedido(orderId: string): Promise<void> {
+// Kits que o fechamento materializou. `novo` distingue o que ganhou código
+// agora do que reaproveitou um código existente (composição repetida).
+export type KitMaterializado = { id: string; code: string | null; name: string; novo: boolean };
+
+export async function fecharPedido(orderId: string): Promise<KitMaterializado[]> {
   // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
   // código quando a mesma composição já existe. Precisa vir ANTES de ler o
@@ -358,7 +362,9 @@ export async function fecharPedido(orderId: string): Promise<void> {
   const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
   if (erroAprovacao) throw erroAprovacao;
 
-  const { error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", { p_order_id: orderId });
+  const { data: kitsMaterializados, error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", {
+    p_order_id: orderId,
+  });
   if (erroKits) throw erroKits;
 
   const pedido = await obterPedidoCompleto(orderId);
@@ -380,6 +386,10 @@ export async function fecharPedido(orderId: string): Promise<void> {
     p_commission_rate: sim.comissaoUsada.toString(),
   });
   if (error) throw error;
+
+  // Quem fechou precisa saber qual código nasceu — senão vai procurar na tela
+  // de Kits para descobrir o código do que acabou de criar.
+  return (kitsMaterializados as KitMaterializado[] | null) ?? [];
 }
 
 // ---------- Pré-visualização para quem aprova (nada é gravado) ----------

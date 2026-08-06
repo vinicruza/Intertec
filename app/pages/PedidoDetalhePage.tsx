@@ -10,6 +10,7 @@ import {
   reabrirPedido,
   salvarExpedicao,
   type DadosExpedicao,
+  type KitMaterializado,
   type PedidoCompleto,
 } from "../lib/db/fechamento";
 import {
@@ -39,6 +40,8 @@ export default function PedidoDetalhePage() {
   const queryClient = useQueryClient();
   const { perfil } = useAuth();
   const [erro, setErro] = useState<string | null>(null);
+  // Kits que ganharam código oficial no fechamento deste pedido.
+  const [kitsCriados, setKitsCriados] = useState<KitMaterializado[]>([]);
   const [cancelando, setCancelando] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [perdendo, setPerdendo] = useState(false);
@@ -70,7 +73,12 @@ export default function PedidoDetalhePage() {
 
   const fechar = useMutation({
     mutationFn: () => fecharPedido(id!),
-    onSuccess: recarregar,
+    onSuccess: (kits) => {
+      // O código oficial do kit nasce agora. Sem dizer qual é, quem fechou o
+      // pedido teria de ir procurar na tela de Kits para descobrir.
+      setKitsCriados(kits);
+      recarregar();
+    },
     onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao fechar."),
   });
   const reabrir = useMutation({
@@ -287,6 +295,31 @@ export default function PedidoDetalhePage() {
             </table>
           )}
         </Card>
+      )}
+
+      {kitsCriados.length > 0 && (
+        <div className="rounded-md bg-green-50 px-3 py-3 text-sm text-green-900">
+          <strong>
+            {kitsCriados.some((k) => k.novo)
+              ? "Kits deste pedido — o código oficial nasceu agora:"
+              : "Kits deste pedido (a composição já existia; o código é o mesmo):"}
+          </strong>
+          <ul className="mt-1 space-y-0.5">
+            {kitsCriados.map((k) => (
+              <li key={k.id}>
+                <button
+                  type="button"
+                  className="font-mono font-semibold underline"
+                  onClick={() => navigate(`/kits/${k.id}`)}
+                >
+                  {k.code ?? "—"}
+                </button>{" "}
+                — {k.name}
+                {!k.novo && " (já existia; código reaproveitado)"}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
