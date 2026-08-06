@@ -9,7 +9,7 @@ import {
   type LinhaItem,
 } from "@app/lib/sim/itensDoPedido";
 import type { CatalogoParaKit } from "@app/lib/sim/kitNoPedido";
-import { assinaturaKitCompleta, type CustoProdutoKit } from "@calc";
+import { calcularPedido, assinaturaKitCompleta, toMoney, type CustoProdutoKit } from "@calc";
 
 // ============================================================
 // Da linha da tela para o item do pedido
@@ -170,6 +170,33 @@ describe("itens que vão para o motor de cálculo", () => {
     const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
     const r = montarItensParaMotor(linhas, resolvidas);
     expect(r.estado === "ok" && r.itens[0].quantidade).toBe("2.5");
+  });
+
+  it("kit montado no pedido entra no motor como preço por kit vezes quantidade de kits", () => {
+    const linhas = [
+      linha({
+        itemId: KIT_NOVO,
+        quantidade: "3",
+        preco: "1250",
+        kitNovo: kitNovo(COMPOSICAO_EXISTENTE, [{ insumoId: "ins-envelope", modo: "porKit", quantidade: "1" }]),
+      }),
+    ];
+    const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
+    const r = montarItensParaMotor(linhas, resolvidas);
+    if (r.estado !== "ok") throw new Error("Kit deveria estar pronto para cálculo.");
+
+    const pedido = calcularPedido({
+      itens: r.itens,
+      frete: "0",
+      aliquotaImposto: "0",
+      aliquotaDifal: "0",
+      aliquotaComissao: "0",
+    });
+
+    expect(r.itens[0].precoVenda).toBe("1250");
+    expect(r.itens[0].quantidade).toBe("3");
+    expect(toMoney(pedido.receitaBruta)).toBe("3750.00");
+    expect(toMoney(pedido.cmvTotal)).toBe("19.59"); // 6,52863 × 3
   });
 
   it("produto sem custo entra com CMV 0 para o MOTOR barrar com o nome do item (T9)", () => {

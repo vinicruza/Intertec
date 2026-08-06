@@ -1,4 +1,4 @@
-import type { ItemPedido } from "@calc";
+import { dec, type ItemPedido } from "@calc";
 import { numeroDigitado } from "../format";
 import {
   resolverKitDoPedido,
@@ -172,6 +172,40 @@ export function resumoDoKit(
     .join(" + ");
   const qtd = quantidadeVendida.trim();
   return qtd === "" ? `1 kit = ${dentro}` : `1 kit = ${dentro} · vendendo ${qtd} kits`;
+}
+
+export type ResumoFinanceiroLinhaKit = {
+  quantidadeKits: string;
+  precoPorKit: string;
+  receitaTotal: string;
+  cmvPorKit: string;
+  cmvTotal: string;
+};
+
+export function resumoFinanceiroLinhaKit(
+  quantidadeVendida: string,
+  precoPorKit: string,
+  cmvPorKit: string | null | undefined
+): ResumoFinanceiroLinhaKit | null {
+  const quantidade = numero(quantidadeVendida);
+  const preco = numero(precoPorKit);
+  const cmv = numero(cmvPorKit);
+  if (!quantidade || !preco || !cmv) return null;
+
+  try {
+    const qtd = dec(quantidade);
+    const precoUnitario = dec(preco);
+    const cmvUnitario = dec(cmv);
+    return {
+      quantidadeKits: qtd.toString(),
+      precoPorKit: precoUnitario.toString(),
+      receitaTotal: precoUnitario.times(qtd).toString(),
+      cmvPorKit: cmvUnitario.toString(),
+      cmvTotal: cmvUnitario.times(qtd).toString(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ---------- Partir de um kit que já existe ----------

@@ -13,6 +13,7 @@ import {
   nomeSugeridoParaKit,
   resolverLinhaDoPedido,
   resumoDoKit,
+  resumoFinanceiroLinhaKit,
   type KitNovoEdicao,
   type LinhaItem,
   type LinhaResolvida,
@@ -711,6 +712,7 @@ export default function SimuladorPage() {
                 kit={l.kitNovo}
                 quantidadeVendida={l.quantidade}
                 resolvida={r}
+                precoPorKit={l.preco}
                 verNumeros={verNumeros}
                 aoMudar={(muda) => atualizarKitNovo(i, muda)}
               />
@@ -817,6 +819,7 @@ function MontadorKit({
   ctx,
   kit,
   quantidadeVendida,
+  precoPorKit,
   resolvida,
   verNumeros,
   aoMudar,
@@ -824,6 +827,7 @@ function MontadorKit({
   ctx: ContextoSimulador;
   kit: KitNovoEdicao;
   quantidadeVendida: string;
+  precoPorKit: string;
   resolvida: LinhaResolvida | null;
   verNumeros: boolean;
   aoMudar: (muda: (k: KitNovoEdicao) => KitNovoEdicao) => void;
@@ -849,6 +853,7 @@ function MontadorKit({
     detalhe: p.cmv === null ? "sem custo vigente" : undefined,
   }));
   const resumo = resumoDoKit(kit, quantidadeVendida, nomePorProduto);
+  const resumoFinanceiro = resumoFinanceiroLinhaKit(quantidadeVendida, precoPorKit, resolvida?.cmvUnitario);
   const sugestaoDeNome = nomeSugeridoParaKit(kit, nomePorProduto);
   const opcoesDeKitBase: OpcaoDeBusca[] = ctx.kitsParaCopiar.map((k) => ({
     id: k.id,
@@ -875,6 +880,24 @@ function MontadorKit({
         <p className="rounded-md bg-white px-3 py-2 text-sm">
           <strong>{resumo}</strong>
         </p>
+      )}
+      {verNumeros && resumoFinanceiro && (
+        <div className="grid gap-2 rounded-md bg-white px-3 py-2 text-sm md:grid-cols-2">
+          <div>
+            <Label>Venda da linha</Label>
+            <p>
+              {reais(resumoFinanceiro.precoPorKit)} × {resumoFinanceiro.quantidadeKits} kits ={" "}
+              <strong>{reais(resumoFinanceiro.receitaTotal)}</strong>
+            </p>
+          </div>
+          <div>
+            <Label>CMV da linha</Label>
+            <p>
+              {reais(resumoFinanceiro.cmvPorKit)} × {resumoFinanceiro.quantidadeKits} kits ={" "}
+              <strong>{reais(resumoFinanceiro.cmvTotal)}</strong>
+            </p>
+          </div>
+        </div>
       )}
 
       <div className="flex flex-wrap items-end gap-3">

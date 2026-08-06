@@ -4,6 +4,7 @@ import {
   kitNovoAPartirDe,
   kitsSemNome,
   nomeSugeridoParaKit,
+  resumoFinanceiroLinhaKit,
   resumoDoKit,
   type KitNovoEdicao,
   type KitParaCopiar,
@@ -103,6 +104,30 @@ describe("frase de conferência do kit", () => {
       ],
     });
     expect(resumoDoKit(comSobras, "10", NOMES)).toBe("1 kit = 2× Avental TNT 40g · vendendo 10 kits");
+  });
+});
+
+describe("resumo financeiro da linha de kit", () => {
+  it("multiplica preço por kit pela quantidade de kits vendidos", () => {
+    expect(resumoFinanceiroLinhaKit("3", "1250", "410")).toEqual({
+      quantidadeKits: "3",
+      precoPorKit: "1250",
+      receitaTotal: "3750",
+      cmvPorKit: "410",
+      cmvTotal: "1230",
+    });
+  });
+
+  it("normaliza vírgula decimal antes de multiplicar", () => {
+    expect(resumoFinanceiroLinhaKit("2,5", "100,50", "20,10")?.receitaTotal).toBe("251.25");
+    expect(resumoFinanceiroLinhaKit("2,5", "100,50", "20,10")?.cmvTotal).toBe("50.25");
+  });
+
+  it("não derruba a tela enquanto falta preço, quantidade ou CMV", () => {
+    expect(resumoFinanceiroLinhaKit("", "100", "20")).toBeNull();
+    expect(resumoFinanceiroLinhaKit("2", "", "20")).toBeNull();
+    expect(resumoFinanceiroLinhaKit("2", "100", null)).toBeNull();
+    expect(resumoFinanceiroLinhaKit("abc", "100", "20")).toBeNull();
   });
 });
 
