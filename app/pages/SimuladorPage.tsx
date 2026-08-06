@@ -24,7 +24,7 @@ import {
   type ContextoSimulador,
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
-import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
+import { podeVerCascataNoSimulador } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import {
   fracaoParaPercentual,
@@ -71,9 +71,7 @@ export default function SimuladorPage() {
     enabled: Boolean(idParaEditar),
   });
   const ctxQuery = useQuery({ queryKey: ["ctxSimulador"], queryFn: carregarContextoSimulador });
-  const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
-  // Comercial vê a COR da margem, não o número (reunião 16/07/2026).
-  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, paramsQuery.data);
+  const verNumeros = podeVerCascataNoSimulador(perfil?.perfil);
 
   const [vendedorId, setVendedorId] = useState("");
   const [uf, setUf] = useState("");

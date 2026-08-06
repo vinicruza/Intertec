@@ -25,11 +25,6 @@ export const PARAMETROS_APROVACAO_PADRAO: ParametrosAprovacao = {
   hide_margin_numbers_from_sales: true,
 };
 
-// Quem monta o pedido vê a COR da margem, não o número.
-//
-// A razão, dita na reunião: "elas vão jogando até chegar perto de 52%, opa,
-// continua no verde". Sem o número, o desconto não tem alvo — "se tiver só
-// verde, pode estar 80%, ela não vai saber". Quem aprova vê tudo.
 export function podeVerNumerosDeMargem(
   perfil: Perfil | null | undefined,
   params: ParametrosAprovacao | undefined
@@ -37,6 +32,10 @@ export function podeVerNumerosDeMargem(
   if (!perfil) return false;
   if (!params?.hide_margin_numbers_from_sales) return true;
   return perfil !== "comercial";
+}
+
+export function podeVerCascataNoSimulador(perfil: Perfil | null | undefined): boolean {
+  return perfil === "admin" || perfil === "financeiro" || perfil === "comercial";
 }
 
 export function podeAprovar(

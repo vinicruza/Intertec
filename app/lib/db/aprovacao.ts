@@ -5,7 +5,12 @@ import { statusMargem, type RegraMargem } from "../sim/params";
 import { obterPedidoCompleto, simularPedidoComCustosVigentes } from "./fechamento";
 import { carregarContextoSimulador } from "./pedidos";
 
-export { podeAprovar, podeVerNumerosDeMargem, type ParametrosAprovacao } from "../sim/aprovacao";
+export {
+  podeAprovar,
+  podeVerCascataNoSimulador,
+  podeVerNumerosDeMargem,
+  type ParametrosAprovacao,
+} from "../sim/aprovacao";
 
 // ============================================================
 // Aprovação do pedido (reunião 16/07/2026 + decisão de 29/07/2026)

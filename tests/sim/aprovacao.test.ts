@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { podeAprovar, podeVerNumerosDeMargem, type ParametrosAprovacao } from "@app/lib/sim/aprovacao";
+import {
+  podeAprovar,
+  podeVerCascataNoSimulador,
+  podeVerNumerosDeMargem,
+  type ParametrosAprovacao,
+} from "@app/lib/sim/aprovacao";
 
 const PADRAO: ParametrosAprovacao = {
   approver_roles: ["admin", "financeiro"],
@@ -26,6 +31,22 @@ describe("visibilidade da margem", () => {
   it("sem perfil identificado, não mostra nada", () => {
     expect(podeVerNumerosDeMargem(null, PADRAO)).toBe(false);
     expect(podeVerNumerosDeMargem(undefined, PADRAO)).toBe(false);
+  });
+});
+
+describe("visibilidade da cascata no simulador", () => {
+  it("mostra a cascata para Comercial montar pedido em nome próprio", () => {
+    expect(podeVerCascataNoSimulador("comercial")).toBe(true);
+  });
+
+  it("mantém a cascata visível para Admin e Financeiro", () => {
+    expect(podeVerCascataNoSimulador("admin")).toBe(true);
+    expect(podeVerCascataNoSimulador("financeiro")).toBe(true);
+  });
+
+  it("não libera para produção nem sessão sem perfil", () => {
+    expect(podeVerCascataNoSimulador("producao")).toBe(false);
+    expect(podeVerCascataNoSimulador(null)).toBe(false);
   });
 });
 
