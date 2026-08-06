@@ -40,17 +40,35 @@ export type ClienteCadastro = {
   uf: string | null;
   tax_id: string | null;
   billing_zip: string | null;
+  billing_street: string | null;
+  billing_number: string | null;
+  billing_complement: string | null;
+  billing_district: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
   shipping_zip: string | null;
+  shipping_street: string | null;
+  shipping_number: string | null;
+  shipping_complement: string | null;
+  shipping_district: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
   contact_name: string | null;
   phone: string | null;
   email: string | null;
+  commercial_contact_name: string | null;
+  commercial_phone: string | null;
+  commercial_email: string | null;
+  financial_contact_name: string | null;
+  financial_phone: string | null;
+  financial_email: string | null;
   notes: string | null;
   customer_type_id: string | null;
   customer_specialty_id: string | null;
 };
 
 const CAMPOS_CADASTRO =
-  "id, code, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email, notes, customer_type_id, customer_specialty_id";
+  "id, code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
 
 export async function listarTiposCliente(): Promise<OpcaoSegmento[]> {
   const { data, error } = await supabase
@@ -105,10 +123,28 @@ export type DadosCliente = {
   uf: string | null;
   tax_id: string | null;
   billing_zip: string | null;
+  billing_street: string | null;
+  billing_number: string | null;
+  billing_complement: string | null;
+  billing_district: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
   shipping_zip: string | null;
+  shipping_street: string | null;
+  shipping_number: string | null;
+  shipping_complement: string | null;
+  shipping_district: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
   contact_name: string | null;
   phone: string | null;
   email: string | null;
+  commercial_contact_name: string | null;
+  commercial_phone: string | null;
+  commercial_email: string | null;
+  financial_contact_name: string | null;
+  financial_phone: string | null;
+  financial_email: string | null;
   notes: string | null;
 };
 
@@ -129,10 +165,28 @@ export async function salvarCliente(id: string | null, d: DadosCliente): Promise
     p_uf: limpar(d.uf),
     p_tax_id: digitosOuNulo(d.tax_id),
     p_billing_zip: digitosOuNulo(d.billing_zip),
+    p_billing_street: limpar(d.billing_street),
+    p_billing_number: limpar(d.billing_number),
+    p_billing_complement: limpar(d.billing_complement),
+    p_billing_district: limpar(d.billing_district),
+    p_billing_city: limpar(d.billing_city),
+    p_billing_state: limpar(d.billing_state),
     p_shipping_zip: digitosOuNulo(d.shipping_zip),
+    p_shipping_street: limpar(d.shipping_street),
+    p_shipping_number: limpar(d.shipping_number),
+    p_shipping_complement: limpar(d.shipping_complement),
+    p_shipping_district: limpar(d.shipping_district),
+    p_shipping_city: limpar(d.shipping_city),
+    p_shipping_state: limpar(d.shipping_state),
     p_contact_name: limpar(d.contact_name),
     p_phone: digitosOuNulo(d.phone),
     p_email: limpar(d.email),
+    p_commercial_contact_name: limpar(d.commercial_contact_name),
+    p_commercial_phone: digitosOuNulo(d.commercial_phone),
+    p_commercial_email: limpar(d.commercial_email),
+    p_financial_contact_name: limpar(d.financial_contact_name),
+    p_financial_phone: digitosOuNulo(d.financial_phone),
+    p_financial_email: limpar(d.financial_email),
     p_notes: limpar(d.notes),
   });
   if (error) throw error;

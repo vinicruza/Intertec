@@ -36,21 +36,85 @@ const UFS = [
   "PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",
 ];
 
+type EnderecoApi = {
+  cep?: string;
+  state?: string;
+  city?: string;
+  neighborhood?: string;
+  street?: string;
+};
+
+type CnpjApi = {
+  cnpj?: string;
+  razao_social?: string;
+  nome_fantasia?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  municipio?: string;
+  uf?: string;
+  ddd_telefone_1?: string;
+  email?: string;
+};
+
+async function buscarCnpjBrasilApi(cnpj: string): Promise<CnpjApi> {
+  const d = somenteDigitos(cnpj);
+  if (d.length !== 14 || !cnpjCpfValido(d)) throw new Error("Informe um CNPJ válido antes de buscar.");
+  const resposta = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${d}`);
+  if (!resposta.ok) throw new Error("Não consegui consultar esse CNPJ agora.");
+  return (await resposta.json()) as CnpjApi;
+}
+
+async function buscarCepBrasilApi(cep: string): Promise<EnderecoApi> {
+  const d = somenteDigitos(cep);
+  if (d.length !== 8) throw new Error("Informe um CEP com 8 dígitos antes de buscar.");
+  const resposta = await fetch(`https://brasilapi.com.br/api/cep/v2/${d}`);
+  if (!resposta.ok) throw new Error("Não consegui consultar esse CEP agora.");
+  return (await resposta.json()) as EnderecoApi;
+}
+
 type Campos = {
   name: string;
   uf: string;
   tax_id: string;
   billing_zip: string;
+  billing_street: string;
+  billing_number: string;
+  billing_complement: string;
+  billing_district: string;
+  billing_city: string;
+  billing_state: string;
   shipping_zip: string;
+  shipping_street: string;
+  shipping_number: string;
+  shipping_complement: string;
+  shipping_district: string;
+  shipping_city: string;
+  shipping_state: string;
   contact_name: string;
   phone: string;
   email: string;
+  commercial_contact_name: string;
+  commercial_phone: string;
+  commercial_email: string;
+  financial_contact_name: string;
+  financial_phone: string;
+  financial_email: string;
   notes: string;
 };
 
 const VAZIO: Campos = {
-  name: "", uf: "", tax_id: "", billing_zip: "", shipping_zip: "",
-  contact_name: "", phone: "", email: "", notes: "",
+  name: "", uf: "", tax_id: "",
+  billing_zip: "", billing_street: "", billing_number: "", billing_complement: "",
+  billing_district: "", billing_city: "", billing_state: "",
+  shipping_zip: "", shipping_street: "", shipping_number: "", shipping_complement: "",
+  shipping_district: "", shipping_city: "", shipping_state: "",
+  contact_name: "", phone: "", email: "",
+  commercial_contact_name: "", commercial_phone: "", commercial_email: "",
+  financial_contact_name: "", financial_phone: "", financial_email: "",
+  notes: "",
 };
 
 export default function ClienteFormPage() {
@@ -67,6 +131,8 @@ export default function ClienteFormPage() {
 
   const [c, setC] = useState<Campos>(VAZIO);
   const [erro, setErro] = useState<string | null>(null);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState<"billing" | "shipping" | null>(null);
 
   useEffect(() => {
     if (!cliente) return;
@@ -75,10 +141,28 @@ export default function ClienteFormPage() {
       uf: cliente.uf ?? "",
       tax_id: formatarCnpjCpf(cliente.tax_id),
       billing_zip: formatarCep(cliente.billing_zip),
+      billing_street: cliente.billing_street ?? "",
+      billing_number: cliente.billing_number ?? "",
+      billing_complement: cliente.billing_complement ?? "",
+      billing_district: cliente.billing_district ?? "",
+      billing_city: cliente.billing_city ?? "",
+      billing_state: cliente.billing_state ?? cliente.uf ?? "",
       shipping_zip: formatarCep(cliente.shipping_zip),
+      shipping_street: cliente.shipping_street ?? "",
+      shipping_number: cliente.shipping_number ?? "",
+      shipping_complement: cliente.shipping_complement ?? "",
+      shipping_district: cliente.shipping_district ?? "",
+      shipping_city: cliente.shipping_city ?? "",
+      shipping_state: cliente.shipping_state ?? "",
       contact_name: cliente.contact_name ?? "",
       phone: formatarTelefone(cliente.phone),
       email: cliente.email ?? "",
+      commercial_contact_name: cliente.commercial_contact_name ?? cliente.contact_name ?? "",
+      commercial_phone: formatarTelefone(cliente.commercial_phone ?? cliente.phone),
+      commercial_email: cliente.commercial_email ?? cliente.email ?? "",
+      financial_contact_name: cliente.financial_contact_name ?? "",
+      financial_phone: formatarTelefone(cliente.financial_phone),
+      financial_email: cliente.financial_email ?? "",
       notes: cliente.notes ?? "",
     });
   }, [cliente]);
@@ -109,12 +193,80 @@ export default function ClienteFormPage() {
       c.phone.trim() !== "" && !telefoneValido(c.phone)
         ? "Telefone precisa ter DDD + 8 ou 9 dígitos."
         : null,
+    telefoneComercial:
+      c.commercial_phone.trim() !== "" && !telefoneValido(c.commercial_phone)
+        ? "Telefone precisa ter DDD + 8 ou 9 dígitos."
+        : null,
+    telefoneFinanceiro:
+      c.financial_phone.trim() !== "" && !telefoneValido(c.financial_phone)
+        ? "Telefone precisa ter DDD + 8 ou 9 dígitos."
+        : null,
     email:
       c.email.trim() !== "" && !emailPlausivel(c.email)
         ? "E-mail parece incompleto."
         : null,
+    emailComercial:
+      c.commercial_email.trim() !== "" && !emailPlausivel(c.commercial_email)
+        ? "E-mail parece incompleto."
+        : null,
+    emailFinanceiro:
+      c.financial_email.trim() !== "" && !emailPlausivel(c.financial_email)
+        ? "E-mail parece incompleto."
+        : null,
   };
   const podeSalvar = !Object.values(erros).some(Boolean);
+
+  async function consultarCnpj() {
+    setBuscandoCnpj(true);
+    setErro(null);
+    try {
+      const dados = await buscarCnpjBrasilApi(c.tax_id);
+      setC((a) => ({
+        ...a,
+        tax_id: formatarCnpjCpf(dados.cnpj ?? a.tax_id),
+        name: dados.razao_social || a.name,
+        uf: dados.uf || a.uf,
+        billing_zip: formatarCep(dados.cep ?? a.billing_zip),
+        billing_street: dados.logradouro ?? a.billing_street,
+        billing_number: dados.numero ?? a.billing_number,
+        billing_complement: dados.complemento ?? a.billing_complement,
+        billing_district: dados.bairro ?? a.billing_district,
+        billing_city: dados.municipio ?? a.billing_city,
+        billing_state: dados.uf ?? a.billing_state,
+        phone: formatarTelefone(dados.ddd_telefone_1 ?? a.phone),
+        email: dados.email ?? a.email,
+        commercial_phone: a.commercial_phone || formatarTelefone(dados.ddd_telefone_1),
+        commercial_email: a.commercial_email || (dados.email ?? ""),
+      }));
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não consegui consultar esse CNPJ agora.");
+    } finally {
+      setBuscandoCnpj(false);
+    }
+  }
+
+  async function consultarCep(tipo: "billing" | "shipping") {
+    setBuscandoCep(tipo);
+    setErro(null);
+    try {
+      const prefixo = tipo === "billing" ? "billing" : "shipping";
+      const cep = tipo === "billing" ? c.billing_zip : c.shipping_zip;
+      const dados = await buscarCepBrasilApi(cep);
+      setC((a) => ({
+        ...a,
+        [`${prefixo}_zip`]: formatarCep(dados.cep ?? cep),
+        [`${prefixo}_street`]: dados.street ?? a[`${prefixo}_street` as keyof Campos],
+        [`${prefixo}_district`]: dados.neighborhood ?? a[`${prefixo}_district` as keyof Campos],
+        [`${prefixo}_city`]: dados.city ?? a[`${prefixo}_city` as keyof Campos],
+        [`${prefixo}_state`]: dados.state ?? a[`${prefixo}_state` as keyof Campos],
+        uf: tipo === "billing" && dados.state ? dados.state : a.uf,
+      }));
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não consegui consultar esse CEP agora.");
+    } finally {
+      setBuscandoCep(null);
+    }
+  }
 
   const gravar = useMutation({
     mutationFn: () => {
@@ -123,10 +275,28 @@ export default function ClienteFormPage() {
         uf: c.uf || null,
         tax_id: c.tax_id || null,
         billing_zip: c.billing_zip || null,
+        billing_street: c.billing_street || null,
+        billing_number: c.billing_number || null,
+        billing_complement: c.billing_complement || null,
+        billing_district: c.billing_district || null,
+        billing_city: c.billing_city || null,
+        billing_state: c.billing_state || null,
         shipping_zip: c.shipping_zip || null,
-        contact_name: c.contact_name || null,
-        phone: c.phone || null,
-        email: c.email || null,
+        shipping_street: c.shipping_street || null,
+        shipping_number: c.shipping_number || null,
+        shipping_complement: c.shipping_complement || null,
+        shipping_district: c.shipping_district || null,
+        shipping_city: c.shipping_city || null,
+        shipping_state: c.shipping_state || null,
+        contact_name: c.commercial_contact_name || c.contact_name || null,
+        phone: c.commercial_phone || c.phone || null,
+        email: c.commercial_email || c.email || null,
+        commercial_contact_name: c.commercial_contact_name || null,
+        commercial_phone: c.commercial_phone || null,
+        commercial_email: c.commercial_email || null,
+        financial_contact_name: c.financial_contact_name || null,
+        financial_phone: c.financial_phone || null,
+        financial_email: c.financial_email || null,
         notes: c.notes || null,
       };
       return salvarCliente(novo ? null : id!, d);
@@ -187,13 +357,23 @@ export default function ClienteFormPage() {
           </div>
           <div>
             <Label htmlFor="doc">CNPJ / CPF</Label>
-            <Input
-              id="doc"
-              value={c.tax_id}
-              placeholder="00.000.000/0000-00"
-              onChange={(e) => mudar("tax_id")(e.target.value)}
-              onBlur={() => mudar("tax_id")(formatarCnpjCpf(c.tax_id))}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="doc"
+                value={c.tax_id}
+                placeholder="00.000.000/0000-00"
+                onChange={(e) => mudar("tax_id")(e.target.value)}
+                onBlur={() => mudar("tax_id")(formatarCnpjCpf(c.tax_id))}
+              />
+              <Button
+                type="button"
+                className="whitespace-nowrap bg-white text-[var(--cor-primaria)] ring-1 ring-[var(--cor-primaria)] hover:bg-[var(--cor-primaria-clara)]"
+                disabled={buscandoCnpj || somenteDigitos(c.tax_id).length !== 14 || !cnpjCpfValido(c.tax_id)}
+                onClick={consultarCnpj}
+              >
+                {buscandoCnpj ? "Buscando..." : "Buscar CNPJ"}
+              </Button>
+            </div>
             {erros.documento && <p className="mt-1 text-xs text-red-600">{erros.documento}</p>}
           </div>
         </div>
@@ -213,24 +393,44 @@ export default function ClienteFormPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label htmlFor="cepfat">CEP de faturamento</Label>
-            <Input
-              id="cepfat"
-              value={c.billing_zip}
-              placeholder="00000-000"
-              onChange={(e) => mudar("billing_zip")(e.target.value)}
-              onBlur={() => mudar("billing_zip")(formatarCep(c.billing_zip))}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="cepfat"
+                value={c.billing_zip}
+                placeholder="00000-000"
+                onChange={(e) => mudar("billing_zip")(e.target.value)}
+                onBlur={() => mudar("billing_zip")(formatarCep(c.billing_zip))}
+              />
+              <Button
+                type="button"
+                className="whitespace-nowrap bg-white text-[var(--cor-primaria)] ring-1 ring-[var(--cor-primaria)] hover:bg-[var(--cor-primaria-clara)]"
+                disabled={buscandoCep === "billing" || !cepValido(c.billing_zip)}
+                onClick={() => consultarCep("billing")}
+              >
+                {buscandoCep === "billing" ? "Buscando..." : "Buscar CEP"}
+              </Button>
+            </div>
             {erros.cepFat && <p className="mt-1 text-xs text-red-600">{erros.cepFat}</p>}
           </div>
           <div>
             <Label htmlFor="cepent">CEP de entrega</Label>
-            <Input
-              id="cepent"
-              value={c.shipping_zip}
-              placeholder="00000-000"
-              onChange={(e) => mudar("shipping_zip")(e.target.value)}
-              onBlur={() => mudar("shipping_zip")(formatarCep(c.shipping_zip))}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="cepent"
+                value={c.shipping_zip}
+                placeholder="00000-000"
+                onChange={(e) => mudar("shipping_zip")(e.target.value)}
+                onBlur={() => mudar("shipping_zip")(formatarCep(c.shipping_zip))}
+              />
+              <Button
+                type="button"
+                className="whitespace-nowrap bg-white text-[var(--cor-primaria)] ring-1 ring-[var(--cor-primaria)] hover:bg-[var(--cor-primaria-clara)]"
+                disabled={buscandoCep === "shipping" || !cepValido(c.shipping_zip)}
+                onClick={() => consultarCep("shipping")}
+              >
+                {buscandoCep === "shipping" ? "Buscando..." : "Buscar CEP"}
+              </Button>
+            </div>
             {erros.cepEnt && <p className="mt-1 text-xs text-red-600">{erros.cepEnt}</p>}
             {somenteDigitos(c.billing_zip) !== "" &&
               somenteDigitos(c.shipping_zip) === "" && (
@@ -244,40 +444,52 @@ export default function ClienteFormPage() {
               )}
           </div>
         </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <EnderecoCampos
+            titulo="Endereço de faturamento / sede"
+            prefixo="billing"
+            campos={c}
+            mudar={mudar}
+          />
+          <EnderecoCampos
+            titulo="Endereço de entrega"
+            prefixo="shipping"
+            campos={c}
+            mudar={mudar}
+          />
+        </div>
       </Card>
 
       <Card className="space-y-4">
-        <h2 className="font-semibold">Contato</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <Label htmlFor="contato">Contato</Label>
-            <Input
-              id="contato"
-              value={c.contact_name}
-              onChange={(e) => mudar("contact_name")(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="tel">Telefone</Label>
-            <Input
-              id="tel"
-              value={c.phone}
-              placeholder="(00) 00000-0000"
-              onChange={(e) => mudar("phone")(e.target.value)}
-              onBlur={() => mudar("phone")(formatarTelefone(c.phone))}
-            />
-            {erros.telefone && <p className="mt-1 text-xs text-red-600">{erros.telefone}</p>}
-          </div>
-          <div>
-            <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              value={c.email}
-              onChange={(e) => mudar("email")(e.target.value)}
-            />
-            {erros.email && <p className="mt-1 text-xs text-red-600">{erros.email}</p>}
-          </div>
-        </div>
+        <h2 className="font-semibold">Contatos</h2>
+        <ContatoCampos
+          titulo="Contato comercial"
+          nomeId="contato-comercial"
+          telefoneId="telefone-comercial"
+          emailId="email-comercial"
+          nome={c.commercial_contact_name}
+          telefone={c.commercial_phone}
+          email={c.commercial_email}
+          erroTelefone={erros.telefoneComercial}
+          erroEmail={erros.emailComercial}
+          mudarNome={mudar("commercial_contact_name")}
+          mudarTelefone={mudar("commercial_phone")}
+          mudarEmail={mudar("commercial_email")}
+        />
+        <ContatoCampos
+          titulo="Contato financeiro"
+          nomeId="contato-financeiro"
+          telefoneId="telefone-financeiro"
+          emailId="email-financeiro"
+          nome={c.financial_contact_name}
+          telefone={c.financial_phone}
+          email={c.financial_email}
+          erroTelefone={erros.telefoneFinanceiro}
+          erroEmail={erros.emailFinanceiro}
+          mudarNome={mudar("financial_contact_name")}
+          mudarTelefone={mudar("financial_phone")}
+          mudarEmail={mudar("financial_email")}
+        />
         <div>
           <Label htmlFor="obs">Observação</Label>
           <textarea
@@ -309,6 +521,111 @@ export default function ClienteFormPage() {
           é de lá que sai o código.
         </p>
       )}
+    </div>
+  );
+}
+
+function EnderecoCampos({
+  titulo,
+  prefixo,
+  campos,
+  mudar,
+}: {
+  titulo: string;
+  prefixo: "billing" | "shipping";
+  campos: Campos;
+  mudar: (campo: keyof Campos) => (valor: string) => void;
+}) {
+  const campo = (nome: "street" | "number" | "complement" | "district" | "city" | "state") =>
+    `${prefixo}_${nome}` as keyof Campos;
+
+  return (
+    <div className="space-y-3 rounded-md border border-[var(--cor-borda)] p-3">
+      <h3 className="text-sm font-semibold">{titulo}</h3>
+      <div>
+        <Label>Logradouro</Label>
+        <Input value={campos[campo("street")]} onChange={(e) => mudar(campo("street"))(e.target.value)} />
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <Label>Número</Label>
+          <Input value={campos[campo("number")]} onChange={(e) => mudar(campo("number"))(e.target.value)} />
+        </div>
+        <div>
+          <Label>Complemento</Label>
+          <Input value={campos[campo("complement")]} onChange={(e) => mudar(campo("complement"))(e.target.value)} />
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div>
+          <Label>Bairro</Label>
+          <Input value={campos[campo("district")]} onChange={(e) => mudar(campo("district"))(e.target.value)} />
+        </div>
+        <div>
+          <Label>Cidade</Label>
+          <Input value={campos[campo("city")]} onChange={(e) => mudar(campo("city"))(e.target.value)} />
+        </div>
+        <div>
+          <Label>UF</Label>
+          <Input value={campos[campo("state")]} onChange={(e) => mudar(campo("state"))(e.target.value.toUpperCase())} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContatoCampos({
+  titulo,
+  nomeId,
+  telefoneId,
+  emailId,
+  nome,
+  telefone,
+  email,
+  erroTelefone,
+  erroEmail,
+  mudarNome,
+  mudarTelefone,
+  mudarEmail,
+}: {
+  titulo: string;
+  nomeId: string;
+  telefoneId: string;
+  emailId: string;
+  nome: string;
+  telefone: string;
+  email: string;
+  erroTelefone: string | null;
+  erroEmail: string | null;
+  mudarNome: (valor: string) => void;
+  mudarTelefone: (valor: string) => void;
+  mudarEmail: (valor: string) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border border-[var(--cor-borda)] p-3">
+      <h3 className="text-sm font-semibold">{titulo}</h3>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div>
+          <Label htmlFor={nomeId}>Nome</Label>
+          <Input id={nomeId} value={nome} onChange={(e) => mudarNome(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor={telefoneId}>Telefone</Label>
+          <Input
+            id={telefoneId}
+            value={telefone}
+            placeholder="(00) 00000-0000"
+            onChange={(e) => mudarTelefone(e.target.value)}
+            onBlur={() => mudarTelefone(formatarTelefone(telefone))}
+          />
+          {erroTelefone && <p className="mt-1 text-xs text-red-600">{erroTelefone}</p>}
+        </div>
+        <div>
+          <Label htmlFor={emailId}>E-mail</Label>
+          <Input id={emailId} value={email} onChange={(e) => mudarEmail(e.target.value)} />
+          {erroEmail && <p className="mt-1 text-xs text-red-600">{erroEmail}</p>}
+        </div>
+      </div>
     </div>
   );
 }
