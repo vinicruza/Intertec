@@ -6,9 +6,13 @@ import { simular, statusMargem } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   KIT_NOVO,
+  kitNovoAPartirDe,
+  kitsSemNome,
   montarItensDaCotacao,
   montarItensParaMotor,
+  nomeSugeridoParaKit,
   resolverLinhaDoPedido,
+  resumoDoKit,
   type KitNovoEdicao,
   type LinhaItem,
   type LinhaResolvida,
@@ -22,9 +26,16 @@ import {
 import { obterPedidoCompleto } from "../lib/db/fechamento";
 import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
-import { reais, percentual } from "../lib/format";
+import {
+  fracaoParaPercentual,
+  interpretacaoDoNumero,
+  percentual,
+  percentualParaFracao,
+  reais,
+} from "../lib/format";
 import { formatarCep } from "../../lib/cadastro/documentos";
-import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBusca";
 
 // O montador de kit dentro do pedido, a resolução de cada linha e a montagem
 // dos itens vivem em lib/sim/itensDoPedido.ts — regra do projeto: nada de
@@ -179,6 +190,19 @@ export default function SimuladorPage() {
 
   const catalogo = useMemo(() => (ctx ? montarCatalogoDeKit(ctx) : null), [ctx]);
 
+  // Opções de busca das duas listas grandes: os itens vendáveis (produtos +
+  // kits) e os produtos que entram dentro de um kit.
+  const opcoesDeItem: OpcaoDeBusca[] = useMemo(
+    () =>
+      (ctx?.itens ?? []).map((i) => ({
+        id: i.id,
+        codigo: i.codigo,
+        nome: i.nome,
+        detalhe: i.cmvUnitario === null ? "sem custo vigente" : undefined,
+      })),
+    [ctx]
+  );
+
   // Cada linha resolvida uma vez só: nome, CMV e detecção de kit já existente.
   const resolvidas = useMemo(
     () => (ctx && catalogo ? linhas.map((l) => resolverLinhaDoPedido(l, ctx.itens, catalogo)) : []),
@@ -211,9 +235,18 @@ export default function SimuladorPage() {
     }
   }, [ctx, vendedor, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
 
+  // Kit sem nome não é salvo: sem ele, o kit entra no catálogo como "Kit do
+  // pedido" e, alguns pedidos depois, ninguém sabe qual é qual.
+  const linhasComKitSemNome = kitsSemNome(linhas);
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (simulacao.estado !== "ok" || !vendedor || !ctx) throw new Error("Cotação incompleta.");
+      if (linhasComKitSemNome.length > 0) {
+        throw new Error(
+          `Dê um nome ao kit montado no item ${linhasComKitSemNome.map((i) => i + 1).join(", ")} antes de salvar.`
+        );
+      }
 
       const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
 
@@ -316,6 +349,11 @@ export default function SimuladorPage() {
     setSalvo(null);
   }
 
+  // Acima de 20% não é comissão, é engano de digitação (o maior canal hoje é
+  // Externos, com 6,1%). Avisa em vez de bloquear: casos fora da curva
+  // existem, e quem decide é quem aprova.
+  const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
+
   const freteAutomatico = vendedor?.regras.modeloFrete === "uf_percent";
   const transportadora = ctx.transportadoras.find((t) => t.id === transportadoraId) ?? null;
   const transportadoraPedeNome = transportadora?.pedeNome ?? false;
@@ -395,14 +433,29 @@ export default function SimuladorPage() {
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
-            <Label>Comissão (fração)</Label>
-            <Input
-              value={comissao ?? vendedor?.regras.comissaoPadrao ?? ""}
-              onChange={(e) => setComissao(e.target.value)}
-              placeholder="ex.: 0,025"
-            />
+            {/* Em porcentagem, não em fração: pedir 0,025 é pedir para alguém
+                digitar 0,25 achando que são 2,5% — e 25% de comissão passaria
+                sem aviso nenhum. */}
+            <Label>Comissão (%)</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                value={fracaoParaPercentual(comissao ?? vendedor?.regras.comissaoPadrao ?? "")}
+                onChange={(e) => setComissao(percentualParaFracao(e.target.value))}
+                placeholder="ex.: 2,5"
+              />
+              <span className="text-sm text-[var(--cor-texto-suave)]">%</span>
+            </div>
             {vendedor && comissao !== null && comissao !== vendedor.regras.comissaoPadrao && (
-              <p className="mt-1 text-xs text-amber-700">Override do padrão do canal ({vendedor.regras.comissaoPadrao}) — registrado em auditoria ao fechar.</p>
+              <p className="mt-1 text-xs text-amber-700">
+                Diferente do padrão do canal ({fracaoParaPercentual(vendedor.regras.comissaoPadrao)}%) —
+                registrado em auditoria ao fechar.
+              </p>
+            )}
+            {comissaoForaDoNormal && (
+              <p className="mt-1 text-xs font-medium text-red-700">
+                ⚠️ {fracaoParaPercentual(comissao)}% de comissão está muito acima do normal — confira
+                se não digitou a fração no lugar da porcentagem.
+              </p>
             )}
           </div>
           <div>
@@ -565,19 +618,47 @@ export default function SimuladorPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-72 flex-1">
                 <Label>Produto ou kit</Label>
-                <select className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={l.itemId} onChange={(e) => atualizarLinha(i, "itemId", e.target.value)}>
-                  <option value="">Selecione…</option>
-                  <option value={KIT_NOVO}>➕ Montar um kit novo aqui</option>
-                  {ctx.itens.map((it) => <option key={it.id} value={it.id}>{it.codigo} — {it.nome}</option>)}
-                </select>
+                {/* Montar um kit novo é uma AÇÃO, não um item de catálogo —
+                    ficava escondida como primeira opção de uma lista de 324
+                    produtos. Agora é um botão ao lado, e o campo é só busca. */}
+                {l.itemId === KIT_NOVO ? (
+                  <div className="flex min-h-10 items-center gap-2 rounded-[0.625rem] border border-dashed border-[var(--cor-primaria)] bg-[var(--cor-primaria-clara)] px-3 text-sm">
+                    <Badge>Kit montado neste pedido</Badge>
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--cor-texto-suave)] underline"
+                      onClick={() => atualizarLinha(i, "itemId", "")}
+                    >
+                      escolher um item do catálogo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <EscolhaComBusca
+                      valor={l.itemId}
+                      opcoes={opcoesDeItem}
+                      aoEscolher={(id) => atualizarLinha(i, "itemId", id)}
+                      placeholder="Digite o código ou o nome…"
+                    />
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs font-medium text-[var(--cor-primaria)] hover:underline"
+                      onClick={() => atualizarLinha(i, "itemId", KIT_NOVO)}
+                    >
+                      ➕ montar kit
+                    </button>
+                  </div>
+                )}
               </div>
               <div>
                 <Label>{l.itemId === KIT_NOVO ? "Quantidade de kits" : "Quantidade"}</Label>
                 <Input className="w-28" value={l.quantidade} onChange={(e) => atualizarLinha(i, "quantidade", e.target.value)} />
+                <AvisoDeNumero valor={l.quantidade} />
               </div>
               <div>
                 <Label>{l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
                 <Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} />
+                <AvisoDeNumero valor={l.preco} />
               </div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
@@ -593,6 +674,7 @@ export default function SimuladorPage() {
               <MontadorKit
                 ctx={ctx}
                 kit={l.kitNovo}
+                quantidadeVendida={l.quantidade}
                 resolvida={r}
                 verNumeros={verNumeros}
                 aoMudar={(muda) => atualizarKitNovo(i, muda)}
@@ -653,9 +735,18 @@ export default function SimuladorPage() {
           ))}
 
           <div className="flex items-center gap-3 pt-2">
-            <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+            <Button
+              onClick={() => salvar.mutate()}
+              disabled={salvar.isPending || linhasComKitSemNome.length > 0}
+              title={linhasComKitSemNome.length > 0 ? "Dê um nome ao kit montado antes de salvar." : undefined}
+            >
               {salvar.isPending ? "Salvando…" : cotacaoId ? "Salvar nova versão" : "Salvar cotação"}
             </Button>
+            {linhasComKitSemNome.length > 0 && (
+              <span className="text-sm text-amber-700">
+                Dê um nome ao kit montado no item {linhasComKitSemNome.map((i) => i + 1).join(", ")}.
+              </span>
+            )}
             {salvo && (
               <span className="text-sm text-green-700">
                 Cotação <strong>{salvo.quote_number}</strong> salva — versão {salvo.version} ✓
@@ -675,12 +766,14 @@ export default function SimuladorPage() {
 function MontadorKit({
   ctx,
   kit,
+  quantidadeVendida,
   resolvida,
   verNumeros,
   aoMudar,
 }: {
   ctx: ContextoSimulador;
   kit: KitNovoEdicao;
+  quantidadeVendida: string;
   resolvida: LinhaResolvida | null;
   verNumeros: boolean;
   aoMudar: (muda: (k: KitNovoEdicao) => KitNovoEdicao) => void;
@@ -698,26 +791,95 @@ function MontadorKit({
     return ctx.insumosEmbalagem.filter((i) => i.embalagem || i.id === insumoIdAtual);
   }
 
+  const nomePorProduto = new Map(ctx.produtos.map((p) => [p.id, p.nome]));
+  const opcoesDeProduto: OpcaoDeBusca[] = ctx.produtos.map((p) => ({
+    id: p.id,
+    codigo: p.codigo,
+    nome: p.nome,
+    detalhe: p.cmv === null ? "sem custo vigente" : undefined,
+  }));
+  const resumo = resumoDoKit(kit, quantidadeVendida, nomePorProduto);
+  const sugestaoDeNome = nomeSugeridoParaKit(kit, nomePorProduto);
+  const opcoesDeKitBase: OpcaoDeBusca[] = ctx.kitsParaCopiar.map((k) => ({
+    id: k.id,
+    codigo: k.codigo,
+    nome: k.nome,
+  }));
+
   return (
-    <div className="space-y-3 rounded-md bg-[var(--cor-fundo)] p-3">
-      <p className="text-sm text-[var(--cor-texto-suave)]">
-        A quantidade e o preço acima são da <strong>venda deste kit</strong>. Aqui embaixo é a{" "}
-        <strong>receita do kit</strong> — o que entra dentro de cada um.
-      </p>
+    // Recuo com barra à esquerda: o que está aqui dentro é a RECEITA de um kit,
+    // não a venda. As duas quantidades ficavam a poucos centímetros uma da
+    // outra, com a mesma cara — trocar 100 kits vendidos por 100 aventais
+    // dentro do kit era o erro mais fácil de cometer nesta tela.
+    <div className="ml-2 space-y-3 rounded-md border-l-4 border-[var(--cor-primaria)] bg-[var(--cor-fundo)] p-3 pl-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold">Receita de 1 kit</h3>
+        <p className="text-xs text-[var(--cor-texto-suave)]">
+          A quantidade e o preço lá em cima são da <strong>venda</strong>. Aqui é o que entra
+          dentro de <strong>cada kit</strong>.
+        </p>
+      </div>
+
+      {/* Conferência em uma frase, na língua de quem está montando. */}
+      {resumo && (
+        <p className="rounded-md bg-white px-3 py-2 text-sm">
+          <strong>{resumo}</strong>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-64 flex-1">
           <Label>Como chamar este kit (uso interno)</Label>
           <Input
             value={kit.rotulo}
-            placeholder="ex.: Kit catarata Hospital X"
+            placeholder={sugestaoDeNome || "ex.: Kit catarata Hospital X"}
             onChange={(e) => aoMudar((k) => ({ ...k, rotulo: e.target.value }))}
           />
+          {kit.rotulo.trim() === "" && (
+            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+              Obrigatório — é por este nome que o kit vai aparecer no catálogo depois.
+              {sugestaoDeNome && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="font-medium text-[var(--cor-primaria)] hover:underline"
+                    onClick={() => aoMudar((k) => ({ ...k, rotulo: sugestaoDeNome }))}
+                  >
+                    usar a sugestão
+                  </button>
+                </>
+              )}
+            </p>
+          )}
         </div>
         <p className="pb-2 text-xs text-[var(--cor-texto-suave)]">
           O código oficial só é gerado quando o pedido for ganho.
         </p>
       </div>
+
+      {/* Partir de um kit existente: montar "o kit catarata mais uma
+          compressa" obrigava a escolher tudo de novo, produto por produto. */}
+      {opcoesDeKitBase.length > 0 && (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-64 flex-1">
+            <Label>Partir de um kit que já existe (opcional)</Label>
+            <EscolhaComBusca
+              valor=""
+              opcoes={opcoesDeKitBase}
+              placeholder="Digite o código ou o nome do kit…"
+              aoEscolher={(id) => {
+                const base = ctx.kitsParaCopiar.find((k) => k.id === id);
+                if (base) aoMudar(() => kitNovoAPartirDe(base));
+              }}
+            />
+          </div>
+          <p className="pb-2 text-xs text-[var(--cor-texto-suave)]">
+            Carrega a composição para você ajustar. Se nada mudar, o sistema avisa que aquele kit
+            já existe e usa o código dele.
+          </p>
+        </div>
+      )}
 
       {/* Aviso de composição já existente — pedido explícito na reunião:
           "a hora que ela jogar ali, o próprio sistema acusasse que aquele kit já existe". */}
@@ -764,21 +926,19 @@ function MontadorKit({
         )}
         {kit.produtos.map((p, j) => (
           <div key={j} className="flex items-end gap-2">
-            <select
-              className="flex-1 rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={p.produtoId}
-              onChange={(e) =>
-                aoMudar((k) => ({
-                  ...k,
-                  produtos: k.produtos.map((x, idx) => (idx === j ? { ...x, produtoId: e.target.value } : x)),
-                }))
-              }
-            >
-              <option value="">Selecione…</option>
-              {ctx.produtos.map((prod) => (
-                <option key={prod.id} value={prod.id}>{prod.codigo} — {prod.nome}</option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <EscolhaComBusca
+                valor={p.produtoId}
+                opcoes={opcoesDeProduto}
+                placeholder="Digite o código ou o nome…"
+                aoEscolher={(id) =>
+                  aoMudar((k) => ({
+                    ...k,
+                    produtos: k.produtos.map((x, idx) => (idx === j ? { ...x, produtoId: id } : x)),
+                  }))
+                }
+              />
+            </div>
             <Input
               className="w-24"
               value={p.quantidade}
@@ -806,8 +966,8 @@ function MontadorKit({
             <Label>Embalagem e esterilização</Label>
             <p className="text-xs text-[var(--cor-texto-suave)]">
               O envelope é <strong>um por kit</strong>. A caixa de esterilização atende vários
-              kits: escolha "itens por caixa" e diga quantos kits ela atende — o custo é rateado
-              automaticamente, não é a quantidade de caixas.
+              kits: escolha <strong>"kits por caixa"</strong> e diga quantos kits cabem nela — o
+              custo é rateado automaticamente. Não é a quantidade de caixas usadas.
             </p>
           </div>
           <button
@@ -852,7 +1012,7 @@ function MontadorKit({
               }
             >
               <option value="porKit">un. por kit</option>
-              <option value="itensPorCaixa">itens por caixa</option>
+              <option value="itensPorCaixa">kits por caixa</option>
             </select>
             <div>
               <Input
@@ -915,6 +1075,15 @@ function PesoDeCustoDoKit({ ctx, resolvida }: { ctx: ContextoSimulador; resolvid
       </table>
     </div>
   );
+}
+
+// O ponto sozinho é ambíguo ("4.20" são quatro reais e vinte; "1.000" quase
+// sempre é mil). Em vez de adivinhar — e errar a quantidade de um pedido
+// inteiro —, o sistema mostra o que entendeu, embaixo do campo.
+function AvisoDeNumero({ valor }: { valor: string }) {
+  const aviso = interpretacaoDoNumero(valor);
+  if (!aviso) return null;
+  return <p className="mt-1 w-28 text-[0.65rem] leading-tight text-amber-700">{aviso}</p>;
 }
 
 function LinhaCascata({ rotulo, valor, pct, destaque }: { rotulo: string; valor: string; pct?: string; destaque?: boolean }) {

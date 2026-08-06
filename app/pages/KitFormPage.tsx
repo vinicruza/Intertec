@@ -10,6 +10,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { perfilPodeAcessar } from "../lib/roles";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBusca";
 
 type ItemEdicao = { produtoId: string; quantidade: string };
 // Envelope e caixas de esterilização: consumidos UMA vez por kit montado
@@ -149,6 +150,18 @@ export default function KitFormPage() {
   });
 
   const produtos = produtosQuery.data ?? [];
+  const opcoesDeProduto: OpcaoDeBusca[] = produtos.map((p) => ({
+    id: p.id,
+    codigo: p.code,
+    nome: p.name,
+    detalhe: p.cmv === null ? "sem custo vigente" : undefined,
+  }));
+
+  // Kit que nasceu de pedido ganho: composição imutável. O código já foi para
+  // o papel e para a nota — mudar o que ele significa quebra a promessa de
+  // "um código, uma composição", e muda por baixo o custo de cotações em
+  // aberto que usam este kit. O banco recusa; aqui a tela evita a digitação.
+  const composicaoTravada = Boolean(kitQuery.data?.source_order_id);
 
   if (editando && kitQuery.isLoading) {
     return <p className="text-[var(--cor-texto-suave)]">Carregando kit...</p>;
@@ -250,37 +263,67 @@ export default function KitFormPage() {
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Composição</h2>
-            <Button type="button" onClick={() => setItens((a) => [...a, { produtoId: "", quantidade: "1" }])}>
-              Adicionar produto
-            </Button>
+            {!composicaoTravada && (
+              <Button type="button" onClick={() => setItens((a) => [...a, { produtoId: "", quantidade: "1" }])}>
+                Adicionar produto
+              </Button>
+            )}
           </div>
+
+          {/* Kit que nasceu de pedido ganho: o código já circulou em papel e em
+              nota. Mudar a composição faria o código deixar de valer para quem
+              o recebeu — e cotações em aberto que usam este kit passariam a
+              valer outro custo, sem aviso. O banco recusa; aqui a tela explica
+              antes de a pessoa digitar. */}
+          {composicaoTravada && (
+            <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
+              Este kit nasceu de um pedido ganho, então a composição dele não muda mais: o código{" "}
+              <strong className="font-mono">{codigo}</strong> já foi para o papel e para a nota, e
+              precisa continuar significando exatamente isto. <strong>Nome e descrição</strong> você
+              pode ajustar aqui. Para uma composição diferente,{" "}
+              <Link className="font-medium underline" to="/simulador">
+                monte um kit novo no simulador
+              </Link>{" "}
+              — ele ganha código próprio.
+            </p>
+          )}
 
           {itens.map((item, i) => (
             <div key={i} className="flex items-end gap-3">
               <div className="flex-1">
                 <Label>Produto</Label>
-                <select
-                  className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-                  value={item.produtoId}
-                  onChange={(e) => atualizarItem(i, "produtoId", e.target.value)}
-                >
-                  <option value="">Selecione…</option>
-                  {produtos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                {composicaoTravada ? (
+                  <p className="min-h-10 rounded-[0.625rem] bg-[var(--cor-fundo)] px-3 py-2 text-sm">
+                    {produtos.find((p) => p.id === item.produtoId)?.name ?? item.produtoId}
+                  </p>
+                ) : (
+                  <EscolhaComBusca
+                    valor={item.produtoId}
+                    opcoes={opcoesDeProduto}
+                    placeholder="Digite o código ou o nome…"
+                    aoEscolher={(id) => atualizarItem(i, "produtoId", id)}
+                  />
+                )}
               </div>
               <div>
                 <Label>Quantidade</Label>
-                <Input className="w-28" value={item.quantidade} onChange={(e) => atualizarItem(i, "quantidade", e.target.value)} />
+                {composicaoTravada ? (
+                  <p className="min-h-10 w-28 rounded-[0.625rem] bg-[var(--cor-fundo)] px-3 py-2 text-sm">
+                    {item.quantidade}
+                  </p>
+                ) : (
+                  <Input className="w-28" value={item.quantidade} onChange={(e) => atualizarItem(i, "quantidade", e.target.value)} />
+                )}
               </div>
-              <button
-                type="button"
-                className="pb-2 text-xs text-red-600 hover:underline"
-                onClick={() => setItens((a) => a.filter((_, idx) => idx !== i))}
-              >
-                Remover
-              </button>
+              {!composicaoTravada && (
+                <button
+                  type="button"
+                  className="pb-2 text-xs text-red-600 hover:underline"
+                  onClick={() => setItens((a) => a.filter((_, idx) => idx !== i))}
+                >
+                  Remover
+                </button>
+              )}
             </div>
           ))}
 
@@ -292,13 +335,16 @@ export default function KitFormPage() {
               <h2 className="text-lg font-semibold">Embalagem e esterilização do kit</h2>
               <p className="text-xs text-[var(--cor-texto-suave)]">
                 O envelope é <strong>um por kit</strong>. Já a caixa de esterilização atende
-                vários kits: informe <strong>quantos itens cabem nela</strong> e o custo é rateado.
-                Lançar a caixa como "1 por kit" cobraria a caixa inteira de cada um.
+                vários kits: escolha <strong>"kits por caixa"</strong>, informe quantos kits cabem
+                nela, e o custo é rateado. Lançar a caixa como "1 por kit" cobraria a caixa
+                inteira de cada um.
               </p>
             </div>
-            <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", modo: "porKit", quantidade: "1" }])}>
-              Adicionar embalagem
-            </Button>
+            {!composicaoTravada && (
+              <Button type="button" onClick={() => setEmbalagem((a) => [...a, { insumoId: "", modo: "porKit", quantidade: "1" }])}>
+                Adicionar embalagem
+              </Button>
+            )}
           </div>
 
           {embalagem.length === 0 && (
@@ -307,7 +353,7 @@ export default function KitFormPage() {
             </p>
           )}
 
-          {embalagem.length > 0 && (
+          {embalagem.length > 0 && !composicaoTravada && (
             <label className="flex items-center gap-2 text-xs text-[var(--cor-texto-suave)]">
               <input
                 type="checkbox"
@@ -318,7 +364,19 @@ export default function KitFormPage() {
             </label>
           )}
 
-          {embalagem.map((linha, i) => (
+          {/* Embalagem entra na assinatura do kit: se a composição está
+              travada, ela também está. */}
+          {composicaoTravada &&
+            embalagem.map((linha, i) => (
+              <p key={i} className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
+                {todosInsumos.find((ins) => ins.id === linha.insumoId)?.name ?? linha.insumoId} —{" "}
+                {linha.modo === "itensPorCaixa"
+                  ? `1 caixa para ${linha.quantidade} kits (rateada)`
+                  : `${linha.quantidade} por kit`}
+              </p>
+            ))}
+
+          {!composicaoTravada && embalagem.map((linha, i) => (
             <div key={i} className="flex items-end gap-3">
               <div className="flex-1">
                 <Label>Insumo</Label>
@@ -341,11 +399,11 @@ export default function KitFormPage() {
                   onChange={(e) => atualizarEmbalagem(i, "modo", e.target.value)}
                 >
                   <option value="porKit">Unidades por kit</option>
-                  <option value="itensPorCaixa">Itens por caixa (rateia)</option>
+                  <option value="itensPorCaixa">Kits por caixa (rateia)</option>
                 </select>
               </div>
               <div>
-                <Label>{linha.modo === "itensPorCaixa" ? "Itens por caixa" : "Qtd. por kit"}</Label>
+                <Label>{linha.modo === "itensPorCaixa" ? "Kits por caixa" : "Qtd. por kit"}</Label>
                 <Input
                   className="w-28"
                   value={linha.quantidade}

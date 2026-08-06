@@ -131,6 +131,74 @@ export function montarItensParaMotor(
   };
 }
 
+// ---------- O kit precisa de nome ----------
+//
+// O campo era opcional, e sem ele o kit entrava no catálogo como "Kit do
+// pedido". Alguns pedidos depois, o catálogo tem meia dúzia de kits com o
+// mesmo nome e ninguém sabe qual é qual — sendo que quem montou sabia
+// exatamente para quem era. Custa uma linha digitada e evita um catálogo
+// impossível de ler.
+export function kitsSemNome(linhas: LinhaItem[]): number[] {
+  return linhas.flatMap((l, i) =>
+    l.itemId === KIT_NOVO && l.kitNovo && l.kitNovo.rotulo.trim() === "" ? [i] : []
+  );
+}
+
+// Sugestão de nome a partir da composição, para o campo não começar vazio.
+// É só um ponto de partida — quem monta troca por "Kit catarata Hospital X".
+export function nomeSugeridoParaKit(
+  kit: KitNovoEdicao,
+  nomePorProduto: Map<string, string>
+): string {
+  const partes = kit.produtos
+    .filter((p) => p.produtoId && p.quantidade.trim() !== "")
+    .map((p) => `${numero(p.quantidade)}× ${nomePorProduto.get(p.produtoId) ?? "produto"}`);
+  return partes.length === 0 ? "" : `Kit ${partes.join(" + ")}`;
+}
+
+// Frase de conferência acima da cascata: separa o que é a RECEITA do kit (o
+// que entra em um) do que é a VENDA (quantos kits saem). As duas quantidades
+// ficam a poucos centímetros uma da outra na tela, e trocar uma pela outra é o
+// erro mais fácil de cometer aqui.
+export function resumoDoKit(
+  kit: KitNovoEdicao,
+  quantidadeVendida: string,
+  nomePorProduto: Map<string, string>
+): string | null {
+  const produtos = kit.produtos.filter((p) => p.produtoId && p.quantidade.trim() !== "");
+  if (produtos.length === 0) return null;
+  const dentro = produtos
+    .map((p) => `${numero(p.quantidade)}× ${nomePorProduto.get(p.produtoId) ?? "?"}`)
+    .join(" + ");
+  const qtd = quantidadeVendida.trim();
+  return qtd === "" ? `1 kit = ${dentro}` : `1 kit = ${dentro} · vendendo ${qtd} kits`;
+}
+
+// ---------- Partir de um kit que já existe ----------
+//
+// Montar "o kit catarata mais uma compressa" obrigava a escolher tudo de novo,
+// produto por produto. Carregar a composição de um kit do catálogo no montador
+// resolve — e o aviso de composição repetida cuida do resto: se a pessoa não
+// mudar nada, o sistema avisa que aquele kit já existe e usa o código dele.
+export type KitParaCopiar = {
+  id: string;
+  codigo: string;
+  nome: string;
+  produtos: Array<{ produtoId: string; quantidade: string }>;
+  embalagem: Array<{ insumoId: string; modo: ModoEmbalagem; quantidade: string }>;
+};
+
+export function kitNovoAPartirDe(base: KitParaCopiar): KitNovoEdicao {
+  return {
+    // O nome NÃO é copiado: um kit com a mesma composição e o mesmo nome do
+    // original seria indistinguível na lista. Quem copia está montando outra
+    // coisa — o nome é dele.
+    rotulo: "",
+    produtos: base.produtos.map((p) => ({ ...p })),
+    embalagem: base.embalagem.map((e) => ({ ...e })),
+  };
+}
+
 // ---------- Itens para gravar a cotação ----------
 //
 // Três destinos possíveis para uma linha:

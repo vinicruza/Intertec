@@ -22,6 +22,53 @@ export function numeroDigitado(valor: string): string {
   return limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo;
 }
 
+// O ponto sozinho é ambíguo e não dá para adivinhar: "4.20" é quatro reais e
+// vinte, "1.000" quase sempre é mil — mas os dois são a mesma escrita. Em vez
+// de escolher por conta própria (e errar a quantidade de um pedido inteiro),
+// o sistema mostra o que entendeu e deixa a pessoa corrigir.
+//
+// Devolve o aviso quando há risco real (ponto seguido de exatamente 3 dígitos,
+// sem vírgula: 1.000, 12.500) e null no resto dos casos.
+export function interpretacaoDoNumero(valor: string): string | null {
+  const limpo = valor.trim();
+  // Só o padrão de milhar sem vírgula: 1.000, 12.500, 1.000.000.
+  if (!/^\d{1,3}(\.\d{3})+$/.test(limpo)) return null;
+  const semPontos = limpo.replace(/\./g, "");
+  try {
+    const lido = dec(numeroDigitado(limpo)).toString().replace(".", ",");
+    return `Entendi ${lido}. Se quis dizer ${semPontos}, digite sem o ponto.`;
+  } catch {
+    // "1.000.000" não é número nenhum para o motor — melhor dizer isso.
+    return `Não consegui ler este número. Para ${semPontos}, digite sem o ponto.`;
+  }
+}
+
+// ---------- Comissão ----------
+//
+// O banco e o motor trabalham com fração (0,025). A pessoa pensa em
+// porcentagem (2,5%). Pedir a fração no campo é pedir para alguém digitar
+// 0,25 achando que são 2,5% — e 25% de comissão passaria sem nenhum aviso.
+
+export function fracaoParaPercentual(fracao: string | null | undefined): string {
+  if (fracao === null || fracao === undefined || fracao.trim() === "") return "";
+  try {
+    // Sem casas decimais sobrando: 0,025 vira "2,5" e não "2,50".
+    return dec(numeroDigitado(fracao)).times(100).toString().replace(".", ",");
+  } catch {
+    return "";
+  }
+}
+
+export function percentualParaFracao(percentual: string): string | null {
+  const limpo = numeroDigitado(percentual);
+  if (limpo === "") return null;
+  try {
+    return dec(limpo).div(100).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function reais(valor: ValorNumerico): string {
   if (valor === null || valor === undefined || valor === "") return "—";
   try {

@@ -1,6 +1,7 @@
 import { Decimal, custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc";
 import { supabase } from "../supabase";
 import type { CatalogoParaKit } from "../sim/kitNoPedido";
+import type { KitParaCopiar } from "../sim/itensDoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
@@ -63,6 +64,9 @@ export type ContextoSimulador = {
   // independentemente do status, então a composição igual à de um kit inativo
   // não ganha código novo — cai no kit inativo.
   kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string; ativo: boolean }>;
+  // Kits ativos com a composição aberta, para "partir de um kit existente" no
+  // montador — montar "o kit catarata mais uma compressa" sem reescolher tudo.
+  kitsParaCopiar: KitParaCopiar[];
   // Transportadoras do formulário de pedido (05/08/2026).
   transportadoras: Array<{ id: string; nome: string; pedeNome: boolean }>;
 };
@@ -85,7 +89,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // índice único — precisa aparecer no aviso de "esta composição já existe".
     supabase
       .from("kits")
-      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
+      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(input_id, quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
       .order("name"),
     supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
     supabase.rpc("meu_vendedor"),
@@ -113,6 +117,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
   }));
 
   type EmbalagemBruta = {
+    input_id: string;
     quantity_type: "direct" | "lot";
     quantity: string | null;
     lot_size: string | null;
@@ -173,6 +178,24 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     }
   }
 
+  // Composição aberta dos kits ativos, no formato do montador.
+  const kitsParaCopiar: KitParaCopiar[] = (kits.data ?? [])
+    .filter((k) => k.status === "active")
+    .map((k) => ({
+      id: k.id as string,
+      codigo: (k.code as string | null) ?? "—",
+      nome: k.name as string,
+      produtos: (k.kit_items as Array<{ product_id: string; quantity: string }>).map((i) => ({
+        produtoId: i.product_id,
+        quantidade: String(i.quantity),
+      })),
+      embalagem: ((k.kit_packaging ?? []) as EmbalagemBruta[]).map((e) => ({
+        insumoId: e.input_id,
+        modo: (e.quantity_type === "lot" ? "itensPorCaixa" : "porKit") as "itensPorCaixa" | "porKit",
+        quantidade: String(e.quantity_type === "lot" ? e.lot_size : e.quantity),
+      })),
+    }));
+
   const tabelaPorUF = new Map<string, TabelasUF>();
   const difalPorUF = new Map((difal.data ?? []).map((d) => [d.uf as string, d.final_rate as string]));
   const portalPorUF = new Map((portal.data ?? []).map((p) => [p.uf as string, p.freight_percent as string]));
@@ -221,6 +244,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       embalagem: (i.is_packaging as boolean | null) ?? false,
     })),
     kitPorAssinatura,
+    kitsParaCopiar,
     transportadoras: (transp.data ?? []).map((t) => ({
       id: t.id as string,
       nome: t.name as string,
