@@ -139,6 +139,7 @@ export default function PedidoDetalhePage() {
   // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
   // jeito (mesma regra vale no banco, é a garantia real).
   const souRemetente = Boolean(perfil?.id) && pedido.submitted_by === perfil?.id;
+  const pendenciasAprovacao = camposDeExpedicaoPendentes(pedido);
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -326,7 +327,17 @@ export default function PedidoDetalhePage() {
 
       <div className="flex gap-2">
         {!fechado && !cancelado && !perdida && aprovacao === "rascunho" && params?.require_approval && (
-          <Button disabled={enviar.isPending} onClick={() => { setErro(null); enviar.mutate(); }}>
+          <Button
+            disabled={enviar.isPending}
+            onClick={() => {
+              setErro(null);
+              if (pendenciasAprovacao.length > 0) {
+                setErro(`Preencha antes de enviar para aprovação: ${pendenciasAprovacao.join(", ")}.`);
+                return;
+              }
+              enviar.mutate();
+            }}
+          >
             {enviar.isPending ? "Enviando…" : "Enviar para aprovação"}
           </Button>
         )}
@@ -499,6 +510,15 @@ export default function PedidoDetalhePage() {
   );
 }
 
+function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
+  const pendencias: string[] = [];
+  if (!pedido.carrier_id) pendencias.push("transportadora");
+  if (pedido.carriers?.requires_name && !pedido.carrier_other?.trim()) pendencias.push("nome da transportadora");
+  if (pedido.payment_term_days == null) pendencias.push("pagamento");
+  if (!pedido.shipping_zip && !pedido.customers?.shipping_zip) pendencias.push("CEP de entrega");
+  return pendencias;
+}
+
 function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
   return (
     <tr className={destaque ? "font-semibold" : ""}>
@@ -532,6 +552,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     pesoKg: pedido.weight_kg ?? "",
     volumes: pedido.volumes != null ? String(pedido.volumes) : "",
     cepEntrega: formatarCep(pedido.shipping_zip),
+    prazoPagamentoDias: pedido.payment_term_days != null ? String(pedido.payment_term_days) : "",
     observacao: pedido.order_notes ?? "",
   });
 
@@ -606,6 +627,10 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
             placeholder="00000-000"
           />
           {cepInvalido && <p className="mt-1 text-xs text-red-600">CEP precisa ter 8 dígitos.</p>}
+        </div>
+        <div>
+          <Label>Pagamento (dias)</Label>
+          <Input value={d.prazoPagamentoDias ?? ""} onChange={(e) => mudar("prazoPagamentoDias")(e.target.value)} placeholder="ex.: 30" />
         </div>
       </div>
 

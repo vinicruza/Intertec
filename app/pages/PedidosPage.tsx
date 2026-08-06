@@ -2,14 +2,31 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { dec } from "@calc";
-import { listarPedidos } from "../lib/db/fechamento";
+import { listarPedidos, type PedidoResumo } from "../lib/db/fechamento";
 import { listarRegrasMargem } from "../lib/db/configuracoes";
 import { statusMargem, type RegraMargem } from "../lib/sim/params";
 import { exportarHistoricoPedidos } from "../lib/export/pedidos";
 import { dataCurta, reais } from "../lib/format";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
 
-type StatusFiltro = "todos" | "simulation" | "closed" | "lost" | "cancelled";
+type StatusFiltro = "todos" | "rascunho" | "pendente" | "aprovado" | "recusado" | "closed" | "lost" | "cancelled";
+
+function statusLogico(p: PedidoResumo): StatusFiltro {
+  if (p.cancelled_at) return "cancelled";
+  if (p.status === "closed") return "closed";
+  if (p.status === "lost") return "lost";
+  return p.approval_status ?? "rascunho";
+}
+
+function rotuloStatus(p: PedidoResumo): string {
+  if (p.cancelled_at) return `Cancelado ${dataCurta(p.cancelled_at)}`;
+  if (p.status === "closed") return `Ganho ${dataCurta(p.closed_at)}`;
+  if (p.status === "lost") return `Perdida ${dataCurta(p.lost_at)}`;
+  if (p.approval_status === "pendente") return "Enviado para aprovação";
+  if (p.approval_status === "aprovado") return `Aprovado ${dataCurta(p.approved_at)}`;
+  if (p.approval_status === "recusado") return "Aprovação recusada";
+  return "Em cotação";
+}
 
 export default function PedidosPage() {
   const navigate = useNavigate();
@@ -45,7 +62,7 @@ export default function PedidosPage() {
   const pedidos = useMemo(() => {
     const busca = texto.trim().toLocaleLowerCase("pt-BR");
     return todos.filter((p) => {
-      const logico = p.cancelled_at ? "cancelled" : p.status;
+      const logico = statusLogico(p);
       if (status !== "todos" && logico !== status) return false;
       const dataEvento = p.cancelled_at ?? p.closed_at ?? p.lost_at ?? p.created_at;
       if (periodo && !dataEvento.startsWith(periodo)) return false;
@@ -81,8 +98,9 @@ export default function PedidosPage() {
 
       <Card className="grid gap-3 p-4 md:grid-cols-3 xl:grid-cols-9">
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as StatusFiltro)}>
-          <option value="todos">Todos os status</option><option value="simulation">Em cotação</option>
-          <option value="closed">Ganhos</option><option value="lost">Perdidas</option>
+          <option value="todos">Todos os status</option><option value="rascunho">Em cotação</option>
+          <option value="pendente">Enviados para aprovação</option><option value="aprovado">Aprovados</option>
+          <option value="recusado">Aprovação recusada</option><option value="closed">Ganhos</option><option value="lost">Perdidas</option>
           <option value="cancelled">Cancelados</option>
         </select>
         <Input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Período" />
@@ -119,7 +137,6 @@ export default function PedidosPage() {
           <th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Receita líquida</th>
           <th className="px-4 py-3 font-medium">Margem contrib.</th>
         </tr></thead><tbody>{pedidos.map((p) => {
-          const cancelado = Boolean(p.cancelled_at);
           return <tr key={p.id} className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/pedidos/${p.id}`)}>
             <td className="px-4 py-3">
               <span className="font-mono text-xs">{p.quote_number ?? "—"}</span>
@@ -137,7 +154,7 @@ export default function PedidosPage() {
             <td className="px-4 py-3">{p.sellers?.name ?? "—"}<span className="block text-xs text-[var(--cor-texto-suave)]">{p.channels?.name ?? "—"}</span></td>
             <td className="px-4 py-3">{p.uf ?? "—"}</td>
             <td className="px-4 py-3">
-              <Badge>{cancelado ? `Cancelado ${dataCurta(p.cancelled_at)}` : p.status === "closed" ? `Ganho ${dataCurta(p.closed_at)}` : p.status === "lost" ? `Perdida ${dataCurta(p.lost_at)}` : "Em cotação"}</Badge>
+              <Badge>{rotuloStatus(p)}</Badge>
               {p.status === "lost" && p.loss_reasons && (
                 <span className="block text-xs text-[var(--cor-texto-suave)]">{p.loss_reasons.label}</span>
               )}

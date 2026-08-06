@@ -10,6 +10,9 @@ import { carregarContextoSimulador, montarCatalogoDeKit, type ContextoSimulador 
 export type PedidoResumo = {
   id: string;
   status: "simulation" | "closed" | "lost";
+  approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
+  approved_at: string | null;
+  submitted_at: string | null;
   quote_number: string | null;
   uf: string | null;
   created_at: string;
@@ -51,7 +54,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
+      "id, status, approval_status, approved_at, submitted_at, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -225,6 +228,7 @@ export type DadosExpedicao = {
   pesoKg: string | null;
   volumes: string | null;
   cepEntrega: string | null;
+  prazoPagamentoDias: string | null;
   observacao: string | null;
 };
 
@@ -240,6 +244,7 @@ export async function salvarExpedicao(orderId: string, d: DadosExpedicao): Promi
     p_weight_kg: numero(d.pesoKg),
     p_volumes: numero(d.volumes),
     p_shipping_zip: d.cepEntrega?.replace(/\D/g, "") || null,
+    p_payment_term_days: numero(d.prazoPagamentoDias),
     p_order_notes: d.observacao?.trim() || null,
   });
   if (error) throw error;

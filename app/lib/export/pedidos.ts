@@ -27,6 +27,16 @@ function nomeNFDoItem(i: ItemDoPedido): string {
   );
 }
 
+function statusDoPedido(p: PedidoResumo): string {
+  if (p.cancelled_at) return "Cancelado";
+  if (p.status === "closed") return "Ganho";
+  if (p.status === "lost") return "Perdida";
+  if (p.approval_status === "pendente") return "Enviado para aprovação";
+  if (p.approval_status === "aprovado") return "Aprovado";
+  if (p.approval_status === "recusado") return "Aprovação recusada";
+  return "Em cotação";
+}
+
 export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise<void> {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
@@ -54,7 +64,7 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
     criado: p.created_at.slice(0, 10),
     fechado: p.closed_at?.slice(0, 10) ?? "",
     cancelado: p.cancelled_at?.slice(0, 10) ?? "",
-    status: p.cancelled_at ? "Cancelado" : p.status === "closed" ? "Fechado" : "Simulação",
+    status: statusDoPedido(p),
     cliente: p.customers?.name ?? "",
     vendedor: p.sellers?.name ?? "",
     canal: p.channels?.name ?? "",

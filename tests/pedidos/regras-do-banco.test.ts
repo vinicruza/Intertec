@@ -169,6 +169,15 @@ describe("ciclo da cotação", () => {
       /submitted_by = auth\.uid\(\)[\s\S]*raise exception/i
     );
   });
+
+  it("expedição e condições não travam salvar, mas travam o envio para aprovação", () => {
+    const enviar = definicaoVigente("submit_order_for_approval");
+    expect(gravar).toMatch(/carrier_id = v_carrier_id/i);
+    expect(gravar).toMatch(/payment_term_days = v_payment_term/i);
+    expect(enviar).toMatch(/v_order\.carrier_id is null[\s\S]*transportadora/i);
+    expect(enviar).toMatch(/v_order\.payment_term_days is null[\s\S]*prazo de pagamento/i);
+    expect(enviar).toMatch(/v_order\.shipping_zip is null and v_customer_shipping_zip is null[\s\S]*CEP de entrega/i);
+  });
 });
 
 describe("comercial lança pedido em nome próprio", () => {
