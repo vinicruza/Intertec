@@ -25,7 +25,7 @@ import {
   enviarParaAprovacao,
   obterParametrosAprovacao,
   podeAprovar,
-  podeVerNumerosDeMargem,
+  podeVerCascataOperacional,
 } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
@@ -129,7 +129,7 @@ export default function PedidoDetalhePage() {
   const fechado = pedido.status === "closed";
   const perdida = pedido.status === "lost";
   const params = paramsQuery.data;
-  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, params);
+  const verNumeros = podeVerCascataOperacional(perfil?.perfil);
   const souAprovador = podeAprovar(perfil?.perfil, params);
   const aprovacao = pedido.approval_status;
   const cancelado = Boolean(pedido.cancelled_at);

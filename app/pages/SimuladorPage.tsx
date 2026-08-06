@@ -24,7 +24,7 @@ import {
   type ContextoSimulador,
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
-import { podeVerCascataNoSimulador } from "../lib/db/aprovacao";
+import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import {
   fracaoParaPercentual,
@@ -71,7 +71,7 @@ export default function SimuladorPage() {
     enabled: Boolean(idParaEditar),
   });
   const ctxQuery = useQuery({ queryKey: ["ctxSimulador"], queryFn: carregarContextoSimulador });
-  const verNumeros = podeVerCascataNoSimulador(perfil?.perfil);
+  const verNumeros = podeVerCascataOperacional(perfil?.perfil);
 
   const [vendedorId, setVendedorId] = useState("");
   const [uf, setUf] = useState("");

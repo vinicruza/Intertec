@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { totaisDaFichaDoPedido } from "@calc";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
-import { obterParametrosAprovacao, podeVerNumerosDeMargem } from "../lib/db/aprovacao";
+import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
 import { formatarCep, formatarCnpjCpf, formatarTelefone } from "../../lib/cadastro/documentos";
@@ -37,8 +37,7 @@ export default function PedidoFichaPage() {
     queryKey: ["pedido", id],
     queryFn: () => obterPedidoCompleto(id!),
   });
-  const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
-  const verNumeros = podeVerNumerosDeMargem(perfil?.perfil, paramsQuery.data);
+  const verNumeros = podeVerCascataOperacional(perfil?.perfil);
 
   // Totais por linha e subtotal saem do motor de cálculo, nunca da tela.
   const totais = useMemo(

@@ -7,6 +7,7 @@ import { carregarContextoSimulador } from "./pedidos";
 
 export {
   podeAprovar,
+  podeVerCascataOperacional,
   podeVerCascataNoSimulador,
   podeVerNumerosDeMargem,
   type ParametrosAprovacao,

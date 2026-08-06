@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   podeAprovar,
+  podeVerCascataOperacional,
   podeVerCascataNoSimulador,
   podeVerNumerosDeMargem,
   type ParametrosAprovacao,
@@ -36,17 +37,18 @@ describe("visibilidade da margem", () => {
 
 describe("visibilidade da cascata no simulador", () => {
   it("mostra a cascata para Comercial montar pedido em nome próprio", () => {
+    expect(podeVerCascataOperacional("comercial")).toBe(true);
     expect(podeVerCascataNoSimulador("comercial")).toBe(true);
   });
 
   it("mantém a cascata visível para Admin e Financeiro", () => {
-    expect(podeVerCascataNoSimulador("admin")).toBe(true);
-    expect(podeVerCascataNoSimulador("financeiro")).toBe(true);
+    expect(podeVerCascataOperacional("admin")).toBe(true);
+    expect(podeVerCascataOperacional("financeiro")).toBe(true);
   });
 
   it("não libera para produção nem sessão sem perfil", () => {
-    expect(podeVerCascataNoSimulador("producao")).toBe(false);
-    expect(podeVerCascataNoSimulador(null)).toBe(false);
+    expect(podeVerCascataOperacional("producao")).toBe(false);
+    expect(podeVerCascataOperacional(null)).toBe(false);
   });
 });
 

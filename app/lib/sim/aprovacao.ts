@@ -34,9 +34,11 @@ export function podeVerNumerosDeMargem(
   return perfil !== "comercial";
 }
 
-export function podeVerCascataNoSimulador(perfil: Perfil | null | undefined): boolean {
+export function podeVerCascataOperacional(perfil: Perfil | null | undefined): boolean {
   return perfil === "admin" || perfil === "financeiro" || perfil === "comercial";
 }
+
+export const podeVerCascataNoSimulador = podeVerCascataOperacional;
 
 export function podeAprovar(
   perfil: Perfil | null | undefined,
