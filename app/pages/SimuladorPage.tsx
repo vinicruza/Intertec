@@ -185,8 +185,6 @@ export default function SimuladorPage() {
     if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, podeEscolherVendedor, soMeuVendedor]);
-  const semVendedorProprio = soMeuVendedor && vendedoresDisponiveis.length === 0;
-
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
@@ -396,13 +394,6 @@ export default function SimuladorPage() {
       </div>
 
       <Card className="space-y-4">
-        {semVendedorProprio && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            O sistema não encontrou um vendedor ativo com o mesmo nome do seu acesso. Comercial
-            lança pedido somente em nome próprio; peça para um Administrador conferir o seu nome ou
-            o cadastro de vendedores.
-          </p>
-        )}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {podeEscolherVendedor && (
             <div>
@@ -458,13 +449,13 @@ export default function SimuladorPage() {
               />
               <span className="text-sm text-[var(--cor-texto-suave)]">%</span>
             </div>
-            {vendedor && comissao !== null && comissao !== vendedor.regras.comissaoPadrao && (
+            {podeEditarComissao && vendedor && comissao !== null && comissao !== vendedor.regras.comissaoPadrao && (
               <p className="mt-1 text-xs text-amber-700">
                 Diferente do padrão do canal ({fracaoParaPercentual(vendedor.regras.comissaoPadrao)}%) —
                 registrado em auditoria ao fechar.
               </p>
             )}
-            {comissaoForaDoNormal && (
+            {podeEditarComissao && comissaoForaDoNormal && (
               <p className="mt-1 text-xs font-medium text-red-700">
                 ⚠️ {fracaoParaPercentual(comissao)}% de comissão está muito acima do normal — confira
                 se não digitou a fração no lugar da porcentagem.
