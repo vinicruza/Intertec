@@ -48,7 +48,9 @@ Abaixo, o formulário permite ajustar:
   mostra o custo e a participação percentual de cada componente, ordenados do mais pesado para o
   mais leve.
 
-Se ao salvar a composição resultante já existir em outro kit, um aviso amarelo aparece com um link
-para abrir o kit existente em vez de duplicar — a composição de um kit é única no sistema.
+Se ao salvar a composição resultante já existir em outro kit, um aviso amarelo aparece com o
+**código** do kit existente (e a indicação de que ele está inativo, se for o caso) e um link para
+abri-lo em vez de duplicar — a composição de um kit é única no sistema, mesmo entre kits
+desativados.
 
 Clique em **Salvar** para gravar as mudanças, ou **Cancelar** para voltar sem salvar.

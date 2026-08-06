@@ -67,7 +67,9 @@ abre:
      embalagem/esterilização pelo Administrador na tela de Insumos.
 4. Se a composição que você montou já existir como um kit cadastrado, um aviso amarelo aparece:
    *"Esta composição já existe: [código] ([nome]). Ao salvar, o pedido usará esse kit — o código é
-   o mesmo, não será criado um duplicado."* Isso evita kits repetidos.
+   o mesmo, não será criado um duplicado."* Isso evita kits repetidos. O aviso aparece também
+   quando o kit gêmeo está **inativo** no catálogo — nesse caso ele diz isso, porque o pedido vai
+   usar o kit inativo do mesmo jeito.
 5. Quando os números de margem estiverem visíveis para o seu perfil, uma tabela **"Peso de cada
    item no custo do kit"** mostra o custo e a participação percentual de cada produto e insumo de
    embalagem dentro do kit — útil para ver o que está pesando mais no custo. Não existe um "preço"
