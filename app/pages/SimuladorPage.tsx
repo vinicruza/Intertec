@@ -173,17 +173,16 @@ export default function SimuladorPage() {
     setLinhas(linhasCarregadas.length > 0 ? linhasCarregadas : [LINHA_VAZIA]);
   }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
-  // Comercial lança pedido só para o vendedor vinculado ao acesso dele
-  // (decisão de 04/08/2026). Administrador lança por qualquer um. A trava de
-  // verdade é o gatilho no banco; aqui a lista já vem reduzida para ninguém
-  // escolher um vendedor que o sistema vai recusar só na hora de salvar.
+  // Comercial lança pedido só em nome próprio. Administrador lança por
+  // qualquer vendedor. A tela já reduz a lista, mas a trava definitiva fica no
+  // banco, em assert_vendedor_do_proprio_acesso().
   const soMeuVendedor = perfil?.perfil === "comercial";
   const vendedoresDisponiveis = useMemo(() => {
     if (!ctx) return [];
     if (!soMeuVendedor) return ctx.vendedores;
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, soMeuVendedor]);
-  const semVendedorVinculado = soMeuVendedor && vendedoresDisponiveis.length === 0;
+  const semVendedorProprio = soMeuVendedor && vendedoresDisponiveis.length === 0;
 
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
 
@@ -394,10 +393,11 @@ export default function SimuladorPage() {
       </div>
 
       <Card className="space-y-4">
-        {semVendedorVinculado && (
+        {semVendedorProprio && (
           <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            ⚠️ O seu acesso ainda não está vinculado a um vendedor, então não é possível lançar
-            pedido. Peça a um Administrador para fazer o vínculo na tela de Usuários.
+            O sistema não encontrou um vendedor ativo com o mesmo nome do seu acesso. Comercial
+            lança pedido somente em nome próprio; peça para um Administrador conferir o seu nome ou
+            o cadastro de vendedores.
           </p>
         )}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

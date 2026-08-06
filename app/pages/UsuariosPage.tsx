@@ -10,11 +10,6 @@ import {
 } from "../lib/db/usuarios";
 import { SENHA_MINIMA, senhaSugerida } from "../lib/senha";
 import { NOME_PERFIL, nomePerfil, type Perfil } from "../lib/roles";
-import {
-  listarVendedoresParaVinculo,
-  vincularVendedor,
-  type VendedorOpcaoAdmin,
-} from "../lib/db/usuarios";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
@@ -34,10 +29,6 @@ export default function UsuariosPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({ queryKey: ["usuarios"], queryFn: listarUsuarios });
-  const vendedoresQuery = useQuery({
-    queryKey: ["vendedoresParaVinculo"],
-    queryFn: listarVendedoresParaVinculo,
-  });
 
   function recarregar() {
     queryClient.invalidateQueries({ queryKey: ["usuarios"] });
@@ -57,22 +48,6 @@ export default function UsuariosPage() {
       recarregar();
     },
     onError: (e) => comoErro(e, "Erro ao salvar o usuário."),
-  });
-
-  const vincular = useMutation({
-    mutationFn: (v: { id: string; nome: string; sellerId: string | null }) =>
-      vincularVendedor(v.id, v.sellerId),
-    onSuccess: (_r, v) => {
-      setErro(null);
-      setAviso(
-        v.sellerId
-          ? `${v.nome} agora lança pedido como o vendedor selecionado.`
-          : `${v.nome} ficou sem vendedor vinculado e não consegue lançar pedido.`
-      );
-      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      queryClient.invalidateQueries({ queryKey: ["vendedoresParaVinculo"] });
-    },
-    onError: (e) => comoErro(e, "Erro ao vincular o vendedor."),
   });
 
   const criar = useMutation({
@@ -154,10 +129,6 @@ export default function UsuariosPage() {
           souEu={u.id === eu?.id}
           ocupado={salvar.isPending || senha.isPending || remover.isPending}
           aoSalvar={(nome, perfil, ativo) => salvar.mutate({ id: u.id, nome, perfil, ativo })}
-          vendedores={vendedoresQuery.data ?? []}
-          aoVincularVendedor={(sellerId) =>
-            vincular.mutate({ id: u.id, nome: u.full_name, sellerId })
-          }
           aoRedefinirSenha={(nova) => senha.mutate({ id: u.id, senha: nova, email: u.email })}
           aoRemover={() => remover.mutate({ id: u.id, email: u.email })}
         />
@@ -292,8 +263,6 @@ function LinhaUsuario({
   aoSalvar,
   aoRedefinirSenha,
   aoRemover,
-  vendedores,
-  aoVincularVendedor,
 }: {
   usuario: UsuarioAdmin;
   souEu: boolean;
@@ -301,8 +270,6 @@ function LinhaUsuario({
   aoSalvar: (nome: string, perfil: Perfil, ativo: boolean) => void;
   aoRedefinirSenha: (senha: string) => void;
   aoRemover: () => void;
-  vendedores: VendedorOpcaoAdmin[];
-  aoVincularVendedor: (sellerId: string | null) => void;
 }) {
   const [nome, setNome] = useState(usuario.full_name);
   const [perfil, setPerfil] = useState<Perfil>(usuario.role);
@@ -334,33 +301,6 @@ function LinhaUsuario({
             ))}
           </select>
         </div>
-
-        {/* Vendedor vinculado: é o que decide para quem o Comercial pode lançar
-            pedido. Só aparece no perfil Comercial — Administrador lança por
-            qualquer vendedor, e Financeiro/Produção não lançam pedido. */}
-        {perfil === "comercial" && (
-          <div>
-            <label className="mb-1 block text-xs text-[var(--cor-texto-suave)]">Vendedor vinculado</label>
-            <select
-              className="min-h-10 rounded-md border border-[var(--cor-borda)] px-2 text-sm"
-              value={usuario.seller_id ?? ""}
-              disabled={ocupado}
-              onChange={(e) => aoVincularVendedor(e.target.value || null)}
-            >
-              <option value="">— sem vendedor —</option>
-              {vendedores
-                .filter((v) => v.profile_id === null || v.profile_id === usuario.id)
-                .map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-            </select>
-            {!usuario.seller_id && (
-              <p className="mt-1 max-w-56 text-xs text-amber-700">
-                Sem vendedor vinculado, esta pessoa não consegue lançar pedido.
-              </p>
-            )}
-          </div>
-        )}
 
         <label className="flex items-center gap-2 pb-2 text-sm">
           <input

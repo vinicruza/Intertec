@@ -37,10 +37,9 @@ export type InsumoEmbalagem = {
 
 export type ContextoSimulador = {
   vendedores: VendedorOpcao[];
-  // Vendedor vinculado a quem está usando o sistema (null se não houver).
-  // O Comercial só lança pedido para ele — a trava de verdade é o gatilho
-  // trg_orders_vendedor_do_acesso, no banco; aqui a lista já vem filtrada
-  // para a pessoa não escolher errado e só descobrir ao salvar.
+  // Vendedor que tem o mesmo nome do acesso logado. Comercial lança pedido
+  // somente em nome próprio; Administrador continua podendo escolher qualquer
+  // vendedor. A trava definitiva fica no banco.
   meuVendedorId: string | null;
   clientes: Array<{
     id: string;

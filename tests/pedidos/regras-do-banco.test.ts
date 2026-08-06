@@ -170,3 +170,22 @@ describe("ciclo da cotação", () => {
     );
   });
 });
+
+describe("comercial lança pedido em nome próprio", () => {
+  const meuVendedor = definicaoVigente("meu_vendedor");
+  const trava = definicaoVigente("assert_vendedor_do_proprio_acesso");
+
+  it("resolve o vendedor do Comercial pelo nome do próprio perfil, sem vínculo manual", () => {
+    expect(meuVendedor).toMatch(/join public\.profiles p/i);
+    expect(meuVendedor).toMatch(/lower\(btrim\(s\.name\)\)\s*=\s*lower\(btrim\(p\.full_name\)\)/i);
+    expect(TODAS).toMatch(/drop function if exists public\.vincular_vendedor/i);
+    expect(TODAS).toMatch(/drop column if exists profile_id/i);
+  });
+
+  it("Administrador pode lançar por qualquer vendedor, mas Comercial não", () => {
+    expect(trava).toMatch(/v_role is distinct from 'comercial'[\s\S]*return new/i);
+    expect(trava).toMatch(/v_meu_vendedor := public\.meu_vendedor\(\)/i);
+    expect(trava).toMatch(/new\.seller_id is distinct from v_meu_vendedor/i);
+    expect(trava).toMatch(/Apenas Administrador pode lançar pedido em nome de outro vendedor/i);
+  });
+});
