@@ -183,7 +183,8 @@ export default function SimuladorPage() {
     if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, podeEscolherVendedor, soMeuVendedor]);
-  const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
+  const vendedorIdEfetivo = vendedorId || (soMeuVendedor ? ctx?.meuVendedorId ?? "" : "");
+  const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
   useEffect(() => {
@@ -191,6 +192,12 @@ export default function SimuladorPage() {
       setVendedorId(vendedoresDisponiveis[0].id);
     }
   }, [vendedoresDisponiveis, vendedorId]);
+
+  useEffect(() => {
+    if (uf || !ctx || !clienteId) return;
+    const ufDoCliente = ctx.clientes.find((c) => c.id === clienteId)?.uf;
+    if (ufDoCliente && ctx.tabelaPorUF.has(ufDoCliente)) setUf(ufDoCliente);
+  }, [ctx, clienteId, uf]);
 
   const catalogo = useMemo(() => (ctx ? montarCatalogoDeKit(ctx) : null), [ctx]);
 
