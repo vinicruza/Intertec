@@ -188,4 +188,13 @@ describe("comercial lança pedido em nome próprio", () => {
     expect(trava).toMatch(/new\.seller_id is distinct from v_meu_vendedor/i);
     expect(trava).toMatch(/Apenas Administrador pode lançar pedido em nome de outro vendedor/i);
   });
+
+  it("Comercial não consegue trocar canal nem comissão pela requisição", () => {
+    expect(trava).toMatch(/select s\.channel_id,\s*c\.default_commission_rate/i);
+    expect(trava).toMatch(/new\.channel_id is distinct from v_channel_id/i);
+    expect(trava).toMatch(/Comercial só pode lançar pedido no canal do próprio vendedor/i);
+    expect(trava).toMatch(/new\.commission_rate is null or abs\(new\.commission_rate - v_default_commission\)/i);
+    expect(trava).toMatch(/Comissão só pode ser alterada por Administrador/i);
+    expect(TODAS).toMatch(/before insert or update of seller_id,\s*channel_id,\s*commission_rate on public\.orders/i);
+  });
 });

@@ -173,15 +173,18 @@ export default function SimuladorPage() {
     setLinhas(linhasCarregadas.length > 0 ? linhasCarregadas : [LINHA_VAZIA]);
   }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
+  const podeEscolherVendedor = perfil?.perfil === "admin";
+  const podeEditarComissao = perfil?.perfil === "admin";
   // Comercial lança pedido só em nome próprio. Administrador lança por
-  // qualquer vendedor. A tela já reduz a lista, mas a trava definitiva fica no
-  // banco, em assert_vendedor_do_proprio_acesso().
+  // qualquer vendedor. A tela esconde a escolha para não sugerir uma permissão
+  // que não existe; a trava definitiva fica no banco.
   const soMeuVendedor = perfil?.perfil === "comercial";
   const vendedoresDisponiveis = useMemo(() => {
     if (!ctx) return [];
-    if (!soMeuVendedor) return ctx.vendedores;
+    if (podeEscolherVendedor) return ctx.vendedores;
+    if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
-  }, [ctx, soMeuVendedor]);
+  }, [ctx, podeEscolherVendedor, soMeuVendedor]);
   const semVendedorProprio = soMeuVendedor && vendedoresDisponiveis.length === 0;
 
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorId) ?? null;
@@ -401,20 +404,21 @@ export default function SimuladorPage() {
           </p>
         )}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div>
-            <Label>Vendedor</Label>
-            <select
-              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={vendedorId}
-              disabled={vendedoresDisponiveis.length <= 1}
-              onChange={(e) => { setVendedorId(e.target.value); setComissao(null); setAplicaDifalOverride(null); }}
-            >
-              <option value="">Selecione…</option>
-              {vendedoresDisponiveis.map((v) => (
-                <option key={v.id} value={v.id}>{v.name} — {v.canalNome}</option>
-              ))}
-            </select>
-          </div>
+          {podeEscolherVendedor && (
+            <div>
+              <Label>Vendedor</Label>
+              <select
+                className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                value={vendedorId}
+                onChange={(e) => { setVendedorId(e.target.value); setComissao(null); setAplicaDifalOverride(null); }}
+              >
+                <option value="">Selecione…</option>
+                {vendedoresDisponiveis.map((v) => (
+                  <option key={v.id} value={v.id}>{v.name} — {v.canalNome}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <Label>UF de destino</Label>
             <select className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={uf} onChange={(e) => setUf(e.target.value)}>
@@ -446,7 +450,10 @@ export default function SimuladorPage() {
             <div className="flex items-center gap-1">
               <Input
                 value={fracaoParaPercentual(comissao ?? vendedor?.regras.comissaoPadrao ?? "")}
-                onChange={(e) => setComissao(percentualParaFracao(e.target.value))}
+                onChange={(e) => {
+                  if (podeEditarComissao) setComissao(percentualParaFracao(e.target.value));
+                }}
+                disabled={!podeEditarComissao}
                 placeholder="ex.: 2,5"
               />
               <span className="text-sm text-[var(--cor-texto-suave)]">%</span>
