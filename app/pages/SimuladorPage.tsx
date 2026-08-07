@@ -310,6 +310,7 @@ export default function SimuladorPage() {
         uf,
         itens: itens.map((i) => ({ tipo: i.tipo, quantidade: i.quantidade, preco: i.precoVenda, rotulo: i.kitNovo?.rotulo })),
         receita_bruta: simulacao.resultado.receitaBruta.toString(),
+        receita_liquida: simulacao.resultado.receitaLiquida.toString(),
         cmv_total: simulacao.resultado.cmvTotal.toString(),
         margem_contribuicao: simulacao.resultado.margemContribuicao.toString(),
         margem_contribuicao_pct: simulacao.resultado.margemContribuicaoPct.toString(),

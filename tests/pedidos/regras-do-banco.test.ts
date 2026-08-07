@@ -156,6 +156,12 @@ describe("ciclo da cotação", () => {
     expect(gravar).toMatch(/coalesce\(max\(version\),\s*0\)\s*\+\s*1/i);
   });
 
+  it("a versão da cotação alimenta receita e margem no histórico", () => {
+    expect(definicaoVigente("sync_order_snapshot_from_version")).toMatch(/net_revenue_snapshot/i);
+    expect(definicaoVigente("sync_order_snapshot_from_version")).toMatch(/contribution_margin_snapshot/i);
+    expect(TODAS).toMatch(/create trigger trg_order_versions_sync_order_snapshot/i);
+  });
+
   it("cotação sem itens é recusada", () => {
     expect(gravar).toMatch(/Cotação sem itens/);
   });
