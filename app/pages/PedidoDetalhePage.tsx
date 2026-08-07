@@ -31,9 +31,16 @@ import {
 } from "../lib/db/aprovacao";
 import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, reais } from "../lib/format";
+import { dataCurta, percentual, reais } from "../lib/format";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+
+const CORES_SELO_MARGEM: Record<string, string> = {
+  blue: "bg-blue-100 text-blue-800",
+  green: "bg-green-100 text-green-800",
+  yellow: "bg-yellow-100 text-yellow-800",
+  red: "bg-red-100 text-red-800",
+};
 
 // Detalhe do pedido. Para pedido FECHADO, tudo vem do snapshot congelado —
 // nada é recalculado (D7). Simulações mostram os itens e oferecem o fechamento.
@@ -281,7 +288,14 @@ export default function PedidoDetalhePage() {
 
       {!fechado && !cancelado && !perdida && verNumeros && pedido.itens.length > 0 && (
         <Card className="space-y-1">
-          <h2 className="mb-2 text-lg font-semibold">Cascata (custos vigentes)</h2>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Cascata (custos vigentes)</h2>
+            {seloDaCascata && cascata?.ok && (
+              <span className={`rounded-full px-4 py-2 text-sm font-semibold ${CORES_SELO_MARGEM[seloDaCascata.color] ?? "bg-gray-100 text-gray-800"}`}>
+                {seloDaCascata.label} · {percentual(cascata.margemContribuicaoPct)}
+              </span>
+            )}
+          </div>
           <p className="mb-2 text-sm text-[var(--cor-texto-suave)]">
             Pedido ainda em cotação — nada aqui está gravado. Calculado agora com os custos e
             alíquotas vigentes; pode mudar até o fechamento (Decisão D7).
@@ -438,7 +452,14 @@ export default function PedidoDetalhePage() {
 
       {aprovacao === "pendente" && souAprovador && !souRemetente && !cancelado && (
         <Card className="space-y-3 border-[var(--cor-primaria)]">
-          <h2 className="font-semibold">Aprovação do pedido</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Aprovação do pedido</h2>
+            {seloDaCascata && cascata?.ok && (
+              <span className={`rounded-full px-4 py-2 text-sm font-semibold ${CORES_SELO_MARGEM[seloDaCascata.color] ?? "bg-gray-100 text-gray-800"}`}>
+                {seloDaCascata.label} · {percentual(cascata.margemContribuicaoPct)}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[var(--cor-texto-suave)]">
             Confira preço de venda, CMV e margem de contribuição acima antes de decidir.
             É o que o papel na pasta não mostrava.

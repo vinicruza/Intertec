@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { totaisDaFichaDoPedido } from "@calc";
-import { obterPedidoCompleto } from "../lib/db/fechamento";
+import { calcularCascataVigente, obterPedidoCompleto } from "../lib/db/fechamento";
 import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
@@ -37,6 +37,11 @@ export default function PedidoFichaPage() {
     queryKey: ["pedido", id],
     queryFn: () => obterPedidoCompleto(id!),
   });
+  const cascataQuery = useQuery({
+    queryKey: ["cascataVigente", id],
+    queryFn: () => calcularCascataVigente(id!),
+    enabled: Boolean(pedido) && pedido?.status === "simulation" && pedido.itens.length > 0,
+  });
   const verNumeros = podeVerCascataOperacional(perfil?.perfil);
 
   // Totais por linha e subtotal saem do motor de cálculo, nunca da tela.
@@ -53,6 +58,8 @@ export default function PedidoFichaPage() {
 
   const t = pedido.totals_display;
   const fechado = pedido.status === "closed";
+  const cascata = cascataQuery.data;
+  const totaisFinanceiros = fechado ? t : cascata?.ok ? cascata.totals : t;
   const cliente = pedido.customers;
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
   // senão vale o do cadastro. É a única regra de precedência da folha.
@@ -170,7 +177,11 @@ export default function PedidoFichaPage() {
                     <td className="py-2 text-right font-medium">
                       {reais(totais.linhas[idx]?.total.toString())}
                     </td>
-                    {verNumeros && <td className="py-2 text-right">{reais(i.cmv_unit_snapshot)}</td>}
+                    {verNumeros && (
+                      <td className="py-2 text-right">
+                        {reais(fechado ? i.cmv_unit_snapshot : cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : i.cmv_unit_snapshot)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -215,25 +226,33 @@ export default function PedidoFichaPage() {
         </div>
 
         {/* ---------- Resumo financeiro (só para quem vê margem) ---------- */}
-        {t && verNumeros && (
+        {totaisFinanceiros && verNumeros && (
           <div>
             <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Resumo financeiro</h2>
+            {!fechado && cascataQuery.isLoading && (
+              <p className="mb-2 text-xs text-black/60">Calculando valores financeiros vigentes…</p>
+            )}
+            {!fechado && cascata && !cascata.ok && (
+              <p className="mb-2 border border-black/20 px-2 py-1 text-xs">
+                Não foi possível calcular a cascata vigente: {cascata.erro}
+              </p>
+            )}
             <table className="w-full">
               <tbody>
-                <Linha rotulo="Receita bruta" valor={t.receita_bruta} />
+                <Linha rotulo="Receita bruta" valor={totaisFinanceiros.receita_bruta} />
                 {/* DIFAL em linha própria, e não mais somado a "impostos": o
                     formulário o pede separado, e a conferência precisa
                     enxergá-lo isolado para conversar com o contador. */}
-                <Linha rotulo="(−) Impostos sobre venda" valor={t.impostos} />
+                <Linha rotulo="(−) Impostos sobre venda" valor={totaisFinanceiros.impostos} />
                 <Linha
                   rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
-                  valor={t.difal}
+                  valor={totaisFinanceiros.difal}
                 />
-                <Linha rotulo="(−) Frete" valor={t.frete} />
-                <Linha rotulo="(−) Comissão" valor={t.comissao} />
-                <Linha rotulo="= Receita líquida" valor={t.receita_liquida} negrito />
-                <Linha rotulo="(−) CMV" valor={t.cmv} />
-                <Linha rotulo="= Margem de contribuição" valor={t.margem_contribuicao} negrito />
+                <Linha rotulo="(−) Frete" valor={totaisFinanceiros.frete} />
+                <Linha rotulo="(−) Comissão" valor={totaisFinanceiros.comissao} />
+                <Linha rotulo="= Receita líquida" valor={totaisFinanceiros.receita_liquida} negrito />
+                <Linha rotulo="(−) CMV" valor={totaisFinanceiros.cmv} />
+                <Linha rotulo="= Margem de contribuição" valor={totaisFinanceiros.margem_contribuicao} negrito />
               </tbody>
             </table>
             {/* Sem esta frase, alguém soma as linhas de imposto ao subtotal e
