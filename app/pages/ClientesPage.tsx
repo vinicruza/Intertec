@@ -56,7 +56,7 @@ export default function ClientesPage() {
       if (filtro === "sem_categoria" && !semCategoria) return false;
       if (filtro === "sem_documento" && c.tax_id) return false;
       if (texto) {
-        const porNome = `${c.code ?? ""} ${c.name}`.toLocaleLowerCase("pt-BR").includes(texto);
+        const porNome = `${c.external_code ?? ""} ${c.code ?? ""} ${c.name}`.toLocaleLowerCase("pt-BR").includes(texto);
         // Busca por documento aceita com ou sem máscara: quem copia um CNPJ
         // de um e-mail cola com pontuação, quem digita não usa.
         const porDocumento = digitos !== "" && (c.tax_id ?? "").includes(digitos);
@@ -113,7 +113,7 @@ export default function ClientesPage() {
           className="w-72"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Código, nome ou CNPJ"
+          placeholder="Código do cliente, nome ou CNPJ"
         />
         <span className="self-center text-sm text-[var(--cor-texto-suave)]">
           {clientes.length} de {todos.length}
@@ -138,7 +138,7 @@ export default function ClientesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
-                <th className="px-4 py-3 font-medium">Código</th>
+                <th className="px-4 py-3 font-medium">Código cliente</th>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 font-medium">CNPJ/CPF</th>
                 <th className="px-4 py-3 font-medium">UF</th>
@@ -150,7 +150,14 @@ export default function ClientesPage() {
               {clientes.map((c) => (
                 <tr key={c.id} className="border-b border-[var(--cor-borda)] last:border-0">
                   <td className="px-4 py-2 font-mono text-xs">
-                    {c.code ?? <Badge>sem código</Badge>}
+                    {c.external_code ? (
+                      <div>
+                        <p className="font-semibold text-[var(--cor-texto)]">{c.external_code}</p>
+                        {c.code && <p className="text-[0.65rem] text-[var(--cor-texto-suave)]">Interno: {c.code}</p>}
+                      </div>
+                    ) : (
+                      <Badge>sem código</Badge>
+                    )}
                   </td>
                   <td className="px-4 py-2 font-medium">
                     <Link to={`/clientes/${c.id}`} className="hover:underline">

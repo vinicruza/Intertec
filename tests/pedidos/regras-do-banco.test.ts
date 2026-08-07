@@ -185,6 +185,13 @@ describe("ciclo da cotação", () => {
     expect(enviar).toMatch(/v_order\.shipping_zip is null and v_customer_shipping_zip is null[\s\S]*CEP de entrega/i);
   });
 
+  it("o código externo do cliente é único e pode ser vinculado pela cotação", () => {
+    expect(TODAS).toMatch(/add column if not exists external_code/i);
+    expect(TODAS).toMatch(/customers_external_code_unique/i);
+    expect(definicaoVigente("set_customer_external_code")).toMatch(/Já existe um cliente com este código/i);
+    expect(definicaoVigente("set_order_customer_external_code")).toMatch(/select customer_id into v_customer_id/i);
+  });
+
   it("só vermelho e amarelo dependem de aprovação; verde e azul fecham direto pelo selo", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
     expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ v_net end/i);

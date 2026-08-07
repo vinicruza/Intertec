@@ -29,7 +29,7 @@ export type OpcaoDeBusca = {
 // mãos quando vem com um pedido de papel. Digitar o nome também filtra, porque
 // o navegador procura em qualquer parte do texto.
 export function rotuloDaOpcao(o: OpcaoDeBusca): string {
-  return `${o.codigo} — ${o.nome}`;
+  return o.codigo.trim() ? `${o.codigo} — ${o.nome}` : o.nome;
 }
 
 // Caminho de volta: do texto que ficou no campo para o id.

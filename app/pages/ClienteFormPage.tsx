@@ -79,6 +79,7 @@ async function buscarCepBrasilApi(cep: string): Promise<EnderecoApi> {
 }
 
 type Campos = {
+  external_code: string;
   name: string;
   uf: string;
   tax_id: string;
@@ -111,6 +112,7 @@ type Campos = {
 };
 
 const VAZIO: Campos = {
+  external_code: "",
   name: "", uf: "", tax_id: "",
   billing_zip: "", billing_street: "", billing_number: "", billing_complement: "",
   billing_district: "", billing_city: "", billing_state: "",
@@ -145,6 +147,7 @@ export default function ClienteFormPage() {
   useEffect(() => {
     if (!cliente) return;
     setC({
+      external_code: cliente.external_code ?? "",
       name: cliente.name,
       uf: cliente.uf ?? "",
       tax_id: formatarCnpjCpf(cliente.tax_id),
@@ -281,6 +284,7 @@ export default function ClienteFormPage() {
   const gravar = useMutation({
     mutationFn: async () => {
       const d: DadosCliente = {
+        external_code: c.external_code || null,
         name: c.name,
         uf: c.uf || null,
         tax_id: c.tax_id || null,
@@ -342,10 +346,19 @@ export default function ClienteFormPage() {
             salvar — vá completando conforme for vendendo.
           </p>
         </div>
-        {cliente?.code && (
-          <span className="rounded-full bg-[var(--cor-primaria-clara)] px-3 py-1 font-mono text-sm font-semibold text-[var(--cor-primaria)]">
-            {cliente.code}
-          </span>
+        {(cliente?.external_code || cliente?.code) && (
+          <div className="space-y-1 text-right">
+            {cliente?.external_code && (
+              <span className="block rounded-full bg-[var(--cor-primaria)] px-3 py-1 font-mono text-sm font-semibold text-white">
+                {cliente.external_code}
+              </span>
+            )}
+            {cliente?.code && (
+              <span className="block rounded-full bg-[var(--cor-primaria-clara)] px-3 py-1 font-mono text-xs font-semibold text-[var(--cor-primaria)]">
+                Interno: {cliente.code}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -354,6 +367,15 @@ export default function ClienteFormPage() {
       <Card className="space-y-4">
         <h2 className="font-semibold">Identificação</h2>
         <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <Label htmlFor="codigo-cliente">Código do cliente</Label>
+            <Input
+              id="codigo-cliente"
+              value={c.external_code}
+              placeholder="Código Intertech"
+              onChange={(e) => mudar("external_code")(e.target.value.toUpperCase())}
+            />
+          </div>
           <div className="md:col-span-2">
             <Label htmlFor="nome">Empresa / nome</Label>
             <Input id="nome" value={c.name} onChange={(e) => mudar("name")(e.target.value)} />

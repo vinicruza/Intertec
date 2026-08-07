@@ -94,6 +94,7 @@ export default function SimuladorPage() {
   const [vendedorId, setVendedorId] = useState("");
   const [uf, setUf] = useState("");
   const [clienteId, setClienteId] = useState("");
+  const [clienteNovoCodigo, setClienteNovoCodigo] = useState("");
   const [clienteNovo, setClienteNovo] = useState("");
   const [canalId, setCanalId] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
@@ -151,6 +152,8 @@ export default function SimuladorPage() {
     setCanalId(textoDeCampo(p.channel_id));
     setUf(textoDeCampo(p.uf));
     setClienteId(textoDeCampo(p.customer_id));
+    setClienteNovoCodigo("");
+    setClienteNovo("");
     setComissao(p.commission_rate == null ? null : textoDeCampo(p.commission_rate));
     setFrete(textoDeCampo(p.freight, "0"));
     setFreteCliente(p.freight_paid_by_customer);
@@ -236,6 +239,19 @@ export default function SimuladorPage() {
 
   const catalogo = useMemo(() => (ctx ? montarCatalogoDeKit(ctx) : null), [ctx]);
 
+  // Opções de busca das listas grandes. Cliente também entra aqui porque a
+  // Intertech usa um código único do sistema deles para evitar homônimos.
+  const opcoesDeCliente: OpcaoDeBusca[] = useMemo(
+    () =>
+      (ctx?.clientes ?? []).map((c) => ({
+        id: c.id,
+        codigo: c.external_code ?? "",
+        nome: c.name,
+        detalhe: c.uf ?? undefined,
+      })),
+    [ctx]
+  );
+
   // Opções de busca das duas listas grandes: os itens vendáveis (produtos +
   // kits) e os produtos que entram dentro de um kit.
   const opcoesDeItem: OpcaoDeBusca[] = useMemo(
@@ -319,6 +335,7 @@ export default function SimuladorPage() {
       const selo = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
       const cotacao = await salvarCotacao(cotacaoId, {
         clienteId: clienteId || null,
+        clienteNovoCodigo: clienteId ? null : clienteNovoCodigo,
         clienteNovoNome: clienteId ? null : clienteNovo,
         uf,
         vendedorId: vendedor.id,
@@ -548,16 +565,43 @@ export default function SimuladorPage() {
           </div>
           <div>
             <Label>Cliente</Label>
-            <select className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
-              <option value="">Novo cliente…</option>
-              {ctx.clientes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <EscolhaComBusca
+              valor={clienteId}
+              opcoes={opcoesDeCliente}
+              aoEscolher={(id) => {
+                setClienteId(id);
+                if (id) {
+                  setClienteNovoCodigo("");
+                  setClienteNovo("");
+                }
+              }}
+              placeholder="Digite o código ou nome do cliente…"
+            />
+            {clienteId && (
+              <button
+                type="button"
+                className="mt-1 text-xs text-[var(--cor-primaria)] hover:underline"
+                onClick={() => setClienteId("")}
+              >
+                cadastrar novo cliente nesta cotação
+              </button>
+            )}
           </div>
           {!clienteId && (
-            <div>
-              <Label>Nome do novo cliente</Label>
-              <Input value={clienteNovo} onChange={(e) => setClienteNovo(e.target.value)} />
-            </div>
+            <>
+              <div>
+                <Label>Código do novo cliente</Label>
+                <Input
+                  value={clienteNovoCodigo}
+                  onChange={(e) => setClienteNovoCodigo(e.target.value.toUpperCase())}
+                  placeholder="Código Intertech"
+                />
+              </div>
+              <div>
+                <Label>Nome do novo cliente</Label>
+                <Input value={clienteNovo} onChange={(e) => setClienteNovo(e.target.value)} />
+              </div>
+            </>
           )}
         </div>
 

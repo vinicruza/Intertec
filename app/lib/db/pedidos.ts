@@ -53,6 +53,7 @@ export type ContextoSimulador = {
   meuVendedorId: string | null;
   clientes: Array<{
     id: string;
+    external_code: string | null;
     name: string;
     uf: string | null;
     tax_id: string | null;
@@ -89,7 +90,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
     // simulador só precisa saber quais já estão preenchidos, para avisar
     // antes de o pedido chegar à conferência com o cabeçalho vazio.
-    supabase.from("customers").select("id, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email").eq("active", true).order("name"),
+    supabase.from("customers").select("id, external_code, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
     supabase.from("difal_rates").select("uf, final_rate"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
@@ -317,6 +318,7 @@ export type ItemSimulacao = {
 
 export type DadosSimulacao = {
   clienteId: string | null;
+  clienteNovoCodigo: string | null;
   clienteNovoNome: string | null;
   uf: string;
   vendedorId: string;
@@ -369,6 +371,7 @@ export async function salvarCotacao(
     p_order_id: orderId,
     p_order: {
       customer_id: d.clienteId,
+      customer_external_code: textoOuVazio(d.clienteNovoCodigo).trim().toUpperCase() || null,
       customer_name: textoOuVazio(d.clienteNovoNome).trim() || null,
       uf: d.uf,
       seller_id: d.vendedorId,
@@ -408,7 +411,16 @@ export async function salvarCotacao(
     p_snapshot: fotoDaCotacao,
   });
   if (error) throw error;
-  return data as ResultadoCotacao;
+  const resultado = data as ResultadoCotacao;
+  const codigoCliente = textoOuVazio(d.clienteNovoCodigo).trim().toUpperCase();
+  if (!d.clienteId && codigoCliente) {
+    const { error: erroCodigo } = await supabase.rpc("set_order_customer_external_code", {
+      p_order_id: resultado.id,
+      p_external_code: codigoCliente,
+    });
+    if (erroCodigo) throw erroCodigo;
+  }
+  return resultado;
 }
 
 // ---------- Transportadoras ativas ----------

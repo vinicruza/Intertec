@@ -23,6 +23,7 @@ export type OpcaoSegmento = {
 export type ClienteLinha = {
   id: string;
   code: string | null;
+  external_code: string | null;
   name: string;
   uf: string | null;
   tax_id: string | null;
@@ -36,6 +37,7 @@ export type ClienteLinha = {
 export type ClienteCadastro = {
   id: string;
   code: string | null;
+  external_code: string | null;
   name: string;
   uf: string | null;
   tax_id: string | null;
@@ -68,7 +70,7 @@ export type ClienteCadastro = {
 };
 
 const CAMPOS_CADASTRO =
-  "id, code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
+  "id, code, external_code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
 
 export async function listarTiposCliente(): Promise<OpcaoSegmento[]> {
   const { data, error } = await supabase
@@ -94,7 +96,7 @@ export async function listarClientes(): Promise<ClienteLinha[]> {
   const { data, error } = await supabase
     .from("customers")
     .select(
-      "id, code, name, uf, tax_id, customer_type_id, customer_specialty_id, customer_types(name), customer_specialties(name)"
+      "id, code, external_code, name, uf, tax_id, customer_type_id, customer_specialty_id, customer_types(name), customer_specialties(name)"
     )
     .eq("active", true)
     .order("name")
@@ -119,6 +121,7 @@ export async function obterCliente(id: string): Promise<ClienteCadastro | null> 
 // coisa fora desse formato, então a normalização acontece aqui, uma vez só,
 // e não espalhada por cada campo do formulário.
 export type DadosCliente = {
+  external_code: string | null;
   name: string;
   uf: string | null;
   tax_id: string | null;
@@ -190,7 +193,13 @@ export async function salvarCliente(id: string | null, d: DadosCliente): Promise
     p_notes: limpar(d.notes),
   });
   if (error) throw error;
-  return data as string;
+  const clienteId = data as string;
+  const { error: erroCodigo } = await supabase.rpc("set_customer_external_code", {
+    p_customer_id: clienteId,
+    p_external_code: limpar(d.external_code)?.toUpperCase() ?? null,
+  });
+  if (erroCodigo) throw erroCodigo;
+  return clienteId;
 }
 
 // O código do cliente é gerado pelo banco quando tipo E área estão definidos.
