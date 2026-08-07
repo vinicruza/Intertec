@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante, toMoney } from "@calc";
-import { simular, statusMargem } from "../lib/sim/params";
+import { seloMargemComercial, simular } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   KIT_NOVO,
@@ -48,6 +48,7 @@ import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBus
 const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", kitNovo: null };
 
 const CORES: Record<string, string> = {
+  blue: "bg-blue-100 text-blue-800",
   green: "bg-green-100 text-green-800",
   yellow: "bg-yellow-100 text-yellow-800",
   orange: "bg-orange-100 text-orange-800",
@@ -760,24 +761,17 @@ export default function SimuladorPage() {
 
       {simulacao.estado === "ok" && (
         <Card className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Cascata do pedido</h2>
+          <div className={`flex items-center ${verNumeros ? "justify-between" : "justify-center"}`}>
+            {verNumeros && <h2 className="text-lg font-semibold">Cascata do pedido</h2>}
             {(() => {
-              const st = statusMargem(simulacao.resultado.margemContribuicaoPct, ctx.regrasMargem);
-              return st ? (
-                <span className={`rounded-full px-3 py-1 text-sm font-medium ${CORES[st.color ?? ""] ?? "bg-gray-100 text-gray-800"}`}>
+              const st = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
+              return (
+                <span className={`rounded-full px-3 py-1 text-sm font-medium ${CORES[st.color]}`}>
                   {st.label}
                 </span>
-              ) : null;
+              );
             })()}
           </div>
-
-          {!verNumeros && (
-            <p className="text-sm text-[var(--cor-texto-suave)]">
-              A faixa acima indica a saúde da margem deste pedido. Os valores de custo e margem
-              ficam visíveis para quem aprova.
-            </p>
-          )}
 
           {verNumeros && <table className="w-full text-sm">
             <tbody>

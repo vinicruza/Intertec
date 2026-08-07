@@ -126,6 +126,11 @@ export type RegraMargem = {
   sort_order: number;
 };
 
+export type SeloMargemComercial = {
+  label: "Vermelha" | "Amarela" | "Verde" | "Azul";
+  color: "red" | "yellow" | "green" | "blue";
+};
+
 export function statusMargem(pct: Decimal, regras: RegraMargem[]): RegraMargem | null {
   const ordenadas = [...regras].sort((a, b) => a.sort_order - b.sort_order);
   for (const r of ordenadas) {
@@ -136,4 +141,11 @@ export function statusMargem(pct: Decimal, regras: RegraMargem[]): RegraMargem |
     if (acimaDoMin && abaixoDoMax) return r;
   }
   return null;
+}
+
+export function seloMargemComercial(pct: Decimal): SeloMargemComercial {
+  if (pct.lte("0.40")) return { label: "Vermelha", color: "red" };
+  if (pct.lte("0.50")) return { label: "Amarela", color: "yellow" };
+  if (pct.lte("0.65")) return { label: "Verde", color: "green" };
+  return { label: "Azul", color: "blue" };
 }

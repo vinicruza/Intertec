@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ErroCalculoBloqueante, calcularCMV, calcularPedido, dec, margemPct } from "@calc";
-import { statusMargem, type RegraMargem } from "@app/lib/sim/params";
+import { seloMargemComercial, statusMargem, type RegraMargem } from "@app/lib/sim/params";
 
 // Defeito encontrado em teste real (04/08/2026): um pedido com PREJUÍZO de
 // R$ 320,85 aparecia com o selo verde "Boa". A margem era negativa, a receita
@@ -45,6 +45,26 @@ describe("percentual de margem", () => {
     // Fixture Patricia (Calculations.md §6): RL 10.219,50 e margem 39,82%.
     expect(margemPct(dec("4069.08"), dec("10219.50")).toFixed(4)).toBe("0.3982");
     expect(statusMargem(margemPct(dec("4069.08"), dec("10219.50")), FAIXAS)?.label).toBe("Atenção");
+  });
+});
+
+describe("selo de margem para Comercial", () => {
+  it("classifica até 40% como vermelho", () => {
+    expect(seloMargemComercial(dec("0.40"))).toEqual({ label: "Vermelha", color: "red" });
+  });
+
+  it("classifica acima de 40% até 50% como amarelo", () => {
+    expect(seloMargemComercial(dec("0.4001"))).toEqual({ label: "Amarela", color: "yellow" });
+    expect(seloMargemComercial(dec("0.50"))).toEqual({ label: "Amarela", color: "yellow" });
+  });
+
+  it("classifica acima de 50% até 65% como verde", () => {
+    expect(seloMargemComercial(dec("0.5001"))).toEqual({ label: "Verde", color: "green" });
+    expect(seloMargemComercial(dec("0.65"))).toEqual({ label: "Verde", color: "green" });
+  });
+
+  it("classifica acima de 65% como azul", () => {
+    expect(seloMargemComercial(dec("0.6501"))).toEqual({ label: "Azul", color: "blue" });
   });
 });
 

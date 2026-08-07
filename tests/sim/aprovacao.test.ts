@@ -36,14 +36,14 @@ describe("visibilidade da margem", () => {
 });
 
 describe("visibilidade da cascata no simulador", () => {
-  it("mostra a cascata para Comercial montar pedido em nome próprio", () => {
-    expect(podeVerCascataOperacional("comercial")).toBe(true);
-    expect(podeVerCascataNoSimulador("comercial")).toBe(true);
+  it("esconde a cascata do Comercial, que vê apenas o selo de margem", () => {
+    expect(podeVerCascataOperacional("comercial")).toBe(false);
+    expect(podeVerCascataNoSimulador("comercial")).toBe(false);
   });
 
-  it("mantém a cascata visível para Admin e Financeiro", () => {
+  it("mantém a cascata visível apenas para Admin", () => {
     expect(podeVerCascataOperacional("admin")).toBe(true);
-    expect(podeVerCascataOperacional("financeiro")).toBe(true);
+    expect(podeVerCascataOperacional("financeiro")).toBe(false);
   });
 
   it("não libera para produção nem sessão sem perfil", () => {
