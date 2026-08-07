@@ -139,7 +139,11 @@ export default function PedidoDetalhePage() {
   const cascata = cascataQuery.data;
   const seloDaCascata = cascata?.ok ? seloMargemComercial(dec(cascata.margemContribuicaoPct)) : null;
   const exigeAprovacaoPeloSelo = seloDaCascata ? seloExigeAprovacao(seloDaCascata) : true;
-  const podeFecharDiretoPeloSelo = Boolean(seloDaCascata && !seloExigeAprovacao(seloDaCascata));
+  const podeFecharDiretoPeloSelo = Boolean(
+    seloDaCascata &&
+      !seloExigeAprovacao(seloDaCascata) &&
+      (perfil?.perfil === "admin" || perfil?.perfil === "comercial")
+  );
   // Segregação de funções: quem enviou a cotação não pode ser quem aprova —
   // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
   // jeito (mesma regra vale no banco, é a garantia real).
