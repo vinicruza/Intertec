@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  categorizarCliente,
+  listarAreasCliente,
+  listarTiposCliente,
   obterCliente,
   salvarCliente,
   type DadosCliente,
@@ -96,6 +99,8 @@ type Campos = {
   contact_name: string;
   phone: string;
   email: string;
+  customer_type_id: string;
+  customer_specialty_id: string;
   commercial_contact_name: string;
   commercial_phone: string;
   commercial_email: string;
@@ -112,6 +117,7 @@ const VAZIO: Campos = {
   shipping_zip: "", shipping_street: "", shipping_number: "", shipping_complement: "",
   shipping_district: "", shipping_city: "", shipping_state: "",
   contact_name: "", phone: "", email: "",
+  customer_type_id: "", customer_specialty_id: "",
   commercial_contact_name: "", commercial_phone: "", commercial_email: "",
   financial_contact_name: "", financial_phone: "", financial_email: "",
   notes: "",
@@ -128,6 +134,8 @@ export default function ClienteFormPage() {
     queryFn: () => obterCliente(id!),
     enabled: !novo,
   });
+  const tiposQuery = useQuery({ queryKey: ["tiposCliente"], queryFn: listarTiposCliente });
+  const areasQuery = useQuery({ queryKey: ["areasCliente"], queryFn: listarAreasCliente });
 
   const [c, setC] = useState<Campos>(VAZIO);
   const [erro, setErro] = useState<string | null>(null);
@@ -157,6 +165,8 @@ export default function ClienteFormPage() {
       contact_name: cliente.contact_name ?? "",
       phone: formatarTelefone(cliente.phone),
       email: cliente.email ?? "",
+      customer_type_id: cliente.customer_type_id ?? "",
+      customer_specialty_id: cliente.customer_specialty_id ?? "",
       commercial_contact_name: cliente.commercial_contact_name ?? cliente.contact_name ?? "",
       commercial_phone: formatarTelefone(cliente.commercial_phone ?? cliente.phone),
       commercial_email: cliente.commercial_email ?? cliente.email ?? "",
@@ -269,7 +279,7 @@ export default function ClienteFormPage() {
   }
 
   const gravar = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const d: DadosCliente = {
         name: c.name,
         uf: c.uf || null,
@@ -299,7 +309,13 @@ export default function ClienteFormPage() {
         financial_email: c.financial_email || null,
         notes: c.notes || null,
       };
-      return salvarCliente(novo ? null : id!, d);
+      const clienteId = await salvarCliente(novo ? null : id!, d);
+      await categorizarCliente(
+        clienteId,
+        c.customer_type_id || null,
+        c.customer_specialty_id || null
+      );
+      return clienteId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
@@ -375,6 +391,40 @@ export default function ClienteFormPage() {
               </Button>
             </div>
             {erros.documento && <p className="mt-1 text-xs text-red-600">{erros.documento}</p>}
+          </div>
+          <div>
+            <Label htmlFor="tipo-cliente">Tipo de cliente</Label>
+            <select
+              id="tipo-cliente"
+              className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
+              value={c.customer_type_id}
+              onChange={(e) => mudar("customer_type_id")(e.target.value)}
+              disabled={tiposQuery.isLoading}
+            >
+              <option value="">Selecione…</option>
+              {(tiposQuery.data ?? []).map((tipo) => (
+                <option key={tipo.id} value={tipo.id}>
+                  {tipo.code_prefix} — {tipo.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="area-atuacao">Área de atuação</Label>
+            <select
+              id="area-atuacao"
+              className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
+              value={c.customer_specialty_id}
+              onChange={(e) => mudar("customer_specialty_id")(e.target.value)}
+              disabled={areasQuery.isLoading}
+            >
+              <option value="">Selecione…</option>
+              {(areasQuery.data ?? []).map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.code_prefix} — {area.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </Card>
@@ -515,12 +565,10 @@ export default function ClienteFormPage() {
         </button>
       </div>
 
-      {!novo && (
-        <p className="text-xs text-[var(--cor-texto-suave)]">
-          Tipo de cliente e área de atuação continuam sendo definidos na lista de Clientes —
-          é de lá que sai o código.
-        </p>
-      )}
+      <p className="text-xs text-[var(--cor-texto-suave)]">
+        Tipo de cliente e área de atuação vêm de Cadastros. Quando os dois estão preenchidos,
+        o código do cliente é gerado pelo banco.
+      </p>
     </div>
   );
 }
