@@ -11,12 +11,11 @@ import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, haQuanto, percentual, reais } from "../lib/format";
 import { Badge, Button, Card } from "@components/ui/primitives";
 
-// Cores da faixa de margem — mesma régua de Configurações e do simulador
-// (SimuladorPage.tsx), para o selo aqui significar a mesma coisa em toda tela.
+// Cores do selo de margem — mesma régua do simulador e do detalhe do pedido.
 const CORES: Record<string, string> = {
+  blue: "bg-blue-100 text-blue-800",
   green: "bg-green-100 text-green-800",
   yellow: "bg-yellow-100 text-yellow-800",
-  orange: "bg-orange-100 text-orange-800",
   red: "bg-red-100 text-red-800",
 };
 

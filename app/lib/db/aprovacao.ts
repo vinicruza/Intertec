@@ -1,7 +1,7 @@
 import { dec, margemPct } from "@calc";
 import { supabase } from "../supabase";
 import { PARAMETROS_APROVACAO_PADRAO, type ParametrosAprovacao } from "../sim/aprovacao";
-import { statusMargem, type RegraMargem } from "../sim/params";
+import { seloMargemComercial, type SeloMargemComercial } from "../sim/params";
 import { obterPedidoCompleto, simularPedidoComCustosVigentes } from "./fechamento";
 import { carregarContextoSimulador } from "./pedidos";
 
@@ -105,16 +105,16 @@ export async function contarPedidosPendentesDeAprovacao(): Promise<number> {
 
 // ---------- Selo de margem na fila (evita aprovar com margem ruim sem ver) ----------
 //
-// Mesma régua de cor da tela de Configurações (margin_rules) e do simulador —
-// "Boa/Atenção/Crítica/Negativa". O pedido pendente ainda não tem CMV/margem
-// gravados (só o fechamento grava, Decisão D7), então cada linha é calculada
-// com os custos vigentes, igual à pré-visualização do detalhe do pedido.
+// Mesma régua do selo do simulador/detalhe: vermelho, amarelo, verde ou azul.
+// O pedido pendente ainda não tem CMV/margem gravados (só o fechamento grava,
+// Decisão D7), então cada linha é calculada com os custos vigentes, igual à
+// pré-visualização do detalhe do pedido.
 //
 // Carrega o contexto do simulador (produtos, kits, alíquotas…) UMA vez só e
 // reaproveita para todos os pedidos da fila — chamar calcularCascataVigente
 // pedido a pedido recarregaria a mesma tabela dezenas de vezes.
 export type MargemPedido =
-  | { ok: true; pct: string; regra: RegraMargem | null }
+  | { ok: true; pct: string; regra: SeloMargemComercial }
   | { ok: false; erro: string };
 
 export async function avaliarMargensPendentes(ids: string[]): Promise<Map<string, MargemPedido>> {
@@ -135,7 +135,7 @@ export async function avaliarMargensPendentes(ids: string[]): Promise<Map<string
         const receitaLiquida = dec(snap.pedido.net_revenue_snapshot);
         const margem = dec(snap.pedido.contribution_margin_snapshot);
         const pct = margemPct(margem, receitaLiquida);
-        resultados.set(id, { ok: true, pct: pct.toString(), regra: statusMargem(pct, ctx.regrasMargem) });
+        resultados.set(id, { ok: true, pct: pct.toString(), regra: seloMargemComercial(pct) });
       } catch (e) {
         resultados.set(id, { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular." });
       }
