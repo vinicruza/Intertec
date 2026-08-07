@@ -114,7 +114,7 @@ export default function SimuladorPage() {
   const [pesoKg, setPesoKg] = useState("");
   const [volumes, setVolumes] = useState("");
   const [cepEntrega, setCepEntrega] = useState("");
-  const [prazoPagamento, setPrazoPagamento] = useState("");
+  const [modoPagamentoId, setModoPagamentoId] = useState("");
   const [observacao, setObservacao] = useState("");
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<{
@@ -160,7 +160,7 @@ export default function SimuladorPage() {
     setPesoKg(textoDeCampo(p.weight_kg));
     setVolumes(textoDeCampo(p.volumes));
     setCepEntrega(textoDeCampo(p.shipping_zip));
-    setPrazoPagamento(textoDeCampo(p.payment_term_days));
+    setModoPagamentoId(textoDeCampo(p.payment_term_id));
     setObservacao(textoDeCampo(p.order_notes));
 
     const linhasCarregadas: LinhaItem[] = p.itens.map((item) => {
@@ -206,7 +206,7 @@ export default function SimuladorPage() {
   const soMeuVendedor = perfil?.perfil === "comercial";
   const vendedoresDisponiveis = useMemo(() => {
     if (!ctx) return [];
-    if (podeEscolherVendedor) return ctx.vendedores;
+    if (podeEscolherVendedor) return ctx.vendedores.filter((v) => v.canalNome === "Interno");
     if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, podeEscolherVendedor, soMeuVendedor]);
@@ -261,7 +261,7 @@ export default function SimuladorPage() {
     const pendencias: string[] = [];
     if (!ctx) return { estado: "incompleto" as const, pendencias };
     if (!vendedor) pendencias.push("vendedor");
-    if (!canal) pendencias.push("situação do pedido");
+    if (!canal) pendencias.push("tipo de venda");
     if (!uf) pendencias.push("UF de destino");
     if (!vendedor || !canal || pendencias.length > 0) return { estado: "incompleto" as const, pendencias };
     const tabela = ctx.tabelaPorUF.get(uf);
@@ -332,7 +332,8 @@ export default function SimuladorPage() {
         pesoKg,
         volumes,
         cepEntrega,
-        prazoPagamentoDias: prazoPagamento,
+        modoPagamentoId: modoPagamentoId || null,
+        prazoPagamentoDias: null,
         observacao,
       }, foto);
 
@@ -513,7 +514,7 @@ export default function SimuladorPage() {
           )}
           {podeEscolherVendedor && (
             <div>
-              <Label>Situação do pedido</Label>
+              <Label>Tipo de venda</Label>
               <select
                 className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
                 value={canalIdEfetivo}
@@ -533,7 +534,7 @@ export default function SimuladorPage() {
           )}
           {!podeEscolherVendedor && vendedor && (
             <div>
-              <Label>Situação do pedido</Label>
+              <Label>Tipo de venda</Label>
               <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">{canal?.name ?? vendedor.canalNome}</p>
             </div>
           )}
@@ -689,12 +690,17 @@ export default function SimuladorPage() {
             <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
           </div>
           <div>
-            <Label>Pagamento (dias)</Label>
-            <Input
-              value={prazoPagamento}
-              onChange={(e) => setPrazoPagamento(e.target.value)}
-              placeholder="ex.: 30"
-            />
+            <Label>Modo de pagamento</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={modoPagamentoId}
+              onChange={(e) => setModoPagamentoId(e.target.value)}
+            >
+              <option value="">—</option>
+              {ctx.modosPagamento.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <Label>CEP de entrega</Label>

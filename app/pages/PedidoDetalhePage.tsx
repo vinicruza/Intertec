@@ -16,6 +16,7 @@ import {
 } from "../lib/db/fechamento";
 import {
   listarMotivosPerda,
+  listarModosPagamento,
   listarTransportadoras,
   listarVersoes,
   marcarCotacaoPerdida,
@@ -523,7 +524,7 @@ function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
   const pendencias: string[] = [];
   if (!pedido.carrier_id) pendencias.push("transportadora");
   if (pedido.carriers?.requires_name && !pedido.carrier_other?.trim()) pendencias.push("nome da transportadora");
-  if (pedido.payment_term_days == null) pendencias.push("pagamento");
+  if (!pedido.payment_term_id && pedido.payment_term_days == null) pendencias.push("modo de pagamento");
   if (!pedido.shipping_zip && !pedido.customers?.shipping_zip) pendencias.push("CEP de entrega");
   return pendencias;
 }
@@ -553,6 +554,10 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     queryKey: ["transportadoras"],
     queryFn: listarTransportadoras,
   });
+  const { data: modosPagamento } = useQuery({
+    queryKey: ["modosPagamento"],
+    queryFn: listarModosPagamento,
+  });
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
   const [d, setD] = useState<DadosExpedicao>({
@@ -561,6 +566,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     pesoKg: pedido.weight_kg ?? "",
     volumes: pedido.volumes != null ? String(pedido.volumes) : "",
     cepEntrega: formatarCep(pedido.shipping_zip),
+    modoPagamentoId: pedido.payment_term_id ?? "",
     prazoPagamentoDias: pedido.payment_term_days != null ? String(pedido.payment_term_days) : "",
     observacao: pedido.order_notes ?? "",
   });
@@ -638,8 +644,17 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
           {cepInvalido && <p className="mt-1 text-xs text-red-600">CEP precisa ter 8 dígitos.</p>}
         </div>
         <div>
-          <Label>Pagamento (dias)</Label>
-          <Input value={d.prazoPagamentoDias ?? ""} onChange={(e) => mudar("prazoPagamentoDias")(e.target.value)} placeholder="ex.: 30" />
+          <Label>Modo de pagamento</Label>
+          <select
+            className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+            value={d.modoPagamentoId ?? ""}
+            onChange={(e) => mudar("modoPagamentoId")(e.target.value)}
+          >
+            <option value="">—</option>
+            {(modosPagamento ?? []).map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 

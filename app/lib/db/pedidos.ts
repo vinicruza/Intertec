@@ -79,10 +79,11 @@ export type ContextoSimulador = {
   kitsParaCopiar: KitParaCopiar[];
   // Transportadoras do formulário de pedido (05/08/2026).
   transportadoras: Array<{ id: string; nome: string; pedeNome: boolean }>;
+  modosPagamento: Array<{ id: string; label: string }>;
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp] = await Promise.all([
+  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp, pagamento] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("channels").select("id, name, applies_difal, default_commission_rate, freight_model").order("name"),
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
@@ -105,8 +106,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
     supabase.rpc("meu_vendedor"),
     supabase.from("carriers").select("id, name, requires_name").eq("active", true).order("sort_order"),
+    supabase.from("payment_terms").select("id, label").eq("active", true).order("sort_order"),
   ]);
-  for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp]) {
+  for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp, pagamento]) {
     if (r.error) throw r.error;
   }
 
@@ -270,6 +272,10 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       nome: t.name as string,
       pedeNome: (t.requires_name as boolean | null) ?? false,
     })),
+    modosPagamento: (pagamento.data ?? []).map((p) => ({
+      id: p.id as string,
+      label: p.label as string,
+    })),
   };
 }
 
@@ -332,6 +338,7 @@ export type DadosSimulacao = {
   pesoKg: string | null;
   volumes: string | null;
   cepEntrega: string | null;
+  modoPagamentoId: string | null;
   prazoPagamentoDias: string | null;
   observacao: string | null;
 };
@@ -375,6 +382,7 @@ export async function salvarCotacao(
       weight_kg: numeroOuVazio(d.pesoKg),
       volumes: numeroOuVazio(d.volumes),
       shipping_zip: d.cepEntrega,
+      payment_term_id: d.modoPagamentoId,
       payment_term_days: numeroOuVazio(d.prazoPagamentoDias),
       order_notes: d.observacao,
     },
@@ -421,6 +429,18 @@ export async function listarTransportadoras(): Promise<TransportadoraOpcao[]> {
     nome: t.name as string,
     pedeNome: (t.requires_name as boolean | null) ?? false,
   }));
+}
+
+export type ModoPagamentoOpcao = { id: string; label: string };
+
+export async function listarModosPagamento(): Promise<ModoPagamentoOpcao[]> {
+  const { data, error } = await supabase
+    .from("payment_terms")
+    .select("id, label")
+    .eq("active", true)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as ModoPagamentoOpcao[];
 }
 
 // ---------- Desfecho da cotação ----------

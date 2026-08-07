@@ -155,3 +155,41 @@ export async function excluirTransportadora(id: string): Promise<void> {
   const { error } = await supabase.rpc("delete_carrier", { p_id: id });
   if (error) throw error;
 }
+
+// ---------- Modos de pagamento (formulário de pedido, 07/08/2026) ----------
+
+export type ModoPagamento = {
+  id: string;
+  label: string;
+  sort_order: number;
+  active: boolean;
+};
+
+export async function listarModosPagamentoCadastro(): Promise<ModoPagamento[]> {
+  const { data, error } = await supabase
+    .from("payment_terms")
+    .select("id, label, sort_order, active")
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as ModoPagamento[];
+}
+
+export async function salvarModoPagamento(item: {
+  id: string | null;
+  label: string;
+  sort_order: number;
+  active: boolean;
+}): Promise<void> {
+  const { error } = await supabase.rpc("save_payment_term", {
+    p_id: item.id,
+    p_label: item.label.trim(),
+    p_sort_order: item.sort_order,
+    p_active: item.active,
+  });
+  if (error) throw error;
+}
+
+export async function excluirModoPagamento(id: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_payment_term", { p_id: id });
+  if (error) throw error;
+}

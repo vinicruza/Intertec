@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  excluirModoPagamento,
   excluirTransportadora,
+  listarModosPagamentoCadastro,
   listarTransportadorasCadastro,
+  salvarModoPagamento,
   salvarTransportadora,
+  type ModoPagamento,
   type Transportadora,
   excluirMotivo,
   excluirSegmento,
@@ -27,7 +31,7 @@ import AbaNomenclaturaNF from "./AbaNomenclaturaNF";
 // sugerida: a Intertech ainda não fechou nenhuma dessas listas. Esta tela
 // existe para que a decisão não dependa de mexer no banco.
 
-type Aba = "tipos" | "areas" | "motivos" | "categorias" | "nomenclatura" | "transportadoras";
+type Aba = "tipos" | "areas" | "motivos" | "categorias" | "nomenclatura" | "transportadoras" | "pagamento";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "tipos", rotulo: "Tipos de cliente" },
@@ -36,6 +40,7 @@ const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "categorias", rotulo: "Categorias de produto" },
   { id: "nomenclatura", rotulo: "Nomenclatura NF" },
   { id: "transportadoras", rotulo: "Transportadoras" },
+  { id: "pagamento", rotulo: "Modos de pagamento" },
 ];
 
 export default function CadastrosPage() {
@@ -86,6 +91,7 @@ export default function CadastrosPage() {
       {aba === "categorias" && <AbaCategorias />}
       {aba === "nomenclatura" && <AbaNomenclaturaNF />}
       {aba === "transportadoras" && <AbaTransportadoras />}
+      {aba === "pagamento" && <AbaModosPagamento />}
     </div>
   );
 }
@@ -528,6 +534,114 @@ function LinhaTransportadora({
         Ativa
       </label>
       <Button disabled={!mudou || salvando} onClick={() => aoSalvar(name, Number(ordem) || 0, active)}>
+        Salvar
+      </Button>
+      <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={aoExcluir}>
+        Excluir
+      </button>
+    </Card>
+  );
+}
+
+// ---------- Modos de pagamento (formulário de pedido, 07/08/2026) ----------
+
+function AbaModosPagamento() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["modosPagamentoCadastro"],
+    queryFn: listarModosPagamentoCadastro,
+  });
+  const [erro, setErro] = useState<string | null>(null);
+  const [novo, setNovo] = useState("");
+
+  const invalidar = () => {
+    setErro(null);
+    queryClient.invalidateQueries({ queryKey: ["modosPagamentoCadastro"] });
+    queryClient.invalidateQueries({ queryKey: ["modosPagamento"] });
+    queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+  };
+  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+
+  const salvar = useMutation({
+    mutationFn: salvarModoPagamento,
+    onSuccess: () => { invalidar(); setNovo(""); },
+    onError: aoErrar,
+  });
+  const excluir = useMutation({ mutationFn: excluirModoPagamento, onSuccess: invalidar, onError: aoErrar });
+
+  if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[var(--cor-texto-suave)]">
+        Aparecem no bloco de condições do pedido. Use uma opção padronizada em vez de digitar
+        prazo livre, para evitar variações como “30 dias”, “30” e “trinta”.
+      </p>
+      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+
+      {(data ?? []).map((m) => (
+        <LinhaModoPagamento
+          key={m.id}
+          item={m}
+          salvando={salvar.isPending}
+          aoSalvar={(label, sort_order, active) => salvar.mutate({ id: m.id, label, sort_order, active })}
+          aoExcluir={() => {
+            if (window.confirm(`Excluir "${m.label}"? Só é possível se nenhum pedido usou.`)) {
+              excluir.mutate(m.id);
+            }
+          }}
+        />
+      ))}
+
+      <Card className="flex flex-wrap items-end gap-3">
+        <div className="min-w-64 flex-1">
+          <Label>Novo modo de pagamento</Label>
+          <Input value={novo} onChange={(e) => setNovo(e.target.value)} placeholder="ex.: 30/60" />
+        </div>
+        <Button
+          disabled={!novo.trim() || salvar.isPending}
+          onClick={() =>
+            salvar.mutate({ id: null, label: novo, sort_order: ((data ?? []).length + 1) * 10, active: true })
+          }
+        >
+          Adicionar
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
+function LinhaModoPagamento({
+  item,
+  salvando,
+  aoSalvar,
+  aoExcluir,
+}: {
+  item: ModoPagamento;
+  salvando: boolean;
+  aoSalvar: (label: string, sort_order: number, active: boolean) => void;
+  aoExcluir: () => void;
+}) {
+  const [label, setLabel] = useState(item.label);
+  const [ordem, setOrdem] = useState(String(item.sort_order));
+  const [active, setActive] = useState(item.active);
+  const mudou = label !== item.label || Number(ordem) !== item.sort_order || active !== item.active;
+
+  return (
+    <Card className="flex flex-wrap items-end gap-3">
+      <div className="min-w-64 flex-1">
+        <Label>Modo de pagamento</Label>
+        <Input value={label} onChange={(e) => setLabel(e.target.value)} />
+      </div>
+      <div>
+        <Label>Ordem</Label>
+        <Input className="w-24" value={ordem} onChange={(e) => setOrdem(e.target.value)} />
+      </div>
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        Ativo
+      </label>
+      <Button disabled={!mudou || salvando} onClick={() => aoSalvar(label, Number(ordem) || 0, active)}>
         Salvar
       </Button>
       <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={aoExcluir}>

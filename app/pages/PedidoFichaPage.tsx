@@ -60,6 +60,8 @@ export default function PedidoFichaPage() {
   const transportadora = pedido.carriers?.requires_name
     ? pedido.carrier_other ?? "Outra"
     : pedido.carriers?.name ?? null;
+  const modoPagamento = pedido.payment_terms?.label ??
+    (pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -201,10 +203,7 @@ export default function PedidoFichaPage() {
           <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Expedição e condições</h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <Dado rotulo="Transportadora" valor={transportadora} />
-            <Dado
-              rotulo="Pagamento"
-              valor={pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null}
-            />
+            <Dado rotulo="Pagamento" valor={modoPagamento} />
             <Dado rotulo="Peso" valor={pedido.weight_kg ? `${pedido.weight_kg} kg` : null} />
             <Dado rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
           </div>
