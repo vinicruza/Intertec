@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante, toMoney } from "@calc";
-import { seloMargemComercial, simular } from "../lib/sim/params";
+import { seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   KIT_NOVO,
@@ -27,7 +27,7 @@ import {
   type ContextoSimulador,
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
-import { podeVerCascataOperacional } from "../lib/db/aprovacao";
+import { enviarParaAprovacao, podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import {
   fracaoParaPercentual,
@@ -110,7 +110,11 @@ export default function SimuladorPage() {
   const [prazoPagamento, setPrazoPagamento] = useState("");
   const [observacao, setObservacao] = useState("");
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
-  const [salvo, setSalvo] = useState<{ quote_number: string; version: number } | null>(null);
+  const [salvo, setSalvo] = useState<{
+    quote_number: string;
+    version: number;
+    aprovacao: "rascunho" | "pendente" | "pendente_com_pendencia";
+  } | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
   // Trava para o formulário ser preenchido uma vez só quando o pedido chega —
   // sem isto, todo refetch (ex.: ao voltar de outra aba) apagaria o que a
@@ -299,7 +303,8 @@ export default function SimuladorPage() {
         margem_contribuicao_pct: simulacao.resultado.margemContribuicaoPct.toString(),
       };
 
-      return salvarCotacao(cotacaoId, {
+      const selo = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
+      const cotacao = await salvarCotacao(cotacaoId, {
         clienteId: clienteId || null,
         clienteNovoNome: clienteId ? null : clienteNovo,
         uf,
@@ -318,12 +323,29 @@ export default function SimuladorPage() {
         prazoPagamentoDias: prazoPagamento,
         observacao,
       }, foto);
+
+      if (!seloExigeAprovacao(selo)) {
+        return { ...cotacao, aprovacao: "rascunho" as const };
+      }
+
+      try {
+        await enviarParaAprovacao(cotacao.id);
+        return { ...cotacao, aprovacao: "pendente" as const };
+      } catch (e) {
+        return {
+          ...cotacao,
+          aprovacao: "pendente_com_pendencia" as const,
+          erroAprovacao: e instanceof Error ? e.message : "Não foi possível enviar para aprovação.",
+        };
+      }
     },
     onSuccess: (r) => {
       setCotacaoId(r.id);
-      setSalvo({ quote_number: r.quote_number, version: r.version });
-      setErroSalvar(null);
+      setSalvo({ quote_number: r.quote_number, version: r.version, aprovacao: r.aprovacao });
+      setErroSalvar("erroAprovacao" in r ? r.erroAprovacao : null);
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+      queryClient.invalidateQueries({ queryKey: ["aprovacoes"] });
+      queryClient.invalidateQueries({ queryKey: ["aprovacoesContagem"] });
       queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
       // Estava editando um pedido existente: o detalhe (e, se voltou a
       // rascunho após recusado, a decisão de aprovação) precisa refletir a
@@ -811,8 +833,9 @@ export default function SimuladorPage() {
               </span>
             )}
             {salvo && (
-              <span className="text-sm text-green-700">
-                Cotação <strong>{salvo.quote_number}</strong> salva — versão {salvo.version} ✓
+              <span className={`text-sm ${salvo.aprovacao === "pendente_com_pendencia" ? "text-amber-700" : "text-green-700"}`}>
+                Cotação <strong>{salvo.quote_number}</strong> salva — versão {salvo.version}{" "}
+                {salvo.aprovacao === "pendente" ? "e enviada para aprovação" : salvo.aprovacao === "pendente_com_pendencia" ? "salva; complete os dados para enviar à aprovação" : ""} ✓
               </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}
