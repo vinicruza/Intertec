@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Decimal, calcularFicha, type InsumoCascata, type ProdutoCascata } from "@calc";
+import { Decimal, ErroCalculoBloqueante, calcularFicha, type InsumoCascata, type ProdutoCascata } from "@calc";
 
 // Testa a ficha técnica com participação % (PRD §6.3), incluindo um componente
 // que é outro produto (kit em cascata).
@@ -37,5 +37,19 @@ describe("ficha técnica — participação %", () => {
     expect(soma.toString()).toBe("1");
     expect(insumoLinha.participacao.toFixed(4)).toBe("0.3333");
     expect(kitLinha.participacao.toFixed(4)).toBe("0.6667");
+  });
+
+  it("barra ficha com insumo referenciado que não existe na base de cálculo", () => {
+    expect(() =>
+      calcularFicha("produto-quebrado", insumos, [
+        ...produtos,
+        {
+          id: "produto-quebrado",
+          componentes: [
+            { tipo: "insumo", insumoId: "insumo-removido", quantidade: { tipo: "direta", quantidade: "1" } },
+          ],
+        },
+      ])
+    ).toThrow(ErroCalculoBloqueante);
   });
 });

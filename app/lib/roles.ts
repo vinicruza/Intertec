@@ -78,3 +78,7 @@ export function perfilPodeAcessar(perfil: Perfil, caminho: string): boolean {
   const item = MENU.find((m) => m.caminho === caminho);
   return item ? item.perfis.includes(perfil) : false;
 }
+
+export function perfilPodeEditarProduto(perfil: Perfil): boolean {
+  return perfil === "admin" || perfil === "financeiro";
+}

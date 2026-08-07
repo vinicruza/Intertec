@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   calcularFicha,
   type ComponenteRef,
@@ -21,6 +21,8 @@ import { familiasAtivas, listarFamiliasNF } from "../lib/db/nomenclaturaNF";
 import { listarInsumos } from "../lib/db/insumos";
 import { listarProdutos } from "../lib/db/produtos";
 import { reais, percentual } from "../lib/format";
+import { useAuth } from "../auth/AuthProvider";
+import { perfilPodeEditarProduto } from "../lib/roles";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 
 const ID_EDITANDO = "__editando__";
@@ -34,6 +36,8 @@ const textoCampo = (valor: unknown): string => String(valor ?? "");
 
 export default function ProdutoFormPage() {
   const { id } = useParams();
+  const { perfil } = useAuth();
+  const podeEditar = perfil ? perfilPodeEditarProduto(perfil.perfil) : false;
   const editando = Boolean(id);
   const idAtual = id ?? ID_EDITANDO;
   const navigate = useNavigate();
@@ -48,14 +52,14 @@ export default function ProdutoFormPage() {
   });
   const ficha = useFieldArray({ control, name: "componentes" });
 
-  const insumosQuery = useQuery({ queryKey: ["insumos"], queryFn: listarInsumos });
-  const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
-  const categoriasQuery = useQuery({ queryKey: ["categorias-produto"], queryFn: listarCategoriasProduto });
-  const baseQuery = useQuery({ queryKey: ["baseCascata", id ?? "novo"], queryFn: () => carregarBaseCascata(id ?? null) });
-  const produtoQuery = useQuery({ queryKey: ["produto", id], queryFn: () => obterProduto(id!), enabled: editando });
+  const insumosQuery = useQuery({ queryKey: ["insumos"], queryFn: listarInsumos, enabled: podeEditar });
+  const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos, enabled: podeEditar });
+  const categoriasQuery = useQuery({ queryKey: ["categorias-produto"], queryFn: listarCategoriasProduto, enabled: podeEditar });
+  const baseQuery = useQuery({ queryKey: ["baseCascata", id ?? "novo"], queryFn: () => carregarBaseCascata(id ?? null), enabled: podeEditar });
+  const produtoQuery = useQuery({ queryKey: ["produto", id], queryFn: () => obterProduto(id!), enabled: podeEditar && editando });
   // A regra de nomenclatura é cadastro (Cadastros → Nomenclatura NF), não
   // código: a tela carrega as famílias e as entrega para a função pura.
-  const familiasQuery = useQuery({ queryKey: ["familiasNF"], queryFn: listarFamiliasNF });
+  const familiasQuery = useQuery({ queryKey: ["familiasNF"], queryFn: listarFamiliasNF, enabled: podeEditar });
 
   useEffect(() => {
     const p = produtoQuery.data;
@@ -122,6 +126,10 @@ export default function ProdutoFormPage() {
 
   const insumos = insumosQuery.data ?? [];
   const produtosRef = (produtosQuery.data ?? []).filter((p) => p.id !== id);
+
+  if (!podeEditar) {
+    return <Navigate to="/produtos" replace />;
+  }
 
   return (
     <div className="max-w-4xl space-y-4">
