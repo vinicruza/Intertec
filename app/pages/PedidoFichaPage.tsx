@@ -181,32 +181,14 @@ export default function PedidoFichaPage() {
                 <td className="py-2 text-right">{reais(totais.subtotal.toString())}</td>
                 {verNumeros && <td />}
               </tr>
-              {/* Frete destacado já está rateado no preço unitário dos itens. */}
-              <tr>
-                <td className="py-1" colSpan={3}>
-                  Frete
-                  {pedido.freight_paid_by_customer && (
-                    <span className="ml-1 text-xs font-normal">(destacado nos itens)</span>
-                  )}
-                </td>
-                <td className="py-1 text-right">
-                  {reais(pedido.freight)}
-                </td>
-                {verNumeros && <td />}
-              </tr>
             </tfoot>
           </table>
         </div>
 
-        {/* ---------- Expedição e condições ---------- */}
+        {/* ---------- Condições ---------- */}
         <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Expedição e condições</h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <Dado rotulo="Transportadora" valor={transportadora} />
-            <Dado rotulo="Pagamento" valor={modoPagamento} />
-            <Dado rotulo="Peso" valor={pedido.weight_kg ? `${pedido.weight_kg} kg` : null} />
-            <Dado rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
-          </div>
+          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Condições</h2>
+          <Dado rotulo="Modo de pagamento" valor={modoPagamento} />
           <p className="mt-2">
             <strong>Obs.:</strong>{" "}
             {pedido.order_notes ? (
@@ -215,6 +197,21 @@ export default function PedidoFichaPage() {
               <span className="inline-block w-2/3 border-b border-black/30" />
             )}
           </p>
+        </div>
+
+        {/* ---------- Expedição ---------- */}
+        <div>
+          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Expedição</h2>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Dado rotulo="Transportadora" valor={transportadora} />
+            <Dado rotulo="Frete" valor={reais(pedido.freight)} />
+            <Dado
+              rotulo="Frete destacado"
+              valor={pedido.freight_paid_by_customer ? "Sim, rateado nos itens" : "Não"}
+            />
+            <Dado rotulo="Peso" valor={pedido.weight_kg ? `${pedido.weight_kg} kg` : null} />
+            <Dado rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
+          </div>
         </div>
 
         {/* ---------- Resumo financeiro (só para quem vê margem) ---------- */}

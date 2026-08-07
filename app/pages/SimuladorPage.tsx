@@ -590,26 +590,6 @@ export default function SimuladorPage() {
               </p>
             )}
           </div>
-          <div>
-            <Label>Frete (R$)</Label>
-            {freteAutomatico ? (
-              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
-                {simulacao.estado === "ok" ? reais(simulacao.freteUsado.toString()) : "—"} (automático: % da receita por UF)
-              </p>
-            ) : (
-              <Input value={frete} onChange={(e) => setFrete(e.target.value)} />
-            )}
-          </div>
-          <label className="flex items-end gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={freteCliente}
-              onChange={(e) => {
-                setFreteCliente(e.target.checked);
-              }}
-            />
-            Frete Destacado
-          </label>
           <label className="flex items-end gap-2 pb-2 text-sm">
             <input
               type="checkbox"
@@ -643,95 +623,6 @@ export default function SimuladorPage() {
             </Link>
           </p>
         )}
-      </Card>
-
-      {/* ------------------------------------------------------------------
-          Expedição e condições — o bloco de baixo do formulário de papel.
-          Nenhum destes campos entra na cascata de margem.
-          ------------------------------------------------------------------ */}
-      <Card className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">Expedição e condições</h2>
-          <p className="text-sm text-[var(--cor-texto-suave)]">
-            O que a expedição precisa para despachar e o financeiro para cobrar. Peso e volume
-            podem ficar em branco agora e ser preenchidos na hora de embalar, na tela do pedido.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div>
-            <Label>Transportadora</Label>
-            <select
-              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={transportadoraId}
-              onChange={(e) => setTransportadoraId(e.target.value)}
-            >
-              <option value="">—</option>
-              {ctx.transportadoras.map((t) => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
-          </div>
-          {transportadoraPedeNome && (
-            <div>
-              <Label>Qual transportadora</Label>
-              <Input
-                value={transportadoraOutra}
-                onChange={(e) => setTransportadoraOutra(e.target.value)}
-                placeholder="Nome da transportadora"
-              />
-            </div>
-          )}
-          <div>
-            <Label>Peso (kg)</Label>
-            <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />
-          </div>
-          <div>
-            <Label>Volumes</Label>
-            <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
-          </div>
-          <div>
-            <Label>Modo de pagamento</Label>
-            <select
-              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={modoPagamentoId}
-              onChange={(e) => setModoPagamentoId(e.target.value)}
-            >
-              <option value="">—</option>
-              {ctx.modosPagamento.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>CEP de entrega</Label>
-            <Input
-              value={cepEntrega}
-              onChange={(e) => setCepEntrega(e.target.value)}
-              placeholder={
-                clienteEscolhido?.shipping_zip
-                  ? formatarCep(clienteEscolhido.shipping_zip)
-                  : "00000-000"
-              }
-            />
-            {/* Só se digita aqui quando a entrega foge do endereço de sempre.
-                Em branco, vale o do cadastro — e o cadastro não é alterado. */}
-            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
-              {clienteEscolhido?.shipping_zip
-                ? "Em branco, vale o do cadastro do cliente."
-                : "O cliente não tem CEP de entrega no cadastro."}
-            </p>
-          </div>
-        </div>
-        <div>
-          <Label>Observação</Label>
-          <textarea
-            className="w-full rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
-            rows={2}
-            value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-            placeholder="Sai impressa na ficha do pedido."
-          />
-        </div>
       </Card>
 
       <Card className="space-y-3">
@@ -818,6 +709,119 @@ export default function SimuladorPage() {
           >
             + Montar kit
           </Button>
+        </div>
+      </Card>
+
+      {/* ------------------------------------------------------------------
+          Condições comerciais — abaixo dos itens, como no fluxo do pedido.
+          ------------------------------------------------------------------ */}
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Condições</h2>
+        </div>
+        <div>
+          <Label>Modo de pagamento</Label>
+          <select
+            className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+            value={modoPagamentoId}
+            onChange={(e) => setModoPagamentoId(e.target.value)}
+          >
+            <option value="">—</option>
+            {ctx.modosPagamento.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label>Obs</Label>
+          <textarea
+            className="w-full rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
+            rows={2}
+            value={observacao}
+            onChange={(e) => setObservacao(e.target.value)}
+            placeholder="Sai impressa na ficha do pedido."
+          />
+        </div>
+      </Card>
+
+      {/* ------------------------------------------------------------------
+          Expedição — dados de entrega e frete.
+          ------------------------------------------------------------------ */}
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Expedição</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div>
+            <Label>Transportadora</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={transportadoraId}
+              onChange={(e) => setTransportadoraId(e.target.value)}
+            >
+              <option value="">—</option>
+              {ctx.transportadoras.map((t) => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
+          {transportadoraPedeNome && (
+            <div>
+              <Label>Qual transportadora</Label>
+              <Input
+                value={transportadoraOutra}
+                onChange={(e) => setTransportadoraOutra(e.target.value)}
+                placeholder="Nome da transportadora"
+              />
+            </div>
+          )}
+          <div>
+            <Label>Frete (R$)</Label>
+            {freteAutomatico ? (
+              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
+                {simulacao.estado === "ok" ? reais(simulacao.freteUsado.toString()) : "—"} (automático: % da receita por UF)
+              </p>
+            ) : (
+              <Input value={frete} onChange={(e) => setFrete(e.target.value)} />
+            )}
+          </div>
+          <label className="flex items-end gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={freteCliente}
+              onChange={(e) => {
+                setFreteCliente(e.target.checked);
+              }}
+            />
+            Frete Destacado
+          </label>
+          <div>
+            <Label>Peso (kg)</Label>
+            <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />
+          </div>
+          <div>
+            <Label>Volumes</Label>
+            <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
+          </div>
+          <div>
+            <Label>CEP de entrega</Label>
+            <Input
+              value={cepEntrega}
+              onChange={(e) => setCepEntrega(e.target.value)}
+              placeholder={
+                clienteEscolhido?.shipping_zip
+                  ? formatarCep(clienteEscolhido.shipping_zip)
+                  : "00000-000"
+              }
+            />
+            {/* Só se digita aqui quando a entrega foge do endereço de sempre.
+                Em branco, vale o do cadastro — e o cadastro não é alterado. */}
+            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+              {clienteEscolhido?.shipping_zip
+                ? "Em branco, vale o do cadastro do cliente."
+                : "O cliente não tem CEP de entrega no cadastro."}
+            </p>
+          </div>
         </div>
       </Card>
 

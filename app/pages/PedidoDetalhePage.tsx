@@ -590,59 +590,15 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
   const cepInvalido = (d.cepEntrega ?? "").trim() !== "" && !cepValido(d.cepEntrega);
 
   return (
-    <Card className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Expedição</h2>
-        <p className="text-sm text-[var(--cor-texto-suave)]">
-          Preencha na hora de embalar. Estes campos podem ser alterados mesmo depois de o pedido
-          ter sido ganho — e só eles: qualquer valor de dinheiro continua congelado.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Condições</h2>
+        </div>
 
-      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
-      {salvo && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Expedição registrada.</p>}
+        {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+        {salvo && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Dados registrados.</p>}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div>
-          <Label>Transportadora</Label>
-          <select
-            className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-            value={d.carrierId ?? ""}
-            onChange={(e) => mudar("carrierId")(e.target.value)}
-          >
-            <option value="">—</option>
-            {(transportadoras ?? []).map((t) => (
-              <option key={t.id} value={t.id}>{t.nome}</option>
-            ))}
-          </select>
-        </div>
-        {escolhida?.pedeNome && (
-          <div>
-            <Label>Qual transportadora</Label>
-            <Input
-              value={d.carrierOutra ?? ""}
-              onChange={(e) => mudar("carrierOutra")(e.target.value)}
-            />
-          </div>
-        )}
-        <div>
-          <Label>Peso (kg)</Label>
-          <Input value={d.pesoKg ?? ""} onChange={(e) => mudar("pesoKg")(e.target.value)} placeholder="ex.: 12,5" />
-        </div>
-        <div>
-          <Label>Volumes</Label>
-          <Input value={d.volumes ?? ""} onChange={(e) => mudar("volumes")(e.target.value)} placeholder="ex.: 3" />
-        </div>
-        <div>
-          <Label>CEP de entrega</Label>
-          <Input
-            value={d.cepEntrega ?? ""}
-            onChange={(e) => mudar("cepEntrega")(e.target.value)}
-            onBlur={() => mudar("cepEntrega")(formatarCep(d.cepEntrega))}
-            placeholder="00000-000"
-          />
-          {cepInvalido && <p className="mt-1 text-xs text-red-600">CEP precisa ter 8 dígitos.</p>}
-        </div>
         <div>
           <Label>Modo de pagamento</Label>
           <select
@@ -656,22 +612,75 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
             ))}
           </select>
         </div>
-      </div>
 
-      <div>
-        <Label>Observação</Label>
-        <textarea
-          className="w-full rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
-          rows={2}
-          value={d.observacao ?? ""}
-          onChange={(e) => mudar("observacao")(e.target.value)}
-          placeholder="Sai impressa na ficha do pedido."
-        />
-      </div>
+        <div>
+          <Label>Obs</Label>
+          <textarea
+            className="w-full rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
+            rows={2}
+            value={d.observacao ?? ""}
+            onChange={(e) => mudar("observacao")(e.target.value)}
+            placeholder="Sai impressa na ficha do pedido."
+          />
+        </div>
+      </Card>
 
-      <Button disabled={gravar.isPending || cepInvalido} onClick={() => gravar.mutate()}>
-        {gravar.isPending ? "Salvando…" : "Salvar expedição"}
-      </Button>
-    </Card>
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Expedição</h2>
+          <p className="text-sm text-[var(--cor-texto-suave)]">
+            Preencha na hora de embalar. Estes campos podem ser alterados mesmo depois de o pedido
+            ter sido ganho — e só eles: qualquer valor de dinheiro continua congelado.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div>
+            <Label>Transportadora</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={d.carrierId ?? ""}
+              onChange={(e) => mudar("carrierId")(e.target.value)}
+            >
+              <option value="">—</option>
+              {(transportadoras ?? []).map((t) => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
+          {escolhida?.pedeNome && (
+            <div>
+              <Label>Qual transportadora</Label>
+              <Input
+                value={d.carrierOutra ?? ""}
+                onChange={(e) => mudar("carrierOutra")(e.target.value)}
+              />
+            </div>
+          )}
+          <div>
+            <Label>Peso (kg)</Label>
+            <Input value={d.pesoKg ?? ""} onChange={(e) => mudar("pesoKg")(e.target.value)} placeholder="ex.: 12,5" />
+          </div>
+          <div>
+            <Label>Volumes</Label>
+            <Input value={d.volumes ?? ""} onChange={(e) => mudar("volumes")(e.target.value)} placeholder="ex.: 3" />
+          </div>
+          <div>
+            <Label>CEP de entrega</Label>
+            <Input
+              value={d.cepEntrega ?? ""}
+              onChange={(e) => mudar("cepEntrega")(e.target.value)}
+              onBlur={() => mudar("cepEntrega")(formatarCep(d.cepEntrega))}
+              placeholder="00000-000"
+            />
+            {cepInvalido && <p className="mt-1 text-xs text-red-600">CEP precisa ter 8 dígitos.</p>}
+          </div>
+        </div>
+
+        <Button disabled={gravar.isPending || cepInvalido} onClick={() => gravar.mutate()}>
+          {gravar.isPending ? "Salvando…" : "Salvar condições e expedição"}
+        </Button>
+      </Card>
+    </div>
   );
 }
