@@ -766,7 +766,7 @@ export default function SimuladorPage() {
             {(() => {
               const st = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
               return (
-                <span className={`rounded-full px-3 py-1 text-sm font-medium ${CORES[st.color]}`}>
+                <span className={`rounded-full px-6 py-3 text-xl font-semibold shadow-sm ${CORES[st.color]}`}>
                   {st.label}
                 </span>
               );

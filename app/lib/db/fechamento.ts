@@ -1,6 +1,6 @@
-import { type ItemPedido } from "@calc";
+import { dec, margemPct, type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
-import { simular, type Simulacao } from "../sim/params";
+import { seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
 import { carregarContextoSimulador, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
@@ -358,16 +358,16 @@ export async function simularPedidoComCustosVigentes(
 export type KitMaterializado = { id: string; code: string | null; name: string; novo: boolean };
 
 export async function fecharPedido(orderId: string): Promise<KitMaterializado[]> {
+  const pedidoAntes = await obterPedidoCompleto(orderId);
+  if (!pedidoAntes) throw new Error("Pedido não encontrado.");
+  if (pedidoAntes.status === "closed") throw new Error("Pedido já está fechado.");
+  if (pedidoAntes.status === "lost") throw new Error("Cotação marcada como perdida — reabra antes de fechar.");
+  if (pedidoAntes.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
+
   // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
   // código quando a mesma composição já existe. Precisa vir ANTES de ler o
-  // pedido, porque a materialização preenche o kit_id dos itens.
-  // Aprovação vem antes de tudo: se o Administrador exigir, pedido não
-  // aprovado não fecha (reunião 16/07/2026 — o papel que ia para a mesa da
-  // conferência agora é um estado no sistema).
-  const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
-  if (erroAprovacao) throw erroAprovacao;
-
+  // pedido para fechamento, porque a materialização preenche o kit_id dos itens.
   const { data: kitsMaterializados, error: erroKits } = await supabase.rpc("materialize_ad_hoc_kits", {
     p_order_id: orderId,
   });
@@ -382,6 +382,11 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
 
   const ctx = await carregarContextoSimulador();
   const { sim, snap } = await simularPedidoComCustosVigentes(pedido, ctx);
+  const precisaAprovacao = seloExigeAprovacao(seloMargemComercial(sim.resultado.margemContribuicaoPct));
+  if (precisaAprovacao || pedido.approval_status === "aprovado") {
+    const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
+    if (erroAprovacao) throw erroAprovacao;
+  }
 
   // Snapshot dos itens e do pedido são persistidos na mesma transação.
   const { error } = await supabase.rpc("close_order_with_snapshots", {
@@ -405,7 +410,7 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
 // `pedido.totals_display` está vazio enquanto aprova. Sem isto, o card de
 // aprovação pedia para "conferir CMV e margem" sem mostrar nenhum dos dois.
 export type CascataVigente =
-  | { ok: true; totals: Record<string, string>; cmvPorItem: Map<string, string> }
+  | { ok: true; totals: Record<string, string>; cmvPorItem: Map<string, string>; margemContribuicaoPct: string }
   | { ok: false; erro: string };
 
 export async function calcularCascataVigente(orderId: string): Promise<CascataVigente> {
@@ -421,6 +426,10 @@ export async function calcularCascataVigente(orderId: string): Promise<CascataVi
       ok: true,
       totals: snap.pedido.totals_display,
       cmvPorItem: new Map(snap.itens.map((i) => [i.orderItemId, i.cmv_unit_snapshot])),
+      margemContribuicaoPct: margemPct(
+        dec(snap.pedido.contribution_margin_snapshot),
+        dec(snap.pedido.net_revenue_snapshot)
+      ).toString(),
     };
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular a cascata." };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ErroCalculoBloqueante, calcularCMV, calcularPedido, dec, margemPct } from "@calc";
-import { seloMargemComercial, statusMargem, type RegraMargem } from "@app/lib/sim/params";
+import { seloExigeAprovacao, seloMargemComercial, statusMargem, type RegraMargem } from "@app/lib/sim/params";
 
 // Defeito encontrado em teste real (04/08/2026): um pedido com PREJUÍZO de
 // R$ 320,85 aparecia com o selo verde "Boa". A margem era negativa, a receita
@@ -65,6 +65,13 @@ describe("selo de margem para Comercial", () => {
 
   it("classifica acima de 65% como azul", () => {
     expect(seloMargemComercial(dec("0.6501"))).toEqual({ label: "Azul", color: "blue" });
+  });
+
+  it("envia só vermelho e amarelo para aprovação", () => {
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.40")))).toBe(true);
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.50")))).toBe(true);
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.5001")))).toBe(false);
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.6501")))).toBe(false);
   });
 });
 

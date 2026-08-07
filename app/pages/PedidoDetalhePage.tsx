@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import { dec } from "@calc";
 import {
   calcularCascataVigente,
   cancelarPedido,
@@ -27,6 +28,7 @@ import {
   podeAprovar,
   podeVerCascataOperacional,
 } from "../lib/db/aprovacao";
+import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
@@ -135,6 +137,9 @@ export default function PedidoDetalhePage() {
   const cancelado = Boolean(pedido.cancelled_at);
   const t = pedido.totals_display;
   const cascata = cascataQuery.data;
+  const seloDaCascata = cascata?.ok ? seloMargemComercial(dec(cascata.margemContribuicaoPct)) : null;
+  const exigeAprovacaoPeloSelo = seloDaCascata ? seloExigeAprovacao(seloDaCascata) : true;
+  const podeFecharDiretoPeloSelo = Boolean(seloDaCascata && !seloExigeAprovacao(seloDaCascata));
   // Segregação de funções: quem enviou a cotação não pode ser quem aprova —
   // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
   // jeito (mesma regra vale no banco, é a garantia real).
@@ -326,7 +331,7 @@ export default function PedidoDetalhePage() {
       {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
       <div className="flex gap-2">
-        {!fechado && !cancelado && !perdida && aprovacao === "rascunho" && params?.require_approval && (
+        {!fechado && !cancelado && !perdida && aprovacao === "rascunho" && params?.require_approval && exigeAprovacaoPeloSelo && (
           <Button
             disabled={enviar.isPending}
             onClick={() => {
@@ -341,7 +346,7 @@ export default function PedidoDetalhePage() {
             {enviar.isPending ? "Enviando…" : "Enviar para aprovação"}
           </Button>
         )}
-        {!fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval) && (
+        {!fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval || podeFecharDiretoPeloSelo) && (
           <Button
             disabled={fechar.isPending}
             onClick={() => {

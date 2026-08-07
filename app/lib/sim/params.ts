@@ -149,3 +149,7 @@ export function seloMargemComercial(pct: Decimal): SeloMargemComercial {
   if (pct.lte("0.65")) return { label: "Verde", color: "green" };
   return { label: "Azul", color: "blue" };
 }
+
+export function seloExigeAprovacao(selo: SeloMargemComercial): boolean {
+  return selo.color === "red" || selo.color === "yellow";
+}

@@ -178,6 +178,14 @@ describe("ciclo da cotação", () => {
     expect(enviar).toMatch(/v_order\.payment_term_days is null[\s\S]*prazo de pagamento/i);
     expect(enviar).toMatch(/v_order\.shipping_zip is null and v_customer_shipping_zip is null[\s\S]*CEP de entrega/i);
   });
+
+  it("só vermelho e amarelo dependem de aprovação; verde e azul fecham direto pelo selo", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ v_net end/i);
+    expect(fechar).toMatch(/v_margin_pct > 0\.50/i);
+    expect(fechar).toMatch(/v_role in \('admin', 'comercial'\)/i);
+    expect(fechar).toMatch(/approval_status=case when v_self_approved_by_margin then 'aprovado'::approval_status/i);
+  });
 });
 
 describe("comercial lança pedido em nome próprio", () => {
