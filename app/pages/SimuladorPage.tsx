@@ -95,6 +95,7 @@ export default function SimuladorPage() {
   const [uf, setUf] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [clienteNovo, setClienteNovo] = useState("");
+  const [canalId, setCanalId] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
   const [frete, setFrete] = useState("0");
   const [freteCliente, setFreteCliente] = useState(false);
@@ -147,6 +148,7 @@ export default function SimuladorPage() {
     const p = pedidoParaEditar;
     setCotacaoId(p.id);
     setVendedorId(textoDeCampo(p.seller_id));
+    setCanalId(textoDeCampo(p.channel_id));
     setUf(textoDeCampo(p.uf));
     setClienteId(textoDeCampo(p.customer_id));
     setComissao(p.commission_rate == null ? null : textoDeCampo(p.commission_rate));
@@ -215,11 +217,14 @@ export default function SimuladorPage() {
   }, [ctx, soMeuVendedor, perfil?.nome]);
   const vendedorIdEfetivo = vendedorId || (soMeuVendedor ? ctx?.meuVendedorId ?? vendedorDoPerfil?.id ?? "" : "");
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
+  const canalIdEfetivo = canalId || vendedor?.channel_id || "";
+  const canal = ctx?.canais.find((c) => c.id === canalIdEfetivo) ?? null;
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
   useEffect(() => {
     if (vendedoresDisponiveis.length === 1 && !vendedorId) {
       setVendedorId(vendedoresDisponiveis[0].id);
+      setCanalId(vendedoresDisponiveis[0].channel_id);
     }
   }, [vendedoresDisponiveis, vendedorId]);
 
@@ -256,8 +261,9 @@ export default function SimuladorPage() {
     const pendencias: string[] = [];
     if (!ctx) return { estado: "incompleto" as const, pendencias };
     if (!vendedor) pendencias.push("vendedor");
+    if (!canal) pendencias.push("situação do pedido");
     if (!uf) pendencias.push("UF de destino");
-    if (!vendedor || pendencias.length > 0) return { estado: "incompleto" as const, pendencias };
+    if (!vendedor || !canal || pendencias.length > 0) return { estado: "incompleto" as const, pendencias };
     const tabela = ctx.tabelaPorUF.get(uf);
     if (!tabela) return { estado: "incompleto" as const, pendencias: ["UF de destino"] };
     const preparados = montarItensParaMotor(linhas, resolvidas);
@@ -270,7 +276,7 @@ export default function SimuladorPage() {
         fretePorContaCliente: freteCliente,
         comissao: comissao ? numeroDigitado(comissao) : null,
         aplicaDifal: aplicaDifalOverride,
-        canal: vendedor.regras,
+        canal: canal.regras,
         uf: tabela,
       });
       return { estado: "ok" as const, ...s };
@@ -278,7 +284,7 @@ export default function SimuladorPage() {
       if (e instanceof ErroCalculoBloqueante) return { estado: "bloqueado" as const, msg: e.message };
       return { estado: "bloqueado" as const, msg: "Não foi possível calcular." };
     }
-  }, [ctx, vendedor, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
+  }, [ctx, vendedor, canal, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
 
   // Kit sem nome não é salvo: sem ele, o kit entra no catálogo como "Kit do
   // pedido" e, alguns pedidos depois, ninguém sabe qual é qual.
@@ -286,7 +292,7 @@ export default function SimuladorPage() {
 
   const salvar = useMutation({
     mutationFn: async () => {
-      if (simulacao.estado !== "ok" || !vendedor || !ctx) throw new Error("Cotação incompleta.");
+      if (simulacao.estado !== "ok" || !vendedor || !canal || !ctx) throw new Error("Cotação incompleta.");
       if (linhasComKitSemNome.length > 0) {
         throw new Error(
           `Dê um nome ao kit montado no item ${linhasComKitSemNome.map((i) => i + 1).join(", ")} antes de salvar.`
@@ -315,7 +321,7 @@ export default function SimuladorPage() {
         clienteNovoNome: clienteId ? null : clienteNovo,
         uf,
         vendedorId: vendedor.id,
-        channelId: vendedor.channel_id,
+        channelId: canal.id,
         frete: simulacao.freteUsado.toString(),
         fretePorContaCliente: freteCliente,
         comissao: simulacao.comissaoUsada.toString(),
@@ -438,7 +444,7 @@ export default function SimuladorPage() {
   // existem, e quem decide é quem aprova.
   const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
 
-  const freteAutomatico = vendedor?.regras.modeloFrete === "uf_percent";
+  const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
   const precoFinalPorLinha = new Map<number, string>();
   if (simulacao.estado === "ok" && freteCliente) {
     let itemCalculado = 0;
@@ -490,13 +496,45 @@ export default function SimuladorPage() {
               <select
                 className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
                 value={vendedorId}
-                onChange={(e) => { setVendedorId(e.target.value); setComissao(null); setAplicaDifalOverride(null); }}
+                onChange={(e) => {
+                  const novoVendedor = ctx.vendedores.find((v) => v.id === e.target.value);
+                  setVendedorId(e.target.value);
+                  setCanalId(novoVendedor?.channel_id ?? "");
+                  setComissao(null);
+                  setAplicaDifalOverride(null);
+                }}
               >
                 <option value="">Selecione…</option>
                 {vendedoresDisponiveis.map((v) => (
                   <option key={v.id} value={v.id}>{v.name} — {v.canalNome}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {podeEscolherVendedor && (
+            <div>
+              <Label>Situação do pedido</Label>
+              <select
+                className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                value={canalIdEfetivo}
+                onChange={(e) => {
+                  setCanalId(e.target.value);
+                  setComissao(null);
+                  setAplicaDifalOverride(null);
+                }}
+                disabled={!vendedor}
+              >
+                <option value="">Selecione…</option>
+                {ctx.canais.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {!podeEscolherVendedor && vendedor && (
+            <div>
+              <Label>Situação do pedido</Label>
+              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">{canal?.name ?? vendedor.canalNome}</p>
             </div>
           )}
           <div>
@@ -529,7 +567,7 @@ export default function SimuladorPage() {
             <Label>Comissão (%)</Label>
             <div className="flex items-center gap-1">
               <Input
-                value={fracaoParaPercentual(comissao ?? vendedor?.regras.comissaoPadrao ?? "")}
+                value={fracaoParaPercentual(comissao ?? canal?.regras.comissaoPadrao ?? "")}
                 onChange={(e) => {
                   if (podeEditarComissao) setComissao(percentualParaFracao(e.target.value));
                 }}
@@ -538,9 +576,9 @@ export default function SimuladorPage() {
               />
               <span className="text-sm text-[var(--cor-texto-suave)]">%</span>
             </div>
-            {podeEditarComissao && vendedor && comissao !== null && comissao !== vendedor.regras.comissaoPadrao && (
+            {podeEditarComissao && canal && comissao !== null && comissao !== canal.regras.comissaoPadrao && (
               <p className="mt-1 text-xs text-amber-700">
-                Diferente do padrão do canal ({fracaoParaPercentual(vendedor.regras.comissaoPadrao)}%) —
+                Diferente do padrão da situação {canal.name} ({fracaoParaPercentual(canal.regras.comissaoPadrao)}%) —
                 registrado em auditoria ao fechar.
               </p>
             )}
@@ -574,7 +612,7 @@ export default function SimuladorPage() {
           <label className="flex items-end gap-2 pb-2 text-sm">
             <input
               type="checkbox"
-              checked={aplicaDifalOverride ?? vendedor?.regras.aplicaDifal ?? true}
+              checked={aplicaDifalOverride ?? canal?.regras.aplicaDifal ?? true}
               onChange={(e) => setAplicaDifalOverride(e.target.checked)}
             />
             Aplica DIFAL neste pedido
@@ -586,9 +624,9 @@ export default function SimuladorPage() {
             Intertech em 05/08/2026 (Calculations.md §12). O canal já vem com
             um padrão, mas o mesmo vendedor pode vender para os dois tipos de
             cliente, então a caixa acima decide pedido a pedido. */}
-        {vendedor && (aplicaDifalOverride ?? vendedor.regras.aplicaDifal) !== vendedor.regras.aplicaDifal && (
+        {canal && (aplicaDifalOverride ?? canal.regras.aplicaDifal) !== canal.regras.aplicaDifal && (
           <p className="text-xs text-amber-700">
-            Diferente do padrão do canal ({vendedor.regras.aplicaDifal ? "aplica" : "não aplica"} DIFAL) —
+            Diferente do padrão da situação {canal.name} ({canal.regras.aplicaDifal ? "aplica" : "não aplica"} DIFAL) —
             registrado no pedido.
           </p>
         )}

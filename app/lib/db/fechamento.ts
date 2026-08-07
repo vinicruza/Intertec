@@ -271,6 +271,9 @@ export async function simularPedidoComCustosVigentes(
   if (!tabela) throw new Error(`UF ${pedido.uf ?? "—"} sem alíquotas cadastradas.`);
   const vendedor = ctx.vendedores.find((v) => v.id === pedido.seller_id);
   if (!vendedor) throw new Error("Pedido sem vendedor/canal definido.");
+  const canal = ctx.canais.find((c) => c.id === pedido.channel_id) ??
+    ctx.canais.find((c) => c.id === vendedor.channel_id);
+  if (!canal) throw new Error("Pedido sem situação de cálculo definida.");
 
   const custoPorItemVendavel = new Map(ctx.itens.map((i) => [i.id, i]));
 
@@ -346,7 +349,7 @@ export async function simularPedidoComCustosVigentes(
     freteJaDestacadoNosPrecos: pedido.freight_paid_by_customer,
     comissao: pedido.commission_rate,
     aplicaDifal: pedido.applies_difal,
-    canal: vendedor.regras,
+    canal: canal.regras,
     uf: tabela,
   });
 

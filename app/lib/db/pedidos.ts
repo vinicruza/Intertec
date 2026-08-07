@@ -15,6 +15,12 @@ export type VendedorOpcao = {
   regras: CanalRegras;
 };
 
+export type CanalOpcao = {
+  id: string;
+  name: string;
+  regras: CanalRegras;
+};
+
 export type ItemVendavel = {
   tipo: "produto" | "kit";
   id: string;
@@ -37,6 +43,10 @@ export type InsumoEmbalagem = {
 
 export type ContextoSimulador = {
   vendedores: VendedorOpcao[];
+  // Situações de cálculo da planilha: Interno, Marketplace, Externos,
+  // Revendas e Descpro. Administrador pode trocar a situação sem trocar o
+  // vendedor; Comercial fica preso ao canal do próprio vendedor.
+  canais: CanalOpcao[];
   // Vendedor que tem o mesmo nome do acesso logado. Comercial lança pedido
   // somente em nome próprio; Administrador continua podendo escolher qualquer
   // vendedor. A trava definitiva fica no banco.
@@ -72,8 +82,9 @@ export type ContextoSimulador = {
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp] = await Promise.all([
+  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
+    supabase.from("channels").select("id, name, applies_difal, default_commission_rate, freight_model").order("name"),
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
     // simulador só precisa saber quais já estão preenchidos, para avisar
     // antes de o pedido chegar à conferência com o cabeçalho vazio.
@@ -95,7 +106,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.rpc("meu_vendedor"),
     supabase.from("carriers").select("id, name, requires_name").eq("active", true).order("sort_order"),
   ]);
-  for (const r of [vend, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp]) {
+  for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp]) {
     if (r.error) throw r.error;
   }
 
@@ -211,6 +222,15 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
 
   return {
     meuVendedorId: (meuVend.data as string | null) ?? null,
+    canais: (canais.data ?? []).map((c) => ({
+      id: c.id as string,
+      name: c.name as string,
+      regras: {
+        aplicaDifal: (c.applies_difal as boolean | null) ?? true,
+        comissaoPadrao: (c.default_commission_rate as string | null) ?? "0.025",
+        modeloFrete: ((c.freight_model as string | null) ?? "manual") as "manual" | "uf_percent",
+      },
+    })),
     vendedores: (vend.data ?? []).map((v) => {
       const c = v.channels as unknown as { name: string; applies_difal: boolean; default_commission_rate: string; freight_model: "manual" | "uf_percent" } | null;
       return {
