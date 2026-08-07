@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ErroCalculoBloqueante, assinaturaKitCompleta, toMoney, toPercent, type CustoProdutoKit } from "@calc";
+import { ErroCalculoBloqueante, assinaturaKitCompleta, dec, toMoney, toPercent, type CustoProdutoKit } from "@calc";
 import {
   KIT_NOVO,
+  aplicarPrecosCalculadosAosItensDaCotacao,
   montarItensDaCotacao,
   montarItensParaMotor,
   resolverKitAdHocDoPedido,
@@ -118,7 +119,7 @@ function montarPedido(p: Pedido) {
     resolverLinhaDoPedido(l, ITENS_VENDAVEIS, cat)
   );
   const paraMotor = montarItensParaMotor(p.linhas, resolvidas);
-  const itensDaCotacao = montarItensDaCotacao(p.linhas, resolvidas, ITENS_VENDAVEIS);
+  const itensBaseDaCotacao = montarItensDaCotacao(p.linhas, resolvidas, ITENS_VENDAVEIS);
 
   // A tela chama o motor dentro de um try: erro bloqueante vira mensagem
   // vermelha, não tela quebrada. Aqui é igual, para o teste poder olhar os
@@ -143,6 +144,11 @@ function montarPedido(p: Pedido) {
       erroDoMotor = e;
     }
   }
+
+  const itensDaCotacao =
+    simulacao && p.fretePorContaCliente
+      ? aplicarPrecosCalculadosAosItensDaCotacao(itensBaseDaCotacao, simulacao.itensCalculados)
+      : itensBaseDaCotacao;
 
   return { resolvidas, paraMotor, itensDaCotacao, simulacao, erroDoMotor, calcular };
 }
@@ -452,13 +458,16 @@ describe("escolhas do vendedor que mudam a conta", () => {
     frete: "1000",
   };
 
-  it("frete por conta do cliente zera frete E imposto de frete", () => {
-    const s = montarPedido({ ...base, fretePorContaCliente: true }).simulacao!;
-    expect(toMoney(s.freteUsado)).toBe("0.00");
-    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    // Receita líquida sobe exatamente o frete + o imposto dele.
+  it("frete destacado rateia o frete no preço unitário e mantém o frete no pedido", () => {
+    const pedido = montarPedido({ ...base, fretePorContaCliente: true });
+    const s = pedido.simulacao!;
+    expect(toMoney(s.freteUsado)).toBe("1000.00");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
+    expect(toMoney(dec(s.itensCalculados[0].precoVenda))).toBe("4.45");
+    expect(toMoney(dec(pedido.itensDaCotacao[0].precoVenda))).toBe("4.45");
+    // Receita bruta sobe exatamente o valor do frete destacado.
     const comFrete = montarPedido(base).simulacao!;
-    expect(Number(s.resultado.receitaLiquida) - Number(comFrete.resultado.receitaLiquida)).toBeCloseTo(1162.5, 2);
+    expect(Number(s.resultado.receitaBruta) - Number(comFrete.resultado.receitaBruta)).toBeCloseTo(1000, 2);
   });
 
   it("DIFAL desmarcado no pedido vale mais que o padrão do canal", () => {

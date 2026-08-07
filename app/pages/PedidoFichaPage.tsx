@@ -179,19 +179,16 @@ export default function PedidoFichaPage() {
                 <td className="py-2 text-right">{reais(totais.subtotal.toString())}</td>
                 {verNumeros && <td />}
               </tr>
-              {/* Frete aparece na folha porque está no formulário e a
-                  conferência precisa dele. Quando é por conta do cliente, a
-                  folha diz isso, em vez de mostrar um valor zerado sem
-                  explicação. */}
+              {/* Frete destacado já está rateado no preço unitário dos itens. */}
               <tr>
                 <td className="py-1" colSpan={3}>
                   Frete
                   {pedido.freight_paid_by_customer && (
-                    <span className="ml-1 text-xs font-normal">(por conta do cliente)</span>
+                    <span className="ml-1 text-xs font-normal">(destacado nos itens)</span>
                   )}
                 </td>
                 <td className="py-1 text-right">
-                  {pedido.freight_paid_by_customer ? "—" : reais(pedido.freight)}
+                  {reais(pedido.freight)}
                 </td>
                 {verNumeros && <td />}
               </tr>

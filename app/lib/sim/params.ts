@@ -26,7 +26,8 @@ export type TabelasUF = {
 export type EntradaSimulacao = {
   itens: ItemPedido[];
   freteManual: EntradaDecimal; // usado quando o canal é frete manual
-  fretePorContaCliente: boolean;
+  fretePorContaCliente: boolean; // legado no banco; na tela, significa "Frete Destacado"
+  freteJaDestacadoNosPrecos?: boolean;
   comissao: EntradaDecimal | null; // override; null = padrão do canal
   // Override por pedido; null = padrão do canal (Decisão D4 estendida,
   // 05/08/2026 — ver Calculations.md §12). DIFAL é devido pela Intertech
@@ -44,6 +45,7 @@ export type Simulacao = {
   comissaoUsada: Decimal;
   difalAplicado: Decimal;
   aplicaDifalUsado: boolean;
+  itensCalculados: ItemPedido[];
   avisos: string[];
 };
 
@@ -74,22 +76,45 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     }
   }
 
-  // Frete por conta do cliente zera o frete do pedido — inclusive o automático
-  // dos canais por percentual de UF. Zerar aqui, e não só no cálculo, faz o
-  // snapshot do fechamento gravar frete 0: o DRE do mês precisa enxergar a
-  // mesma coisa que a tela mostrou.
-  if (entrada.fretePorContaCliente) freteUsado = new Decimal(0);
+  // Frete destacado: o frete continua existindo no pedido, mas entra também no
+  // preço unitário dos itens, rateado pela participação de cada linha na
+  // receita original. Quando a simulação vem de um pedido salvo, os preços já
+  // estão destacados no banco e não podem receber o frete de novo.
+  const itensCalculados =
+    entrada.fretePorContaCliente && !entrada.freteJaDestacadoNosPrecos
+      ? aplicarFreteDestacadoAosItens(entrada.itens, freteUsado)
+      : entrada.itens;
 
   const resultado = calcularPedido({
-    itens: entrada.itens,
+    itens: itensCalculados,
     frete: freteUsado,
-    fretePorContaCliente: entrada.fretePorContaCliente,
+    fretePorContaCliente: false,
     aliquotaImposto: entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,
   });
 
-  return { resultado, freteUsado, comissaoUsada, difalAplicado, aplicaDifalUsado, avisos };
+  return { resultado, freteUsado, comissaoUsada, difalAplicado, aplicaDifalUsado, itensCalculados, avisos };
+}
+
+export function aplicarFreteDestacadoAosItens(itens: ItemPedido[], frete: Decimal): ItemPedido[] {
+  if (frete.lte(0) || itens.length === 0) return itens;
+
+  const receitas = itens.map((i) => dec(i.precoVenda).times(dec(i.quantidade)));
+  const receitaBase = receitas.reduce((s, r) => s.plus(r), new Decimal(0));
+  if (receitaBase.lte(0)) return itens;
+
+  return itens.map((item, i) => {
+    const quantidade = dec(item.quantidade);
+    if (quantidade.lte(0)) return item;
+
+    const freteDaLinha = frete.times(receitas[i].div(receitaBase));
+    const acrescimoUnitario = freteDaLinha.div(quantidade);
+    return {
+      ...item,
+      precoVenda: dec(item.precoVenda).plus(acrescimoUnitario).toString(),
+    };
+  });
 }
 
 // Faixas de status da margem de contribuição (PRD §5.5), vindas de margin_rules.

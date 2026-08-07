@@ -343,6 +343,7 @@ export async function simularPedidoComCustosVigentes(
     itens: itensMotor,
     freteManual: pedido.freight ?? "0",
     fretePorContaCliente: pedido.freight_paid_by_customer,
+    freteJaDestacadoNosPrecos: pedido.freight_paid_by_customer,
     comissao: pedido.commission_rate,
     aplicaDifal: pedido.applies_difal,
     canal: vendedor.regras,

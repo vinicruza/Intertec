@@ -6,11 +6,13 @@ import { simular, statusMargem } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   KIT_NOVO,
+  aplicarPrecosCalculadosAosItensDaCotacao,
   kitNovoAPartirDe,
   kitsSemNome,
   montarItensDaCotacao,
   montarItensParaMotor,
   nomeSugeridoParaKit,
+  removerFreteDestacadoDasLinhas,
   resolverLinhaDoPedido,
   resumoDoKit,
   resumoFinanceiroLinhaKit,
@@ -177,7 +179,10 @@ export default function SimuladorPage() {
         },
       };
     });
-    setLinhas(linhasCarregadas.length > 0 ? linhasCarregadas : [LINHA_VAZIA]);
+    const linhasParaEdicao = p.freight_paid_by_customer
+      ? removerFreteDestacadoDasLinhas(linhasCarregadas, p.freight)
+      : linhasCarregadas;
+    setLinhas(linhasParaEdicao.length > 0 ? linhasParaEdicao : [LINHA_VAZIA]);
   }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
   const podeEscolherVendedor = perfil?.perfil === "admin";
@@ -277,7 +282,10 @@ export default function SimuladorPage() {
         );
       }
 
-      const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
+      const itensBase = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
+      const itens = freteCliente
+        ? aplicarPrecosCalculadosAosItensDaCotacao(itensBase, simulacao.itensCalculados)
+        : itensBase;
 
       // A foto da cotação vai junto na versão, para a análise do que não vingou.
       const foto = {
@@ -402,6 +410,17 @@ export default function SimuladorPage() {
   const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
 
   const freteAutomatico = vendedor?.regras.modeloFrete === "uf_percent";
+  const precoFinalPorLinha = new Map<number, string>();
+  if (simulacao.estado === "ok" && freteCliente) {
+    let itemCalculado = 0;
+    linhas.forEach((linha, i) => {
+      if (resolvidas[i] && linha.quantidade.trim() !== "" && linha.preco.trim() !== "") {
+        const precoFinal = simulacao.itensCalculados[itemCalculado]?.precoVenda;
+        if (precoFinal) precoFinalPorLinha.set(i, String(precoFinal));
+        itemCalculado += 1;
+      }
+    });
+  }
   const transportadora = ctx.transportadoras.find((t) => t.id === transportadoraId) ?? null;
   const transportadoraPedeNome = transportadora?.pedeNome ?? false;
   const clienteEscolhido = ctx.clientes.find((c) => c.id === clienteId) ?? null;
@@ -505,13 +524,7 @@ export default function SimuladorPage() {
           </div>
           <div>
             <Label>Frete (R$)</Label>
-            {/* Frete por conta do cliente: o campo é bloqueado e vale 0. Nada de
-                digitar um valor que o sistema depois ignora — ou pior, desconta. */}
-            {freteCliente ? (
-              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
-                R$ 0,00 — por conta do cliente
-              </p>
-            ) : freteAutomatico ? (
+            {freteAutomatico ? (
               <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
                 {simulacao.estado === "ok" ? reais(simulacao.freteUsado.toString()) : "—"} (automático: % da receita por UF)
               </p>
@@ -525,10 +538,9 @@ export default function SimuladorPage() {
               checked={freteCliente}
               onChange={(e) => {
                 setFreteCliente(e.target.checked);
-                if (e.target.checked) setFrete("0");
               }}
             />
-            Frete por conta do cliente
+            Frete Destacado
           </label>
           <label className="flex items-end gap-2 pb-2 text-sm">
             <input
@@ -695,6 +707,11 @@ export default function SimuladorPage() {
                 <Label>{l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
                 <Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} />
                 <AvisoDeNumero valor={l.preco} />
+                {freteCliente && precoFinalPorLinha.has(i) && (
+                  <p className="mt-1 w-32 text-[0.65rem] leading-tight text-[var(--cor-texto-suave)]">
+                    Final com frete: {reais(precoFinalPorLinha.get(i)!)}
+                  </p>
+                )}
               </div>
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
@@ -779,7 +796,7 @@ export default function SimuladorPage() {
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
             Deduções da receita líquida: frete {toMoney(simulacao.freteUsado).replace(".", ",")} · imposto frete{" "}
             {toMoney(simulacao.resultado.impostoFrete).replace(".", ",")} · comissão {toMoney(simulacao.resultado.comissao).replace(".", ",")}
-            {freteCliente ? " · frete por conta do cliente (não entra no resultado)" : ""}
+            {freteCliente ? " · frete destacado nos preços dos itens" : ""}
           </p>}
 
           {simulacao.avisos.map((a, i) => (

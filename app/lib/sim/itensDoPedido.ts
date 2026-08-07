@@ -281,6 +281,35 @@ export function montarItensDaCotacao(
   });
 }
 
+export function aplicarPrecosCalculadosAosItensDaCotacao(
+  itens: ItemSimulacao[],
+  precosCalculados: ItemPedido[]
+): ItemSimulacao[] {
+  return itens.map((item, i) => ({
+    ...item,
+    precoVenda: precosCalculados[i]?.precoVenda?.toString() ?? item.precoVenda,
+  }));
+}
+
+export function removerFreteDestacadoDasLinhas(linhas: LinhaItem[], frete: string | null | undefined): LinhaItem[] {
+  const freteDecimal = dec(numero(frete ?? "0"));
+  if (freteDecimal.lte(0)) return linhas;
+
+  const receitasDestacadas = linhas.map((linha) => {
+    if (linha.preco.trim() === "" || linha.quantidade.trim() === "") return dec("0");
+    return dec(numero(linha.preco)).times(dec(numero(linha.quantidade)));
+  });
+  const receitaDestacada = receitasDestacadas.reduce((s, r) => s.plus(r), dec("0"));
+  const receitaBase = receitaDestacada.minus(freteDecimal);
+  if (receitaDestacada.lte(0) || receitaBase.lte(0)) return linhas;
+
+  const fator = receitaBase.div(receitaDestacada);
+  return linhas.map((linha) => {
+    if (linha.preco.trim() === "") return linha;
+    return { ...linha, preco: dec(numero(linha.preco)).times(fator).toString() };
+  });
+}
+
 // ---------- Kit montado no pedido, visto de fora do simulador ----------
 //
 // Entre salvar a cotação e ganhar o pedido, o kit montado na hora NÃO tem
