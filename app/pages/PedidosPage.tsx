@@ -29,6 +29,14 @@ function rotuloStatus(p: PedidoResumo): string {
   return "Em cotação";
 }
 
+function receitaLiquidaDoHistorico(p: PedidoResumo): string | null | undefined {
+  return p.net_revenue_snapshot ?? p.totals_display?.receita_liquida;
+}
+
+function margemContribuicaoDoHistorico(p: PedidoResumo): string | null | undefined {
+  return p.contribution_margin_snapshot ?? p.totals_display?.margem_contribuicao;
+}
+
 export default function PedidosPage() {
   const navigate = useNavigate();
   const { perfil } = useAuth();
@@ -82,8 +90,10 @@ export default function PedidosPage() {
       const alvo = `${p.quote_number ?? ""} ${p.customers?.name ?? ""} ${nomesItens}`;
       if (busca && !alvo.toLocaleLowerCase("pt-BR").includes(busca)) return false;
       if (faixa) {
-        if (!p.net_revenue_snapshot || !p.contribution_margin_snapshot || dec(p.net_revenue_snapshot).isZero()) return false;
-        const regra = statusMargem(dec(p.contribution_margin_snapshot).div(p.net_revenue_snapshot), regras);
+        const receitaLiquida = receitaLiquidaDoHistorico(p);
+        const margemContribuicao = margemContribuicaoDoHistorico(p);
+        if (!receitaLiquida || !margemContribuicao || dec(receitaLiquida).isZero()) return false;
+        const regra = statusMargem(dec(margemContribuicao).div(receitaLiquida), regras);
         if (regra?.label !== faixa) return false;
       }
       return true;
@@ -166,8 +176,8 @@ export default function PedidosPage() {
                 <span className="block text-xs text-[var(--cor-texto-suave)]">{p.loss_reasons.label}</span>
               )}
             </td>
-            <td className="px-4 py-3">{reais(p.totals_display?.receita_liquida)}</td>
-            <td className="px-4 py-3">{reais(p.totals_display?.margem_contribuicao)}</td>
+            <td className="px-4 py-3">{reais(receitaLiquidaDoHistorico(p))}</td>
+            <td className="px-4 py-3">{reais(margemContribuicaoDoHistorico(p))}</td>
           </tr>;
         })}</tbody></table>
       </Card>}
