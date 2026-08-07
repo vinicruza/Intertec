@@ -68,6 +68,12 @@ function normalizarNome(valor: string): string {
     .toLowerCase();
 }
 
+function mensagemErro(e: unknown, padrao: string): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && "message" in e && typeof e.message === "string") return e.message;
+  return padrao;
+}
+
 export default function SimuladorPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -335,7 +341,7 @@ export default function SimuladorPage() {
         return {
           ...cotacao,
           aprovacao: "pendente_com_pendencia" as const,
-          erroAprovacao: e instanceof Error ? e.message : "Não foi possível enviar para aprovação.",
+          erroAprovacao: mensagemErro(e, "Não foi possível enviar para aprovação."),
         };
       }
     },
@@ -355,7 +361,7 @@ export default function SimuladorPage() {
       queryClient.invalidateQueries({ queryKey: ["cascataVigente", r.id] });
       queryClient.invalidateQueries({ queryKey: ["versoes", r.id] });
     },
-    onError: (e: unknown) => setErroSalvar(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErroSalvar(mensagemErro(e, "Erro ao salvar.")),
   });
 
   if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {
