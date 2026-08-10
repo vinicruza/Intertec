@@ -62,6 +62,17 @@ describe("identidade do kit: uma composição, um código", () => {
     // receber o mesmo código.
     expect(proximo).toMatch(/pg_advisory_xact_lock/i);
   });
+
+  it("o próximo código casa o prefixo EXATO — CS não pode contar CSU, nem CL contar CLB/CLM", () => {
+    // Desde 10/08/2026 existem prefixos que são início de outro (CS/CSU,
+    // CM/CMM, CL/CLB/CLM, AV/AVC/AVT/AVS/AVL). Um "code like p_prefix || '%'"
+    // (a forma antiga) contaria os produtos da família maior na sequência da
+    // menor e furaria a numeração. A função tem que casar com âncora de fim
+    // de string, não com LIKE.
+    const proximo = definicaoVigente("next_category_code");
+    expect(proximo).not.toMatch(/like\s+p_prefix/i);
+    expect(proximo).toMatch(/code\s*~\s*\(\s*'\^'\s*\|\|\s*p_prefix\s*\|\|\s*'\[0-9\]\+\$'\s*\)/i);
+  });
 });
 
 describe("gravar kit pela tela de Kits", () => {
