@@ -199,6 +199,41 @@ Base tecnica criada:
 - registro automatico de `page_view`;
 - registros funcionais iniciais de `cliente_salvo` e `cotacao_salva`.
 - tela interna `/monitoramento`, visivel apenas para Super Admin.
+- agrupamento automatico de erros em `client_error_groups`;
+- classificacao de severidade: `critico`, `alto`, `medio`, `baixo`;
+- fila de alerta em `client_error_alerts` para erro novo/critico;
+- status operacional por grupo: `novo`, `em_analise`, `corrigido`, `ignorado`.
+
+## Tratamento rapido de erros
+
+A captura de erro continua salvando cada ocorrencia bruta em `client_errors`, mas agora tambem consolida por `fingerprint`.
+O fingerprint considera tela normalizada, mensagem, trecho inicial da stack e versao de deploy quando disponivel.
+
+Na pratica, a tela de Monitoramento passa a mostrar:
+
+- quantas vezes o mesmo erro aconteceu;
+- quando apareceu pela primeira e ultima vez;
+- usuario e tela da ultima ocorrencia;
+- severidade automatica;
+- se existe alerta pendente;
+- status de acompanhamento.
+
+Regra de prioridade inicial:
+
+- `critico`: erro em telas centrais (`/login`, `/simulador`, `/clientes`, `/pedidos`, `/aprovacoes`, `/dre`) ou falhas fortes de carregamento/chunk;
+- `alto`: erro nao tratado de promessa, falha de rede, fetch ou timeout;
+- `medio`: demais erros de interface;
+- `baixo`: reservado para avisos sem impacto quando passarmos a capturar esse tipo de evento.
+
+O alerta automatico no Telegram deve consumir a fila `client_error_alerts` e marcar `sent_at` apos envio. Enquanto o segredo do bot/chat nao estiver configurado, a propria tela mostra os alertas pendentes para acao manual.
+
+Base de envio preparada:
+
+- Edge Function `intertech-error-alerts`;
+- secrets esperados: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` e, opcionalmente, `INTERTECH_ALERT_SECRET`;
+- envia ate 5 alertas pendentes por execucao;
+- apos envio, marca `client_error_alerts.sent_at` e limpa `client_error_groups.alert_needed`.
+- erros historicos agrupados por backfill ficam visiveis na tela, mas nao entram como envio retroativo.
 
 Com ferramentas externas:
 

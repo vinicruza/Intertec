@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listarEventosMonitoramento, type MonitoramentoEvento } from "../lib/db/monitoramento";
-import { listarErrosRecentes } from "../lib/db/observabilidade";
+import {
+  atualizarStatusGrupoErro,
+  listarAlertasDeErrosPendentes,
+  listarGruposDeErros,
+  type GrupoErroCliente,
+} from "../lib/db/observabilidade";
 import { dataCurta } from "../lib/format";
 import { Badge, Card } from "@components/ui/primitives";
 
@@ -12,6 +17,7 @@ const PERIODOS = [
 ];
 
 export default function MonitoramentoPage() {
+  const queryClient = useQueryClient();
   const [horas, setHoras] = useState(24);
   const desde = useMemo(() => new Date(Date.now() - horas * 60 * 60 * 1000).toISOString(), [horas]);
   const eventosQuery = useQuery({
@@ -19,15 +25,29 @@ export default function MonitoramentoPage() {
     queryFn: () => listarEventosMonitoramento(desde),
     refetchInterval: 60_000,
   });
-  const errosQuery = useQuery({
-    queryKey: ["monitoramentoErros"],
-    queryFn: listarErrosRecentes,
+  const gruposErrosQuery = useQuery({
+    queryKey: ["monitoramentoErrosAgrupados"],
+    queryFn: listarGruposDeErros,
     refetchInterval: 60_000,
+  });
+  const alertasQuery = useQuery({
+    queryKey: ["monitoramentoAlertasPendentes"],
+    queryFn: listarAlertasDeErrosPendentes,
+    refetchInterval: 60_000,
+  });
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: GrupoErroCliente["status"] }) => atualizarStatusGrupoErro(id, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["monitoramentoErrosAgrupados"] });
+    },
   });
 
   const eventos = eventosQuery.data ?? [];
   const resumo = useMemo(() => montarResumo(eventos), [eventos]);
-  const erros = errosQuery.data ?? [];
+  const gruposErros = gruposErrosQuery.data ?? [];
+  const alertasPendentes = alertasQuery.data ?? [];
+  const errosAbertos = gruposErros.filter((erro) => erro.status !== "corrigido" && erro.status !== "ignorado");
+  const errosCriticos = errosAbertos.filter((erro) => erro.severity === "critico");
 
   return (
     <div className="space-y-5">
@@ -54,8 +74,8 @@ export default function MonitoramentoPage() {
       <div className="grid gap-3 md:grid-cols-4">
         <Numero titulo="Eventos" valor={String(eventos.length)} />
         <Numero titulo="Usuários ativos" valor={String(resumo.usuariosUnicos)} />
-        <Numero titulo="Telas vistas" valor={String(resumo.telasUnicas)} />
-        <Numero titulo="Erros recentes" valor={String(erros.length)} alerta={erros.length > 0} />
+        <Numero titulo="Alertas pendentes" valor={String(alertasPendentes.length)} alerta={alertasPendentes.length > 0} />
+        <Numero titulo="Erros críticos" valor={String(errosCriticos.length)} alerta={errosCriticos.length > 0} />
       </div>
 
       {eventosQuery.isLoading && <p className="text-sm text-[var(--cor-texto-suave)]">Carregando monitoramento…</p>}
@@ -78,30 +98,42 @@ export default function MonitoramentoPage() {
           <TabelaUsuarios linhas={resumo.usuarios} />
         </Card>
         <Card className="overflow-hidden p-0">
-          <CabecalhoTabela titulo="Erros recentes" subtitulo="Últimos registros capturados pela interface." />
-          {errosQuery.isLoading ? (
+          <CabecalhoTabela titulo="Alertas pendentes" subtitulo="Erros novos ou críticos aguardando envio/ação." />
+          {alertasQuery.isLoading ? (
             <p className="p-5 text-sm text-[var(--cor-texto-suave)]">Carregando…</p>
-          ) : erros.length === 0 ? (
-            <p className="p-5 text-sm text-green-700">Nenhum erro registrado.</p>
+          ) : alertasPendentes.length === 0 ? (
+            <p className="p-5 text-sm text-green-700">Nenhum alerta pendente.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
-                  <th className="px-5 py-3 font-medium">Data</th><th className="px-5 py-3 font-medium">Usuário</th><th className="px-5 py-3 font-medium">Tela</th><th className="px-5 py-3 font-medium">Mensagem</th>
-                </tr></thead>
-                <tbody>{erros.map((erro) => (
-                  <tr key={erro.id} className="border-b border-[var(--cor-borda)] last:border-0">
-                    <td className="px-5 py-3">{dataCurta(erro.occurred_at)}</td>
-                    <td className="px-5 py-3">{erro.profiles?.full_name ?? "—"}</td>
-                    <td className="px-5 py-3 font-mono text-xs">{erro.path}</td>
-                    <td className="max-w-md break-words px-5 py-3 text-red-700">{erro.message}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+            <div className="divide-y divide-[var(--cor-borda)]">
+              {alertasPendentes.map((alerta) => (
+                <div key={alerta.id} className="space-y-2 px-5 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{rotuloSeveridade(alerta.severity)}</Badge>
+                    <span className="text-xs text-[var(--cor-texto-suave)]">{dataCurta(alerta.created_at)}</span>
+                  </div>
+                  <p className="break-words text-sm text-red-700">{alerta.message}</p>
+                  {alerta.send_error && <p className="text-xs text-red-700">{alerta.send_error}</p>}
+                </div>
+              ))}
             </div>
           )}
         </Card>
       </div>
+
+      <Card className="overflow-hidden p-0">
+        <CabecalhoTabela titulo="Erros agrupados" subtitulo="Ocorrências repetidas consolidadas por tela, mensagem, stack e versão." />
+        {gruposErrosQuery.isLoading ? (
+          <p className="p-5 text-sm text-[var(--cor-texto-suave)]">Carregando…</p>
+        ) : gruposErros.length === 0 ? (
+          <p className="p-5 text-sm text-green-700">Nenhum erro agrupado registrado.</p>
+        ) : (
+          <TabelaErrosAgrupados
+            linhas={gruposErros}
+            alterandoId={statusMutation.variables?.id}
+            aoAtualizarStatus={(id, status) => statusMutation.mutate({ id, status })}
+          />
+        )}
+      </Card>
 
       <Card className="overflow-hidden p-0">
         <CabecalhoTabela titulo="Últimos eventos" subtitulo="Amostra operacional para investigação rápida." />
@@ -241,10 +273,99 @@ function TabelaUsuarios({ linhas }: { linhas: Array<{ nome: string; eventos: num
   );
 }
 
+function TabelaErrosAgrupados({
+  linhas,
+  alterandoId,
+  aoAtualizarStatus,
+}: {
+  linhas: GrupoErroCliente[];
+  alterandoId?: string;
+  aoAtualizarStatus: (id: string, status: GrupoErroCliente["status"]) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
+          <th className="px-5 py-3 font-medium">Prioridade</th>
+          <th className="px-5 py-3 font-medium">Status</th>
+          <th className="px-5 py-3 text-right font-medium">Ocorrências</th>
+          <th className="px-5 py-3 font-medium">Última</th>
+          <th className="px-5 py-3 font-medium">Usuário</th>
+          <th className="px-5 py-3 font-medium">Tela</th>
+          <th className="px-5 py-3 font-medium">Mensagem</th>
+          <th className="px-5 py-3 font-medium">Ação</th>
+        </tr></thead>
+        <tbody>{linhas.map((erro) => (
+          <tr key={erro.id} className="border-b border-[var(--cor-borda)] align-top last:border-0">
+            <td className="px-5 py-3"><Badge>{rotuloSeveridade(erro.severity)}</Badge></td>
+            <td className="px-5 py-3">{rotuloStatus(erro.status)}</td>
+            <td className="px-5 py-3 text-right font-semibold">{erro.occurrences}</td>
+            <td className="px-5 py-3">{dataCurta(erro.last_seen_at)}</td>
+            <td className="px-5 py-3">{erro.profiles?.full_name ?? "—"}</td>
+            <td className="px-5 py-3 font-mono text-xs">{erro.last_path}</td>
+            <td className="max-w-lg px-5 py-3">
+              <div className="break-words text-red-700">{erro.message}</div>
+              <div className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+                {erro.alert_needed ? "Alerta pendente" : "Alerta tratado"}{erro.deploy_ref ? ` · ${erro.deploy_ref.slice(0, 8)}` : ""}
+              </div>
+            </td>
+            <td className="px-5 py-3">
+              <div className="flex min-w-52 flex-wrap gap-2">
+                <BotaoStatus disabled={alterandoId === erro.id || erro.status === "em_analise"} onClick={() => aoAtualizarStatus(erro.id, "em_analise")}>
+                  Análise
+                </BotaoStatus>
+                <BotaoStatus disabled={alterandoId === erro.id || erro.status === "corrigido"} onClick={() => aoAtualizarStatus(erro.id, "corrigido")}>
+                  Corrigido
+                </BotaoStatus>
+                <BotaoStatus disabled={alterandoId === erro.id || erro.status === "ignorado"} onClick={() => aoAtualizarStatus(erro.id, "ignorado")}>
+                  Ignorar
+                </BotaoStatus>
+              </div>
+            </td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function BotaoStatus({ children, disabled, onClick }: { children: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className="min-h-8 rounded-md border border-[var(--cor-borda)] bg-white px-2.5 text-xs font-semibold text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)] disabled:cursor-not-allowed disabled:opacity-45"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
 function formatarMs(valor: number | null): string {
   if (valor == null) return "—";
   if (valor < 1000) return `${Math.round(valor)} ms`;
   return `${(valor / 1000).toFixed(1).replace(".", ",")} s`;
+}
+
+function rotuloSeveridade(severidade: GrupoErroCliente["severity"]): string {
+  const mapa: Record<GrupoErroCliente["severity"], string> = {
+    critico: "Crítico",
+    alto: "Alto",
+    medio: "Médio",
+    baixo: "Baixo",
+  };
+  return mapa[severidade];
+}
+
+function rotuloStatus(status: GrupoErroCliente["status"]): string {
+  const mapa: Record<GrupoErroCliente["status"], string> = {
+    novo: "Novo",
+    em_analise: "Em análise",
+    corrigido: "Corrigido",
+    ignorado: "Ignorado",
+  };
+  return mapa[status];
 }
 
 function rotuloEvento(tipo: string): string {
