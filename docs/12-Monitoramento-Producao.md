@@ -198,6 +198,7 @@ Base tecnica criada:
 - funcao `log_monitoring_event`;
 - registro automatico de `page_view`;
 - registros funcionais iniciais de `cliente_salvo` e `cotacao_salva`.
+- tela interna `/monitoramento`, visivel apenas para Super Admin.
 
 Com ferramentas externas:
 

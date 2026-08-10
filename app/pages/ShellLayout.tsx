@@ -60,6 +60,13 @@ export default function ShellLayout() {
     const indice = operacao?.itens.findIndex((i) => i.caminho === "/pedidos") ?? -1;
     if (operacao) operacao.itens.splice(indice >= 0 ? indice + 1 : operacao.itens.length, 0, item);
   }
+  if (perfil.superAdmin) {
+    const administracao = grupos.find((g) => g.area === "administracao");
+    const item = { caminho: "/monitoramento", rotulo: "Monitoramento", icone: "⌁", area: "administracao" as const, perfis: [] };
+    if (administracao && !administracao.itens.some((i) => i.caminho === item.caminho)) {
+      administracao.itens.push(item);
+    }
+  }
   const pendentes = contagemQuery.data ?? 0;
   const iniciais = perfil.nome.split(" ").slice(0, 2).map((parte) => parte[0]).join("").toUpperCase();
 

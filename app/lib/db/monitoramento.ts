@@ -1,5 +1,15 @@
 import { supabase } from "../supabase";
 
+export type MonitoramentoEvento = {
+  id: string;
+  occurred_at: string;
+  event_type: string;
+  path: string;
+  duration_ms: number | null;
+  context: Record<string, unknown>;
+  profiles: { full_name: string } | null;
+};
+
 type EventoMonitoramento = {
   tipo: string;
   caminho?: string;
@@ -30,4 +40,15 @@ export async function registrarEventoMonitoramento({
   } catch {
     // Monitoramento nunca pode bloquear a operacao principal.
   }
+}
+
+export async function listarEventosMonitoramento(desde: string): Promise<MonitoramentoEvento[]> {
+  const { data, error } = await supabase
+    .from("monitoring_events")
+    .select("id, occurred_at, event_type, path, duration_ms, context, profiles(full_name)")
+    .gte("occurred_at", desde)
+    .order("occurred_at", { ascending: false })
+    .limit(1000);
+  if (error) throw error;
+  return (data ?? []) as unknown as MonitoramentoEvento[];
 }

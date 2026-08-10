@@ -27,6 +27,15 @@ export function ExigirAcesso({ caminho, children }: { caminho: string; children:
   return <>{children}</>;
 }
 
+export function ExigirSuperAdmin({ children }: { children: ReactNode }) {
+  const { perfil, session, carregando, sair } = useAuth();
+  if (carregando) return <TelaCarregando />;
+  if (session && !perfil) return <AguardandoLiberacao aoSair={sair} />;
+  if (!perfil) return <Navigate to="/login" replace />;
+  if (!perfil.superAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AguardandoLiberacao({ aoSair }: { aoSair: () => Promise<void> }) {
   return (
     <div className="flex h-full items-center justify-center p-6">

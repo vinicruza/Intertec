@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { AuthProvider } from "./auth/AuthProvider";
-import { ExigirAcesso, ExigirLogin } from "./auth/guards";
+import { ExigirAcesso, ExigirLogin, ExigirSuperAdmin } from "./auth/guards";
 import { lazyComRetry } from "./lib/recarregarChunk";
 import MonitoramentoRotas from "./MonitoramentoRotas";
 const LoginPage = lazyComRetry(() => import("./pages/LoginPage"));
@@ -28,6 +28,7 @@ const CadastrosPage = lazyComRetry(() => import("./pages/CadastrosPage"));
 const DREPage = lazyComRetry(() => import("./pages/DREPage"));
 const ConfiguracoesPage = lazyComRetry(() => import("./pages/ConfiguracoesPage"));
 const IntegridadePage = lazyComRetry(() => import("./pages/IntegridadePage"));
+const MonitoramentoPage = lazyComRetry(() => import("./pages/MonitoramentoPage"));
 
 const queryClient = new QueryClient();
 
@@ -142,6 +143,10 @@ export default function App() {
               <Route
                 path="/integridade"
                 element={<ExigirAcesso caminho="/integridade"><IntegridadePage /></ExigirAcesso>}
+              />
+              <Route
+                path="/monitoramento"
+                element={<ExigirSuperAdmin><MonitoramentoPage /></ExigirSuperAdmin>}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
