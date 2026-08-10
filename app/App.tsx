@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ExigirAcesso, ExigirLogin } from "./auth/guards";
 import { lazyComRetry } from "./lib/recarregarChunk";
+import MonitoramentoRotas from "./MonitoramentoRotas";
 const LoginPage = lazyComRetry(() => import("./pages/LoginPage"));
 const ShellLayout = lazyComRetry(() => import("./pages/ShellLayout"));
 const InicioPage = lazyComRetry(() => import("./pages/InicioPage"));
@@ -35,6 +36,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+          <MonitoramentoRotas />
           <Suspense fallback={<div className="p-6 text-sm text-[var(--cor-texto-suave)]">Carregando tela…</div>}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />

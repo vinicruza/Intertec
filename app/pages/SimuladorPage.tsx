@@ -28,6 +28,7 @@ import {
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
 import { enviarParaAprovacao, podeVerCascataOperacional } from "../lib/db/aprovacao";
+import { registrarEventoMonitoramento } from "../lib/db/monitoramento";
 import { useAuth } from "../auth/AuthProvider";
 import {
   fracaoParaPercentual,
@@ -371,6 +372,15 @@ export default function SimuladorPage() {
       }
     },
     onSuccess: (r) => {
+      void registrarEventoMonitoramento({
+        tipo: "cotacao_salva",
+        caminho: idParaEditar ? `/simulador/${idParaEditar}` : "/simulador",
+        contexto: {
+          aprovacao: r.aprovacao,
+          editando: Boolean(idParaEditar),
+          itens: linhas.length,
+        },
+      });
       setCotacaoId(r.id);
       setSalvo({ quote_number: r.quote_number, version: r.version, aprovacao: r.aprovacao });
       setErroSalvar("erroAprovacao" in r ? r.erroAprovacao : null);

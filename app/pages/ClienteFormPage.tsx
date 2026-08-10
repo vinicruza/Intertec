@@ -9,6 +9,7 @@ import {
   salvarCliente,
   type DadosCliente,
 } from "../lib/db/clientes";
+import { registrarEventoMonitoramento } from "../lib/db/monitoramento";
 import {
   cepValido,
   cnpjCpfValido,
@@ -321,7 +322,12 @@ export default function ClienteFormPage() {
       );
       return clienteId;
     },
-    onSuccess: () => {
+    onSuccess: (clienteId) => {
+      void registrarEventoMonitoramento({
+        tipo: "cliente_salvo",
+        caminho: novo ? "/clientes/novo" : `/clientes/${id}`,
+        contexto: { novo, clienteId },
+      });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       queryClient.invalidateQueries({ queryKey: ["pendenciaClientes"] });
