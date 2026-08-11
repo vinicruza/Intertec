@@ -26,6 +26,7 @@ import {
   montarCatalogoDeKit,
   salvarCotacao,
   type ContextoSimulador,
+  type FreteCotado,
 } from "../lib/db/pedidos";
 import { obterPedidoCompleto } from "../lib/db/fechamento";
 import { enviarParaAprovacao, podeVerCascataOperacional } from "../lib/db/aprovacao";
@@ -48,6 +49,16 @@ import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBus
 // cálculo dentro de componente de tela, e o que fica na tela não é testável.
 
 const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", kitNovo: null };
+const FRETE_COTADO_VAZIO: FreteCotado = {
+  id: "",
+  carrierId: null,
+  carrierName: null,
+  carrierOther: null,
+  amount: null,
+  leadTimeDays: null,
+  quoteCode: null,
+  selected: false,
+};
 
 const CORES: Record<string, string> = {
   blue: "bg-blue-100 text-blue-800",
@@ -74,6 +85,10 @@ function mensagemErro(e: unknown, padrao: string): string {
   if (e instanceof Error) return e.message;
   if (e && typeof e === "object" && "message" in e && typeof e.message === "string") return e.message;
   return padrao;
+}
+
+function novoFreteCotado(): FreteCotado {
+  return { ...FRETE_COTADO_VAZIO, id: globalThis.crypto?.randomUUID?.() ?? String(Date.now()) };
 }
 
 export default function SimuladorPage() {
@@ -114,6 +129,7 @@ export default function SimuladorPage() {
   // preenchidos depois, na hora de embalar.
   const [transportadoraId, setTransportadoraId] = useState("");
   const [transportadoraOutra, setTransportadoraOutra] = useState("");
+  const [fretesCotados, setFretesCotados] = useState<FreteCotado[]>([]);
   const [pesoKg, setPesoKg] = useState("");
   const [volumes, setVolumes] = useState("");
   const [cepEntrega, setCepEntrega] = useState("");
@@ -162,6 +178,7 @@ export default function SimuladorPage() {
     setAplicaDifalOverride(p.applies_difal);
     setTransportadoraId(textoDeCampo(p.carrier_id));
     setTransportadoraOutra(textoDeCampo(p.carrier_other));
+    setFretesCotados((p.freight_quotes ?? []).map((f) => ({ ...FRETE_COTADO_VAZIO, ...f, id: f.id || novoFreteCotado().id })));
     setPesoKg(textoDeCampo(p.weight_kg));
     setVolumes(textoDeCampo(p.volumes));
     setCepEntrega(textoDeCampo(p.shipping_zip));
@@ -353,6 +370,7 @@ export default function SimuladorPage() {
         itens,
         transportadoraId: transportadoraId || null,
         transportadoraOutra: transportadoraPedeNome ? transportadoraOutra : null,
+        fretesCotados,
         pesoKg,
         volumes,
         cepEntrega,
@@ -470,6 +488,50 @@ export default function SimuladorPage() {
 
   function atualizarKitNovo(i: number, muda: (k: KitNovoEdicao) => KitNovoEdicao) {
     setLinhas((a) => a.map((l, idx) => (idx === i && l.kitNovo ? { ...l, kitNovo: muda(l.kitNovo) } : l)));
+    setSalvo(null);
+  }
+
+  function atualizarFreteCotado(id: string, muda: Partial<FreteCotado>) {
+    const atual = fretesCotados.find((f) => f.id === id);
+    let selecionadaAtualizada: FreteCotado | null = atual?.selected ? { ...atual, ...muda } : null;
+    if (selecionadaAtualizada && muda.carrierId !== undefined && ctx) {
+      const carrier = ctx.transportadoras.find((t) => t.id === muda.carrierId);
+      selecionadaAtualizada = {
+        ...selecionadaAtualizada,
+        carrierName: carrier?.nome ?? null,
+        carrierOther: carrier?.pedeNome ? selecionadaAtualizada.carrierOther : null,
+      };
+    }
+    setFretesCotados((atuais) =>
+      atuais.map((f) => {
+        if (f.id !== id) return f;
+        const proximo = { ...f, ...muda };
+        if (muda.carrierId !== undefined && ctx) {
+          const carrier = ctx.transportadoras.find((t) => t.id === muda.carrierId);
+          proximo.carrierName = carrier?.nome ?? null;
+          if (!carrier?.pedeNome) proximo.carrierOther = null;
+        }
+        return proximo;
+      })
+    );
+    if (selecionadaAtualizada) {
+      setTransportadoraId(selecionadaAtualizada.carrierId ?? "");
+      setTransportadoraOutra(selecionadaAtualizada.carrierOther ?? "");
+      if (selecionadaAtualizada.amount) setFrete(selecionadaAtualizada.amount);
+    }
+    setSalvo(null);
+  }
+
+  function selecionarFreteCotado(freteCotado: FreteCotado) {
+    setFretesCotados((atuais) => atuais.map((f) => ({ ...f, selected: f.id === freteCotado.id })));
+    setTransportadoraId(freteCotado.carrierId ?? "");
+    setTransportadoraOutra(freteCotado.carrierOther ?? "");
+    if (freteCotado.amount) setFrete(freteCotado.amount);
+    setSalvo(null);
+  }
+
+  function removerFreteCotado(id: string) {
+    setFretesCotados((atuais) => atuais.filter((f) => f.id !== id));
     setSalvo(null);
   }
 
@@ -853,6 +915,105 @@ export default function SimuladorPage() {
               ? "Ativado: o frete é rateado nos itens e entra na margem com o imposto sobre frete."
               : "Desativado: o frete fica só na expedição e a margem bate com a rentabilidade antiga."}
           </p>
+          <div className="col-span-2 space-y-2 md:col-span-4">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Opções de frete cotadas</Label>
+              <Button
+                type="button"
+                className="bg-transparent text-[var(--cor-primaria)] hover:bg-[var(--cor-fundo)]"
+                onClick={() => setFretesCotados((atuais) => [...atuais, novoFreteCotado()])}
+              >
+                Adicionar opção
+              </Button>
+            </div>
+            {fretesCotados.length > 0 ? (
+              <div className="overflow-x-auto rounded-md border border-[var(--cor-borda)]">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-[var(--cor-fundo)] text-left">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Escolhida</th>
+                      <th className="px-3 py-2 font-medium">Transportadora</th>
+                      <th className="px-3 py-2 font-medium">Outra / código cotação</th>
+                      <th className="px-3 py-2 font-medium">Valor</th>
+                      <th className="px-3 py-2 font-medium">Prazo</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fretesCotados.map((opcao) => {
+                      const carrierDaOpcao = ctx.transportadoras.find((t) => t.id === opcao.carrierId);
+                      return (
+                        <tr key={opcao.id} className="border-t border-[var(--cor-borda)]">
+                          <td className="px-3 py-2">
+                            <input
+                              type="radio"
+                              checked={opcao.selected}
+                              onChange={() => selecionarFreteCotado(opcao)}
+                              aria-label="Marcar frete escolhido"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                              value={opcao.carrierId ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { carrierId: e.target.value || null })}
+                            >
+                              <option value="">—</option>
+                              {ctx.transportadoras.map((t) => (
+                                <option key={t.id} value={t.id}>{t.nome}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                value={opcao.carrierOther ?? ""}
+                                disabled={!carrierDaOpcao?.pedeNome}
+                                onChange={(e) => atualizarFreteCotado(opcao.id, { carrierOther: e.target.value })}
+                                placeholder={carrierDaOpcao?.pedeNome ? "Nome" : "—"}
+                              />
+                              <Input
+                                value={opcao.quoteCode ?? ""}
+                                onChange={(e) => atualizarFreteCotado(opcao.id, { quoteCode: e.target.value })}
+                                placeholder="Código"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={opcao.amount ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { amount: e.target.value })}
+                              placeholder="R$"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={opcao.leadTimeDays ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { leadTimeDays: e.target.value })}
+                              placeholder="dias"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Button
+                              type="button"
+                              className="bg-transparent text-red-600 hover:bg-red-50"
+                              onClick={() => removerFreteCotado(opcao.id)}
+                            >
+                              Remover
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
+                Nenhuma opção cotada registrada.
+              </p>
+            )}
+          </div>
           <div>
             <Label>Peso (kg)</Label>
             <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />

@@ -71,6 +71,7 @@ export default function PedidoFichaPage() {
   const transportadora = pedido.carriers?.requires_name
     ? pedido.carrier_other ?? "Outra"
     : pedido.carriers?.name ?? null;
+  const fretesCotados = pedido.freight_quotes ?? [];
   const modoPagamento = pedido.payment_terms?.label ??
     (pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null);
   const impressoEm = formatarDataHora(new Date());
@@ -235,6 +236,33 @@ export default function PedidoFichaPage() {
             <Dado rotulo="Peso" valor={pedido.weight_kg ? `${pedido.weight_kg} kg` : null} />
             <Dado rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
           </div>
+          {fretesCotados.length > 0 && (
+            <table className="mt-3 w-full text-xs">
+              <thead>
+                <tr className="border-b border-black/20 text-left">
+                  <th className="py-1 font-medium">Opção de frete</th>
+                  <th className="py-1 text-right font-medium">Valor</th>
+                  <th className="py-1 text-right font-medium">Prazo</th>
+                  <th className="py-1 text-right font-medium">Cotação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fretesCotados.map((opcao) => (
+                  <tr key={opcao.id} className={opcao.selected ? "font-bold" : ""}>
+                    <td className="py-1">
+                      {opcao.selected ? "Escolhida: " : ""}
+                      {opcao.carrierOther || opcao.carrierName || "—"}
+                    </td>
+                    <td className="py-1 text-right">{opcao.amount ? reais(opcao.amount) : "—"}</td>
+                    <td className="py-1 text-right">
+                      {opcao.leadTimeDays ? `${opcao.leadTimeDays} dias` : "—"}
+                    </td>
+                    <td className="py-1 text-right">{opcao.quoteCode || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* ---------- Resumo financeiro (só para quem vê margem) ---------- */}

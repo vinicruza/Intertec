@@ -11,6 +11,7 @@ import {
   reabrirPedido,
   salvarExpedicao,
   type DadosExpedicao,
+  type FreteCotadoPedido,
   type KitMaterializado,
   type PedidoCompleto,
 } from "../lib/db/fechamento";
@@ -34,6 +35,21 @@ import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+
+const FRETE_COTADO_VAZIO: FreteCotadoPedido = {
+  id: "",
+  carrierId: null,
+  carrierName: null,
+  carrierOther: null,
+  amount: null,
+  leadTimeDays: null,
+  quoteCode: null,
+  selected: false,
+};
+
+function novoFreteCotado(): FreteCotadoPedido {
+  return { ...FRETE_COTADO_VAZIO, id: globalThis.crypto?.randomUUID?.() ?? String(Date.now()) };
+}
 
 const CORES_SELO_MARGEM: Record<string, string> = {
   blue: "bg-blue-100 text-blue-800",
@@ -584,6 +600,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
   const [d, setD] = useState<DadosExpedicao>({
     carrierId: pedido.carrier_id ?? "",
     carrierOutra: pedido.carrier_other ?? "",
+    fretesCotados: (pedido.freight_quotes ?? []).map((f) => ({ ...FRETE_COTADO_VAZIO, ...f, id: f.id || novoFreteCotado().id })),
     pesoKg: pedido.weight_kg ?? "",
     volumes: pedido.volumes != null ? String(pedido.volumes) : "",
     cepEntrega: formatarCep(pedido.shipping_zip),
@@ -606,6 +623,44 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     setD((a) => ({ ...a, [campo]: valor }));
     setSalvo(false);
   };
+
+  function atualizarFreteCotado(id: string, muda: Partial<FreteCotadoPedido>) {
+    setD((atual) => {
+      const fretesCotados = atual.fretesCotados.map((f) => {
+        if (f.id !== id) return f;
+        const proximo = { ...f, ...muda };
+        if (muda.carrierId !== undefined) {
+          const carrier = (transportadoras ?? []).find((t) => t.id === muda.carrierId);
+          proximo.carrierName = carrier?.nome ?? null;
+          if (!carrier?.pedeNome) proximo.carrierOther = null;
+        }
+        return proximo;
+      });
+      const selecionada = fretesCotados.find((f) => f.selected);
+      return {
+        ...atual,
+        fretesCotados,
+        carrierId: selecionada?.carrierId ?? atual.carrierId,
+        carrierOutra: selecionada?.carrierOther ?? atual.carrierOutra,
+      };
+    });
+    setSalvo(false);
+  }
+
+  function selecionarFreteCotado(freteCotado: FreteCotadoPedido) {
+    setD((atual) => ({
+      ...atual,
+      carrierId: freteCotado.carrierId ?? "",
+      carrierOutra: freteCotado.carrierOther ?? "",
+      fretesCotados: atual.fretesCotados.map((f) => ({ ...f, selected: f.id === freteCotado.id })),
+    }));
+    setSalvo(false);
+  }
+
+  function removerFreteCotado(id: string) {
+    setD((atual) => ({ ...atual, fretesCotados: atual.fretesCotados.filter((f) => f.id !== id) }));
+    setSalvo(false);
+  }
 
   const escolhida = (transportadoras ?? []).find((t) => t.id === d.carrierId) ?? null;
   const cepInvalido = (d.cepEntrega ?? "").trim() !== "" && !cepValido(d.cepEntrega);
@@ -678,6 +733,110 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
               />
             </div>
           )}
+          <div className="col-span-2 space-y-2 md:col-span-4">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Opções de frete cotadas</Label>
+              <Button
+                type="button"
+                className="bg-transparent text-[var(--cor-primaria)] hover:bg-[var(--cor-fundo)]"
+                onClick={() =>
+                  setD((atual) => ({
+                    ...atual,
+                    fretesCotados: [...atual.fretesCotados, novoFreteCotado()],
+                  }))
+                }
+              >
+                Adicionar opção
+              </Button>
+            </div>
+            {d.fretesCotados.length > 0 ? (
+              <div className="overflow-x-auto rounded-md border border-[var(--cor-borda)]">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="bg-[var(--cor-fundo)] text-left">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Escolhida</th>
+                      <th className="px-3 py-2 font-medium">Transportadora</th>
+                      <th className="px-3 py-2 font-medium">Outra / código cotação</th>
+                      <th className="px-3 py-2 font-medium">Valor</th>
+                      <th className="px-3 py-2 font-medium">Prazo</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.fretesCotados.map((opcao) => {
+                      const carrierDaOpcao = (transportadoras ?? []).find((t) => t.id === opcao.carrierId);
+                      return (
+                        <tr key={opcao.id} className="border-t border-[var(--cor-borda)]">
+                          <td className="px-3 py-2">
+                            <input
+                              type="radio"
+                              checked={opcao.selected}
+                              onChange={() => selecionarFreteCotado(opcao)}
+                              aria-label="Marcar frete escolhido"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+                              value={opcao.carrierId ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { carrierId: e.target.value || null })}
+                            >
+                              <option value="">—</option>
+                              {(transportadoras ?? []).map((t) => (
+                                <option key={t.id} value={t.id}>{t.nome}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                value={opcao.carrierOther ?? ""}
+                                disabled={!carrierDaOpcao?.pedeNome}
+                                onChange={(e) => atualizarFreteCotado(opcao.id, { carrierOther: e.target.value })}
+                                placeholder={carrierDaOpcao?.pedeNome ? "Nome" : "—"}
+                              />
+                              <Input
+                                value={opcao.quoteCode ?? ""}
+                                onChange={(e) => atualizarFreteCotado(opcao.id, { quoteCode: e.target.value })}
+                                placeholder="Código"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={opcao.amount ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { amount: e.target.value })}
+                              placeholder="R$"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={opcao.leadTimeDays ?? ""}
+                              onChange={(e) => atualizarFreteCotado(opcao.id, { leadTimeDays: e.target.value })}
+                              placeholder="dias"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Button
+                              type="button"
+                              className="bg-transparent text-red-600 hover:bg-red-50"
+                              onClick={() => removerFreteCotado(opcao.id)}
+                            >
+                              Remover
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
+                Nenhuma opção cotada registrada.
+              </p>
+            )}
+          </div>
           <div>
             <Label>Peso (kg)</Label>
             <Input value={d.pesoKg ?? ""} onChange={(e) => mudar("pesoKg")(e.target.value)} placeholder="ex.: 12,5" />

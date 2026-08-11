@@ -5,6 +5,17 @@ import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../s
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
 import { carregarContextoSimulador, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
 
+export type FreteCotadoPedido = {
+  id: string;
+  carrierId: string | null;
+  carrierName: string | null;
+  carrierOther: string | null;
+  amount: string | null;
+  leadTimeDays: string | null;
+  quoteCode: string | null;
+  selected: boolean;
+};
+
 // ---------- Histórico ----------
 
 export type PedidoResumo = {
@@ -74,6 +85,7 @@ export type PedidoCompleto = {
   uf: string | null;
   freight: string | null;
   freight_paid_by_customer: boolean;
+  freight_quotes: FreteCotadoPedido[];
   commission_rate: string | null;
   // DIFAL: resolvido no pedido (05/08/2026), override do padrão do canal —
   // ver Calculations.md §12.
@@ -157,7 +169,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -258,6 +270,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
 export type DadosExpedicao = {
   carrierId: string | null;
   carrierOutra: string | null;
+  fretesCotados: FreteCotadoPedido[];
   pesoKg: string | null;
   volumes: string | null;
   cepEntrega: string | null;
@@ -283,6 +296,11 @@ export async function salvarExpedicao(orderId: string, d: DadosExpedicao): Promi
     p_order_notes: d.observacao?.trim() || null,
   });
   if (error) throw error;
+  const { error: erroFretes } = await supabase
+    .from("orders")
+    .update({ freight_quotes: d.fretesCotados })
+    .eq("id", orderId);
+  if (erroFretes) throw erroFretes;
 }
 
 // ---------- Fechamento (D7) ----------

@@ -337,12 +337,24 @@ export type DadosSimulacao = {
   // lê para cobrar.
   transportadoraId: string | null;
   transportadoraOutra: string | null;
+  fretesCotados: FreteCotado[];
   pesoKg: string | null;
   volumes: string | null;
   cepEntrega: string | null;
   modoPagamentoId: string | null;
   prazoPagamentoDias: string | null;
   observacao: string | null;
+};
+
+export type FreteCotado = {
+  id: string;
+  carrierId: string | null;
+  carrierName: string | null;
+  carrierOther: string | null;
+  amount: string | null;
+  leadTimeDays: string | null;
+  quoteCode: string | null;
+  selected: boolean;
 };
 
 // Salva a cotação e EMPILHA UMA VERSÃO (reunião 16/07/2026: "se ele faz 10
@@ -412,6 +424,11 @@ export async function salvarCotacao(
   });
   if (error) throw error;
   const resultado = data as ResultadoCotacao;
+  const { error: erroFretes } = await supabase
+    .from("orders")
+    .update({ freight_quotes: d.fretesCotados })
+    .eq("id", resultado.id);
+  if (erroFretes) throw erroFretes;
   const codigoCliente = textoOuVazio(d.clienteNovoCodigo).trim().toUpperCase();
   if (!d.clienteId && codigoCliente) {
     const { error: erroCodigo } = await supabase.rpc("set_order_customer_external_code", {
