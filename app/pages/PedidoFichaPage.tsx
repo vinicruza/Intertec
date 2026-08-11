@@ -61,6 +61,7 @@ export default function PedidoFichaPage() {
   const cascata = cascataQuery.data;
   const totaisFinanceiros = fechado ? t : cascata?.ok ? cascata.totals : t;
   const cliente = pedido.customers;
+  const codigoCliente = cliente?.external_code?.trim();
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
   // senão vale o do cadastro. É a única regra de precedência da folha.
   const cepEntrega = pedido.shipping_zip ?? cliente?.shipping_zip ?? null;
@@ -99,7 +100,9 @@ export default function PedidoFichaPage() {
 
         {/* ---------- Cabeçalho: os dados do cliente ---------- */}
         <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Cliente</h2>
+          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">
+            {codigoCliente ? `COD: ${codigoCliente}` : "Cliente"}
+          </h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <Dado rotulo="Empresa" valor={cliente?.name} className="col-span-2" />
             <Dado rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />

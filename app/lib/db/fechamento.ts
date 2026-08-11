@@ -106,6 +106,7 @@ export type PedidoCompleto = {
   // O cabeçalho da ficha impressa sai daqui: é o cadastro do cliente que
   // preenche CNPJ, CEPs e contato, não uma digitação por pedido.
   customers: {
+    external_code: string | null;
     name: string;
     tax_id: string | null;
     billing_zip: string | null;
@@ -152,7 +153,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, shipping_zip, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
