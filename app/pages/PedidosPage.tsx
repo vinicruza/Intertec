@@ -87,7 +87,7 @@ export default function PedidosPage() {
       const nomesItens = p.order_items
         .map((i) => i.item_name_snapshot ?? i.products?.name ?? i.kits?.name ?? i.ad_hoc_kit_label ?? "")
         .join(" ");
-      const alvo = `${p.quote_number ?? ""} ${p.customers?.name ?? ""} ${nomesItens}`;
+      const alvo = `${p.quote_number ?? ""} ${p.order_number ?? ""} ${p.customers?.name ?? ""} ${nomesItens}`;
       if (busca && !alvo.toLocaleLowerCase("pt-BR").includes(busca)) return false;
       if (faixa) {
         const receitaLiquida = receitaLiquidaDoHistorico(p);
@@ -117,7 +117,7 @@ export default function PedidosPage() {
           <option value="cancelled">Cancelados</option>
         </select>
         <Input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Período" />
-        <Input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Nº do orçamento, cliente ou item" />
+        <Input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Nº do orçamento, pedido, cliente ou item" />
         {veEquipe && (
           <>
             <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={vendedor} onChange={(e) => setVendedor(e.target.value)}>
@@ -149,7 +149,7 @@ export default function PedidosPage() {
 
       {pedidos.length > 0 && <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm"><thead><tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
-          <th className="px-4 py-3 font-medium">Orçamento</th><th className="px-4 py-3 font-medium">Cliente</th>
+          <th className="px-4 py-3 font-medium">Orçamento / pedido</th><th className="px-4 py-3 font-medium">Cliente</th>
           <th className="px-4 py-3 font-medium">Vendedor / canal</th><th className="px-4 py-3 font-medium">UF</th>
           <th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Receita líquida</th>
           <th className="px-4 py-3 font-medium">Margem contrib.</th>
@@ -157,6 +157,7 @@ export default function PedidosPage() {
           return <tr key={p.id} className="cursor-pointer border-b border-[var(--cor-borda)] last:border-0 hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/pedidos/${p.id}`)}>
             <td className="px-4 py-3">
               <span className="font-mono text-xs">{p.quote_number ?? "—"}</span>
+              <span className="block font-mono text-xs text-[var(--cor-texto-suave)]">{p.order_number ?? "—"}</span>
               <span className="block text-xs text-[var(--cor-texto-suave)]">{dataCurta(p.cancelled_at ?? p.closed_at ?? p.lost_at ?? p.created_at)}</span>
             </td>
             <td className="px-4 py-3 font-medium">

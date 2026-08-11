@@ -200,6 +200,7 @@ export default function PedidoDetalhePage() {
 
       <Card className="space-y-1 text-sm">
         <p><span className="text-[var(--cor-texto-suave)]">Orçamento:</span> <strong className="font-mono">{pedido.quote_number ?? "—"}</strong></p>
+        <p><span className="text-[var(--cor-texto-suave)]">Pedido:</span> <strong className="font-mono">{pedido.order_number ?? "—"}</strong></p>
         <p><span className="text-[var(--cor-texto-suave)]">Vendedor:</span> {pedido.sellers?.name ?? "—"} · <span className="text-[var(--cor-texto-suave)]">UF:</span> {pedido.uf ?? "—"} · <span className="text-[var(--cor-texto-suave)]">Comissão:</span> {pedido.commission_rate ?? "—"}</p>
         {fechado && (
           <p className="text-xs text-[var(--cor-texto-suave)]">
@@ -535,16 +536,18 @@ export default function PedidoDetalhePage() {
         </p>
         <table className="w-full text-sm">
           <thead><tr className="text-left text-[var(--cor-texto-suave)]">
-            <th className="py-1 font-medium">Versão</th><th className="py-1 font-medium">Quando</th>
+            <th className="py-1 font-medium">Versão</th><th className="py-1 font-medium">Quando</th><th className="py-1 font-medium">Usuário</th>
             <th className="py-1 text-right font-medium">Receita</th><th className="py-1 text-right font-medium">Margem contrib.</th>
           </tr></thead>
           <tbody>
             {(versoesQuery.data ?? []).map((v) => {
               const foto = v.snapshot as Record<string, string | undefined>;
+              const usuario = Array.isArray(v.profiles) ? v.profiles[0]?.full_name : v.profiles?.full_name;
               return (
                 <tr key={v.version} className="border-t border-[var(--cor-borda)]">
                   <td className="py-1">v{v.version}</td>
                   <td className="py-1 text-[var(--cor-texto-suave)]">{dataCurta(v.created_at)}</td>
+                  <td className="py-1">{usuario ?? "—"}</td>
                   <td className="py-1 text-right">{reais(foto.receita_bruta)}</td>
                   <td className="py-1 text-right">{reais(foto.margem_contribuicao)}</td>
                 </tr>

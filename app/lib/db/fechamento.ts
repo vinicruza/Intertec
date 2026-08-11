@@ -25,6 +25,7 @@ export type PedidoResumo = {
   approved_at: string | null;
   submitted_at: string | null;
   quote_number: string | null;
+  order_number: string | null;
   uf: string | null;
   created_at: string;
   closed_at: string | null;
@@ -65,7 +66,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, submitted_at, quote_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
+      "id, status, approval_status, approved_at, submitted_at, quote_number, order_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -82,6 +83,7 @@ export type PedidoCompleto = {
   submitted_by: string | null;
   submitted_at: string | null;
   quote_number: string | null;
+  order_number: string | null;
   uf: string | null;
   freight: string | null;
   freight_paid_by_customer: boolean;
@@ -169,7 +171,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();

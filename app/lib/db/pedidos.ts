@@ -362,7 +362,7 @@ export type FreteCotado = {
 // gravados só no fechamento (D7).
 //
 // Passe `orderId` para revisar uma cotação existente; null cria uma nova.
-export type ResultadoCotacao = { id: string; version: number; quote_number: string };
+export type ResultadoCotacao = { id: string; version: number; quote_number: string; order_number: string | null };
 
 // Campo numérico vazio vira string vazia, que a função do banco trata como
 // nulo. Vírgula decimal do teclado brasileiro entra aqui: "12,5" é 12.5.
@@ -429,6 +429,12 @@ export async function salvarCotacao(
     .update({ freight_quotes: d.fretesCotados })
     .eq("id", resultado.id);
   if (erroFretes) throw erroFretes;
+  const { data: numeros, error: erroNumeros } = await supabase
+    .from("orders")
+    .select("quote_number, order_number")
+    .eq("id", resultado.id)
+    .single();
+  if (erroNumeros) throw erroNumeros;
   const codigoCliente = textoOuVazio(d.clienteNovoCodigo).trim().toUpperCase();
   if (!d.clienteId && codigoCliente) {
     const { error: erroCodigo } = await supabase.rpc("set_order_customer_external_code", {
@@ -437,7 +443,11 @@ export async function salvarCotacao(
     });
     if (erroCodigo) throw erroCodigo;
   }
-  return resultado;
+  return {
+    ...resultado,
+    quote_number: (numeros?.quote_number as string | null) ?? resultado.quote_number,
+    order_number: (numeros?.order_number as string | null) ?? resultado.order_number ?? null,
+  };
 }
 
 // ---------- Transportadoras ativas ----------
@@ -512,14 +522,15 @@ export type VersaoCotacao = {
   version: number;
   snapshot: Record<string, unknown>;
   created_at: string;
+  profiles: { full_name: string | null } | Array<{ full_name: string | null }> | null;
 };
 
 export async function listarVersoes(orderId: string): Promise<VersaoCotacao[]> {
   const { data, error } = await supabase
     .from("order_versions")
-    .select("version, snapshot, created_at")
+    .select("version, snapshot, created_at, profiles(full_name)")
     .eq("order_id", orderId)
     .order("version", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as VersaoCotacao[];
+  return (data ?? []) as unknown as VersaoCotacao[];
 }

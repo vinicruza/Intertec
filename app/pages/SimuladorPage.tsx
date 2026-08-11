@@ -138,8 +138,9 @@ export default function SimuladorPage() {
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<{
     quote_number: string;
+    order_number: string | null;
     version: number;
-    aprovacao: "rascunho" | "pendente" | "pendente_com_pendencia";
+    aprovacao: "aprovado_auto" | "rascunho" | "pendente" | "pendente_com_pendencia";
   } | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
   // Trava para o formulário ser preenchido uma vez só quando o pedido chega —
@@ -157,7 +158,10 @@ export default function SimuladorPage() {
       ? true
       : pedidoParaEditar.status === "simulation" &&
         !pedidoParaEditar.cancelled_at &&
-        (pedidoParaEditar.approval_status === "rascunho" || pedidoParaEditar.approval_status === "recusado");
+        (pedidoParaEditar.approval_status === "rascunho" ||
+          pedidoParaEditar.approval_status === "recusado" ||
+          (pedidoParaEditar.approval_status === "aprovado" &&
+            (pedidoParaEditar.approval_notes ?? "").startsWith("Aprovado automaticamente pela margem")));
 
   useEffect(() => {
     if (!idParaEditar || !pedidoParaEditar || !ctx || carregado) return;
@@ -380,7 +384,7 @@ export default function SimuladorPage() {
       }, foto);
 
       if (!seloExigeAprovacao(selo)) {
-        return { ...cotacao, aprovacao: "rascunho" as const };
+        return { ...cotacao, aprovacao: "aprovado_auto" as const };
       }
 
       try {
@@ -405,7 +409,7 @@ export default function SimuladorPage() {
         },
       });
       setCotacaoId(r.id);
-      setSalvo({ quote_number: r.quote_number, version: r.version, aprovacao: r.aprovacao });
+      setSalvo({ quote_number: r.quote_number, order_number: r.order_number, version: r.version, aprovacao: r.aprovacao });
       setErroSalvar("erroAprovacao" in r ? r.erroAprovacao : null);
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
       queryClient.invalidateQueries({ queryKey: ["aprovacoes"] });
@@ -1107,8 +1111,15 @@ export default function SimuladorPage() {
             )}
             {salvo && (
               <span className={`text-sm ${salvo.aprovacao === "pendente_com_pendencia" ? "text-amber-700" : "text-green-700"}`}>
-                Cotação <strong>{salvo.quote_number}</strong> salva — versão {salvo.version}{" "}
-                {salvo.aprovacao === "pendente" ? "e enviada para aprovação" : salvo.aprovacao === "pendente_com_pendencia" ? "salva; complete os dados para enviar à aprovação" : ""} ✓
+                Cotação <strong>{salvo.quote_number}</strong>
+                {salvo.order_number ? <> / Pedido <strong>{salvo.order_number}</strong></> : ""} salva — versão {salvo.version}{" "}
+                {salvo.aprovacao === "aprovado_auto"
+                  ? "e aprovada automaticamente pela margem"
+                  : salvo.aprovacao === "pendente"
+                    ? "e enviada para aprovação"
+                    : salvo.aprovacao === "pendente_com_pendencia"
+                      ? "salva; complete os dados para enviar à aprovação"
+                      : ""} ✓
               </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}

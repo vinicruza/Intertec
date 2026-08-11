@@ -69,6 +69,7 @@ export async function decidirAprovacao(
 export type PedidoPendente = {
   id: string;
   quote_number: string | null;
+  order_number: string | null;
   uf: string | null;
   submitted_at: string | null;
   submitted_by: string | null;
@@ -82,7 +83,7 @@ export async function listarPedidosPendentesDeAprovacao(): Promise<PedidoPendent
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, quote_number, uf, submitted_at, submitted_by, customers(name), sellers(name), channels(name), order_items(quantity, unit_price)"
+      "id, quote_number, order_number, uf, submitted_at, submitted_by, customers(name), sellers(name), channels(name), order_items(quantity, unit_price)"
     )
     .eq("approval_status", "pendente")
     .is("cancelled_at", null)

@@ -47,6 +47,8 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
     { header: "Fechado em", key: "fechado", width: 14 },
     { header: "Cancelado em", key: "cancelado", width: 14 },
     { header: "Status", key: "status", width: 14 },
+    { header: "Orçamento", key: "orcamento", width: 18 },
+    { header: "Pedido", key: "pedido", width: 14 },
     { header: "Cliente", key: "cliente", width: 32 },
     { header: "Vendedor", key: "vendedor", width: 24 },
     { header: "Canal", key: "canal", width: 20 },
@@ -65,6 +67,8 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
     fechado: p.closed_at?.slice(0, 10) ?? "",
     cancelado: p.cancelled_at?.slice(0, 10) ?? "",
     status: statusDoPedido(p),
+    orcamento: p.quote_number ?? "",
+    pedido: p.order_number ?? "",
     cliente: p.customers?.name ?? "",
     vendedor: p.sellers?.name ?? "",
     canal: p.channels?.name ?? "",
@@ -79,7 +83,7 @@ export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise
   sheet.views = [{ state: "frozen", ySplit: 1 }];
   sheet.getColumn("receita").numFmt = '#,##0.00';
   sheet.getColumn("margem").numFmt = '#,##0.00';
-  sheet.autoFilter = { from: "A1", to: "M1" };
+  sheet.autoFilter = { from: "A1", to: "O1" };
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([new Uint8Array(buffer as ArrayBuffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);

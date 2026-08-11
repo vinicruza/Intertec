@@ -96,9 +96,11 @@ export default function PedidoFichaPage() {
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-normal">
-              {fechado ? "Pedido gerado do orçamento" : "Orçamento"}
+              Orçamento
             </p>
             <p className="font-mono text-lg font-bold">{pedido.quote_number ?? "—"}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-normal">Pedido</p>
+            <p className="font-mono text-base font-bold">{pedido.order_number ?? "—"}</p>
             <p className="text-xs">
               {fechado ? `Aprovado em ${dataCurta(pedido.closed_at)}` : "Em cotação"}
             </p>

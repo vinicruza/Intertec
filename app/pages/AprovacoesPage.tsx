@@ -93,6 +93,7 @@ export default function AprovacoesPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <strong className="font-mono text-sm text-[var(--cor-primaria)]">{p.quote_number ?? "—"}</strong>
+                  <span className="font-mono text-xs text-[var(--cor-texto-suave)]">{p.order_number ?? "—"}</span>
                   <span className="font-medium">{p.customers?.name ?? "sem cliente"}</span>
                   {souRemetente && <Badge>você enviou</Badge>}
                 </div>
