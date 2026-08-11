@@ -76,19 +76,21 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     }
   }
 
-  // Frete destacado: o frete continua existindo no pedido, mas entra também no
-  // preço unitário dos itens, rateado pela participação de cada linha na
-  // receita original. Quando a simulação vem de um pedido salvo, os preços já
-  // estão destacados no banco e não podem receber o frete de novo.
+  // Frete destacado: quando ligado, o frete entra no preço dos itens e também
+  // na cascata da margem. Quando desligado, o frete fica registrado para a
+  // expedição, mas não derruba a margem; é a leitura da rentabilidade antiga.
+  // Quando a simulação vem de um pedido salvo, os preços já estão destacados no
+  // banco e não podem receber o frete de novo.
+  const freteDestacado = entrada.fretePorContaCliente;
   const itensCalculados =
-    entrada.fretePorContaCliente && !entrada.freteJaDestacadoNosPrecos
+    freteDestacado && !entrada.freteJaDestacadoNosPrecos
       ? aplicarFreteDestacadoAosItens(entrada.itens, freteUsado)
       : entrada.itens;
 
   const resultado = calcularPedido({
     itens: itensCalculados,
     frete: freteUsado,
-    fretePorContaCliente: false,
+    fretePorContaCliente: !freteDestacado,
     aliquotaImposto: entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,

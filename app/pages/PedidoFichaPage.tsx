@@ -108,9 +108,11 @@ export default function PedidoFichaPage() {
         {/* ---------- Cabeçalho: os dados do cliente ---------- */}
         <div>
           <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">
-            {codigoCliente ? `COD: ${codigoCliente}` : "Cliente"}
+            Cliente
           </h2>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <Dado rotulo="Cód. cliente" valor={codigoCliente ?? null} />
+            <Dado rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
             <Dado rotulo="Empresa" valor={cliente?.name} className="col-span-2" />
             <Dado rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
             <Dado rotulo="Data" valor={dataCurta(pedido.created_at)} />
@@ -119,7 +121,6 @@ export default function PedidoFichaPage() {
             <Dado rotulo="CEP entrega" valor={formatarCep(cepEntrega) || null} />
             <Dado rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} />
             <Dado rotulo="Contato" valor={cliente?.contact_name} />
-            <Dado rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
             <Dado rotulo="E-mail" valor={cliente?.email} className="col-span-2" />
             <Dado rotulo="Vendedor" valor={pedido.sellers?.name} />
           </div>

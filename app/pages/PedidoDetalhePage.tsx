@@ -621,7 +621,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
         {salvo && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Dados registrados.</p>}
 
         <div>
-          <Label>Modo de pagamento</Label>
+          <Label>Condição de pagamento</Label>
           <select
             className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
             value={d.modoPagamentoId ?? ""}

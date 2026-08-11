@@ -630,7 +630,7 @@ function LinhaModoPagamento({
   return (
     <Card className="flex flex-wrap items-end gap-3">
       <div className="min-w-64 flex-1">
-        <Label>Modo de pagamento</Label>
+        <Label>Condição de pagamento</Label>
         <Input value={label} onChange={(e) => setLabel(e.target.value)} />
       </div>
       <div>

@@ -780,7 +780,7 @@ export default function SimuladorPage() {
           <h2 className="text-lg font-semibold">Condições</h2>
         </div>
         <div>
-          <Label>Modo de pagamento</Label>
+          <Label>Condição de pagamento</Label>
           <select
             className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
             value={modoPagamentoId}
@@ -853,8 +853,13 @@ export default function SimuladorPage() {
                 setFreteCliente(e.target.checked);
               }}
             />
-            Frete Destacado
+            Frete destacado
           </label>
+          <p className="col-span-2 text-xs text-[var(--cor-texto-suave)] md:col-span-4">
+            {freteCliente
+              ? "Ativado: o frete é rateado nos itens e entra na margem com o imposto sobre frete."
+              : "Desativado: o frete fica só na expedição e a margem bate com a rentabilidade antiga."}
+          </p>
           <div>
             <Label>Peso (kg)</Label>
             <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />
@@ -924,7 +929,7 @@ export default function SimuladorPage() {
             </tbody>
           </table>}
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
-            Deduções da receita líquida: frete {toMoney(simulacao.freteUsado).replace(".", ",")} · imposto frete{" "}
+            Deduções da receita líquida: frete {toMoney(simulacao.resultado.frete).replace(".", ",")} · imposto frete{" "}
             {toMoney(simulacao.resultado.impostoFrete).replace(".", ",")} · comissão {toMoney(simulacao.resultado.comissao).replace(".", ",")}
             {freteCliente ? " · frete destacado nos preços dos itens" : ""}
           </p>}

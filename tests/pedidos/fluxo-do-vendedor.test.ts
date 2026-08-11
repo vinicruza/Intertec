@@ -172,12 +172,12 @@ describe("pedido só com produtos individuais", () => {
     expect(toMoney(s.resultado.imposto)).toBe("2851.88"); // 16,25%
     expect(toMoney(s.resultado.difal)).toBe("2369.25"); // 13,5%
     expect(toMoney(s.resultado.comissao)).toBe("438.75"); // 2,5%
-    expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10727.63");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11890.13");
     // CMV: 4000 × 1,537605 + 500 × 0,412
     expect(toMoney(s.resultado.cmvTotal)).toBe("6356.42");
-    expect(toMoney(s.resultado.margemContribuicao)).toBe("4371.21");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("40.75");
+    expect(toMoney(s.resultado.margemContribuicao)).toBe("5533.71");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("46.54");
     expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS_MARGEM)?.label).toBe("Boa");
   });
 
@@ -468,6 +468,13 @@ describe("escolhas do vendedor que mudam a conta", () => {
     // Receita bruta sobe exatamente o valor do frete destacado.
     const comFrete = montarPedido(base).simulacao!;
     expect(Number(s.resultado.receitaBruta) - Number(comFrete.resultado.receitaBruta)).toBeCloseTo(1000, 2);
+  });
+
+  it("frete desmarcado fica só na expedição e não entra na margem", () => {
+    const s = montarPedido(base).simulacao!;
+    expect(toMoney(s.freteUsado)).toBe("1000.00");
+    expect(toMoney(s.resultado.frete)).toBe("0.00");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
   });
 
   it("DIFAL desmarcado no pedido vale mais que o padrão do canal", () => {
