@@ -43,6 +43,9 @@ export default function KitsPage() {
   }
 
   const kits = kitsQuery.data ?? [];
+  const semCodigo = kits.filter((k) => !k.code?.trim()).length;
+  const dePedido = kits.filter((k) => k.source_order_id).length;
+  const inativos = kits.filter((k) => k.status === "inactive").length;
 
   return (
     <div className="space-y-4">
@@ -53,9 +56,30 @@ export default function KitsPage() {
         <p className="text-sm text-[var(--cor-texto-suave)]">
           Registro dos kits já criados. Kits novos são montados dentro do{" "}
           <Link className="font-medium underline" to="/simulador">simulador de pedido</Link>, e o
-          código oficial nasce quando o pedido é ganho.
+          código oficial nasce ao clicar em Gerar Pedido.
         </p>
       </div>
+
+      {kits.length > 0 && (
+        <div className="grid gap-3 text-sm md:grid-cols-4">
+          <Card className="py-3">
+            <div className="text-xs text-[var(--cor-texto-suave)]">Kits no catálogo</div>
+            <div className="text-xl font-semibold">{kits.length}</div>
+          </Card>
+          <Card className="py-3">
+            <div className="text-xs text-[var(--cor-texto-suave)]">Nascidos de pedido</div>
+            <div className="text-xl font-semibold">{dePedido}</div>
+          </Card>
+          <Card className="py-3">
+            <div className="text-xs text-[var(--cor-texto-suave)]">Inativos</div>
+            <div className="text-xl font-semibold">{inativos}</div>
+          </Card>
+          <Card className={`py-3 ${semCodigo > 0 ? "border-red-200 bg-red-50" : ""}`}>
+            <div className="text-xs text-[var(--cor-texto-suave)]">Sem código</div>
+            <div className="text-xl font-semibold">{semCodigo}</div>
+          </Card>
+        </div>
+      )}
 
       {kitsQuery.isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
 
@@ -86,11 +110,22 @@ export default function KitsPage() {
                   onClick={() => navigate(`/kits/${k.id}`)}
                 >
                   <td className="px-4 py-3">
-                    <strong className="font-mono text-base text-[var(--cor-primaria)]">{k.code}</strong>
+                    {k.code ? (
+                      <strong className="font-mono text-base text-[var(--cor-primaria)]">{k.code}</strong>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                        sem código
+                      </span>
+                    )}
                     <div className="text-xs text-[var(--cor-texto-suave)]">{k.name}</div>
                     {k.legacy_code && <div className="text-xs text-[var(--cor-texto-suave)]">antigo {k.legacy_code}</div>}
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       <Badge>{k.source_order_id ? "de um pedido" : "cadastro manual"}</Badge>
+                      {k.status === "inactive" && (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                          inativo
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--cor-texto-suave)]">

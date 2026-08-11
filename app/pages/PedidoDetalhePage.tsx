@@ -252,52 +252,51 @@ export default function PedidoDetalhePage() {
             </tr>
           </thead>
           <tbody>
-            {pedido.itens.map((i) => (
-              <tr key={i.id} className="border-b border-[var(--cor-borda)] last:border-0">
-                <td className="px-4 py-3 font-medium">
-                  <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">
-                    {i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
-                      (i.ad_hoc_kit_composicao ? "código ao ganhar" : "")}
-                  </div>
-                  {/* Kit montado dentro deste pedido: ainda não tem código de
-                      catálogo (ele nasce quando o pedido é ganho), mas tem
-                      nome e composição — e é isso que a conferência lê. */}
-                  {i.products?.name ??
-                    (i.kits
-                      ? `[Kit] ${i.kits.name}`
-                      : i.ad_hoc_kit_composicao
-                        ? `[Kit] ${i.ad_hoc_kit_label?.trim() || "Kit montado no pedido"}`
-                        : "—")}
-                  {i.ad_hoc_kit_composicao && (
-                    <div className="mt-1 text-xs font-normal text-[var(--cor-texto-suave)]">
-                      {i.ad_hoc_kit_composicao.map((c) => `${c.quantidade}× ${c.nome}`).join(" · ")}
+            {pedido.itens.map((i) => {
+              const composicaoKit =
+                (i.kit_composition_snapshot as Array<{ nome: string; quantidade: string }> | null) ??
+                i.ad_hoc_kit_composicao ??
+                null;
+              return (
+                <tr key={i.id} className="border-b border-[var(--cor-borda)] last:border-0">
+                  <td className="px-4 py-3 font-medium">
+                    <div className="font-mono text-xs font-bold text-[var(--cor-primaria)]">
+                      {i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
+                        (i.ad_hoc_kit_composicao ? "código ao Gerar Pedido" : "")}
                     </div>
-                  )}
-                  {/* Nome fiscal ao lado do nome do catálogo — só quando os
-                      dois diferem, para não repetir a mesma linha. */}
-                  {i.products?.nf_description && i.products.nf_description !== i.products.name && (
-                    <div className="mt-0.5 text-xs font-normal text-[var(--cor-texto-suave)]">
-                      NF: {i.products.nf_description}
-                    </div>
-                  )}
-                  {fechado && i.kit_composition_snapshot != null && (
-                    <div className="mt-1 text-xs text-[var(--cor-texto-suave)]">
-                      Composição congelada:{" "}
-                      {(i.kit_composition_snapshot as Array<{ nome: string; quantidade: string }>)
-                        .map((c) => `${c.quantidade}× ${c.nome}`)
-                        .join(" · ")}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3">{i.quantity}</td>
-                <td className="px-4 py-3">{reais(i.unit_price)}</td>
-                {verNumeros && (
-                  <td className="px-4 py-3">
-                    {reais(fechado ? i.cmv_unit_snapshot : (cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : null))}
+                    {/* Kit montado dentro deste pedido: ainda não tem código de
+                        catálogo (ele nasce ao Gerar Pedido), mas tem nome e
+                        composição — e é isso que a conferência lê. */}
+                    {i.products?.name ??
+                      (i.kits
+                        ? `[Kit] ${i.kits.name}`
+                        : i.ad_hoc_kit_composicao
+                          ? `[Kit] ${i.ad_hoc_kit_label?.trim() || "Kit montado no pedido"}`
+                          : "—")}
+                    {/* Nome fiscal ao lado do nome do catálogo — só quando os
+                        dois diferem, para não repetir a mesma linha. */}
+                    {i.products?.nf_description && i.products.nf_description !== i.products.name && (
+                      <div className="mt-0.5 text-xs font-normal text-[var(--cor-texto-suave)]">
+                        NF: {i.products.nf_description}
+                      </div>
+                    )}
+                    {composicaoKit && composicaoKit.length > 0 && (
+                      <div className="mt-1 text-xs font-normal text-[var(--cor-texto-suave)]">
+                        {fechado ? "Composição congelada" : "Composição do kit"}:{" "}
+                        {composicaoKit.map((c) => `${c.quantidade}× ${c.nome}`).join(" · ")}
+                      </div>
+                    )}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="px-4 py-3">{i.quantity}</td>
+                  <td className="px-4 py-3">{reais(i.unit_price)}</td>
+                  {verNumeros && (
+                    <td className="px-4 py-3">
+                      {reais(fechado ? i.cmv_unit_snapshot : (cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : null))}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Card>

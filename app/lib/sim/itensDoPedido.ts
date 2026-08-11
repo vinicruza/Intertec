@@ -167,6 +167,46 @@ export function kitsSemNome(linhas: LinhaItem[]): number[] {
   );
 }
 
+export function pendenciasDosKits(
+  linhas: LinhaItem[],
+  resolvidas: Array<LinhaResolvida | null>
+): string[] {
+  return linhas.flatMap((linha, i) => {
+    if (linha.itemId !== KIT_NOVO || !linha.kitNovo) return [];
+    const numeroLinha = i + 1;
+    const pendencias: string[] = [];
+
+    if (linha.kitNovo.rotulo.trim() === "") {
+      pendencias.push(`Item ${numeroLinha}: informe o nome do kit.`);
+    }
+
+    const produtosPreenchidos = linha.kitNovo.produtos.filter((p) => p.produtoId && p.quantidade.trim() !== "");
+    const produtoParcial = linha.kitNovo.produtos.some(
+      (p) => (p.produtoId && p.quantidade.trim() === "") || (!p.produtoId && p.quantidade.trim() !== "")
+    );
+    if (produtoParcial) {
+      pendencias.push(`Item ${numeroLinha}: complete produto e quantidade em todas as linhas do kit.`);
+    }
+    if (produtosPreenchidos.length === 0) {
+      pendencias.push(`Item ${numeroLinha}: inclua ao menos um produto no kit.`);
+    }
+
+    const embalagemParcial = linha.kitNovo.embalagem.some(
+      (e) => (e.insumoId && e.quantidade.trim() === "") || (!e.insumoId && e.quantidade.trim() !== "")
+    );
+    if (embalagemParcial) {
+      pendencias.push(`Item ${numeroLinha}: complete insumo e quantidade nas linhas de embalagem.`);
+    }
+
+    const erro = resolvidas[i]?.erro;
+    if (erro && !pendencias.some((p) => p.toLowerCase().includes(erro.toLowerCase()))) {
+      pendencias.push(`Item ${numeroLinha}: ${erro}`);
+    }
+
+    return pendencias;
+  });
+}
+
 // Sugestão de nome a partir da composição, para o campo não começar vazio.
 // É só um ponto de partida — quem monta troca por "Kit catarata Hospital X".
 export function nomeSugeridoParaKit(
@@ -263,7 +303,7 @@ export function kitNovoAPartirDe(base: KitParaCopiar): KitNovoEdicao {
 //   kit      — kit de catálogo, OU kit montado na hora cuja composição JÁ
 //              existe (aí usa o código que já existe, não cria outro igual);
 //   kitNovo  — composição inédita, que só vira kit de catálogo com código
-//              oficial quando o pedido for ganho (reunião 16/07/2026).
+//              oficial ao Gerar Pedido (reunião 16/07/2026).
 export function montarItensDaCotacao(
   linhas: LinhaItem[],
   resolvidas: Array<LinhaResolvida | null>,
@@ -335,7 +375,7 @@ export function removerFreteDestacadoDasLinhas(linhas: LinhaItem[], frete: strin
 
 // ---------- Kit montado no pedido, visto de fora do simulador ----------
 //
-// Entre salvar a cotação e ganhar o pedido, o kit montado na hora NÃO tem
+// Entre salvar a cotação e Gerar Pedido, o kit montado na hora NÃO tem
 // registro em `kits`: mora nas colunas ad_hoc_* do item. Quem lê o pedido
 // depois (a fila de aprovação, o detalhe, a ficha impressa) precisa do mesmo
 // nome e do mesmo CMV que o simulador mostrou — senão o aprovador vê um item

@@ -8,10 +8,10 @@ import {
   KIT_NOVO,
   aplicarPrecosCalculadosAosItensDaCotacao,
   kitNovoAPartirDe,
-  kitsSemNome,
   montarItensDaCotacao,
   montarItensParaMotor,
   nomeSugeridoParaKit,
+  pendenciasDosKits,
   produtoKitAleatorioExigeComposicao,
   removerFreteDestacadoDasLinhas,
   resolverLinhaDoPedido,
@@ -329,18 +329,14 @@ export default function SimuladorPage() {
     }
   }, [ctx, vendedor, canal, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
 
-  // Kit sem nome não é salvo: sem ele, o kit entra no catálogo como "Kit do
-  // pedido" e, alguns pedidos depois, ninguém sabe qual é qual.
-  const linhasComKitSemNome = kitsSemNome(linhas);
+  // Kit incompleto não é salvo: ao Gerar Pedido ele vira código oficial de
+  // catálogo, então nome e composição precisam estar fechados desde a cotação.
+  const pendenciasKit = pendenciasDosKits(linhas, resolvidas);
 
   const salvar = useMutation({
     mutationFn: async () => {
       if (simulacao.estado !== "ok" || !vendedor || !canal || !ctx) throw new Error("Cotação incompleta.");
-      if (linhasComKitSemNome.length > 0) {
-        throw new Error(
-          `Dê um nome ao kit montado no item ${linhasComKitSemNome.map((i) => i + 1).join(", ")} antes de salvar.`
-        );
-      }
+      if (pendenciasKit.length > 0) throw new Error(pendenciasKit.join(" "));
 
       const itensBase = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
       const itens = freteCliente
@@ -1099,14 +1095,15 @@ export default function SimuladorPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={() => salvar.mutate()}
-              disabled={salvar.isPending || linhasComKitSemNome.length > 0}
-              title={linhasComKitSemNome.length > 0 ? "Dê um nome ao kit montado antes de salvar." : undefined}
+              disabled={salvar.isPending || pendenciasKit.length > 0}
+              title={pendenciasKit.length > 0 ? "Corrija as pendências dos kits antes de salvar." : undefined}
             >
               {salvar.isPending ? "Salvando…" : cotacaoId ? "Salvar nova versão" : "Salvar cotação"}
             </Button>
-            {linhasComKitSemNome.length > 0 && (
+            {pendenciasKit.length > 0 && (
               <span className="text-sm text-amber-700">
-                Dê um nome ao kit montado no item {linhasComKitSemNome.map((i) => i + 1).join(", ")}.
+                {pendenciasKit.slice(0, 2).join(" ")}
+                {pendenciasKit.length > 2 ? ` Mais ${pendenciasKit.length - 2} pendência(s).` : ""}
               </span>
             )}
             {salvo && (
@@ -1245,7 +1242,7 @@ function MontadorKit({
           )}
         </div>
         <p className="pb-2 text-xs text-[var(--cor-texto-suave)]">
-          O código oficial só é gerado quando o pedido for ganho.
+          O código oficial do kit nasce ao clicar em Gerar Pedido.
         </p>
       </div>
 
@@ -1276,7 +1273,7 @@ function MontadorKit({
           "a hora que ela jogar ali, o próprio sistema acusasse que aquele kit já existe". */}
       {resolvida?.kitExistente && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          ⚠️ Esta composição já existe: <strong>{resolvida.kitExistente.codigo}</strong>{" "}
+          Esta composição já existe: <strong>{resolvida.kitExistente.codigo}</strong>{" "}
           ({resolvida.kitExistente.nome}). Ao salvar, o pedido usará esse kit — o código é o mesmo,
           não será criado um duplicado.
           {resolvida.kitExistente.ativo === false && (
@@ -1289,8 +1286,14 @@ function MontadorKit({
           )}
         </p>
       )}
+      {!resolvida?.kitExistente && !resolvida?.erro && resolvida?.assinatura && (
+        <p className="rounded-md bg-white px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
+          Kit novo: se esta cotação virar pedido, o sistema cria o kit no catálogo e gera um código
+          oficial para esta composição.
+        </p>
+      )}
       {resolvida?.erro && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">🛑 {resolvida.erro}</p>
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{resolvida.erro}</p>
       )}
 
       <div className="space-y-2">

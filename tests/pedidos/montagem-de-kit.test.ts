@@ -4,6 +4,7 @@ import {
   kitNovoAPartirDe,
   kitsSemNome,
   nomeSugeridoParaKit,
+  pendenciasDosKits,
   resumoFinanceiroLinhaKit,
   resumoDoKit,
   type KitNovoEdicao,
@@ -63,6 +64,26 @@ describe("kit precisa de nome", () => {
 
   it("produto de catálogo nunca é cobrado por nome — ele já tem o do cadastro", () => {
     expect(kitsSemNome([linha({ itemId: "prod-avental" })])).toEqual([]);
+  });
+
+  it("lista as pendências que impedem o kit de virar código oficial", () => {
+    const linhas = [
+      linha({
+        itemId: KIT_NOVO,
+        kitNovo: kit({
+          rotulo: "",
+          produtos: [{ produtoId: "", quantidade: "1" }],
+          embalagem: [{ insumoId: "", modo: "porKit", quantidade: "1" }],
+        }),
+      }),
+    ];
+
+    expect(pendenciasDosKits(linhas, [{ nome: "", cmvUnitario: null, assinatura: null, kitExistente: null, erro: "Inclua ao menos um produto no kit.", linhasProdutos: [], linhasEmbalagem: [] }])).toEqual([
+      "Item 1: informe o nome do kit.",
+      "Item 1: complete produto e quantidade em todas as linhas do kit.",
+      "Item 1: inclua ao menos um produto no kit.",
+      "Item 1: complete insumo e quantidade nas linhas de embalagem.",
+    ]);
   });
 
   it("sugere um nome a partir da composição, para o campo não começar vazio", () => {

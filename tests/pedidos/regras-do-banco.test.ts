@@ -133,8 +133,18 @@ describe("kit montado dentro do pedido", () => {
     expect(materializar).toMatch(/Kit montado sem assinatura/);
   });
 
+  it("kit montado sem nome ou sem composição é recusado antes de Gerar Pedido", () => {
+    expect(materializar).toMatch(/Kit montado precisa de nome antes de Gerar Pedido/);
+    expect(materializar).toMatch(/Kit montado precisa ter ao menos um produto antes de Gerar Pedido/);
+  });
+
   it("depois de materializar, o item aponta para o kit e larga as colunas provisórias", () => {
     expect(materializar).toMatch(/set kit_id = v_kit_id[\s\S]*ad_hoc_kit_signature = null/i);
+  });
+
+  it("depois de materializar, o item fica com código e nome do kit para rastreabilidade", () => {
+    expect(materializar).toMatch(/item_code_snapshot = coalesce\(item_code_snapshot,\s*v_codigo\)/i);
+    expect(materializar).toMatch(/item_name_snapshot = coalesce\(item_name_snapshot,\s*'\[Kit\] ' \|\| v_nome\)/i);
   });
 
   it("a embalagem do kit vai junto, com o modo de consumo (envelope × caixa rateada)", () => {
@@ -144,7 +154,8 @@ describe("kit montado dentro do pedido", () => {
   it("devolve QUAIS kits nasceram, não só quantos — para a tela dizer o código", () => {
     // Sem isto, quem fecha o pedido tem de ir procurar na tela de Kits o
     // código do que acabou de criar.
-    expect(materializar).toMatch(/'code',\s*\(select code from public\.kits/i);
+    expect(materializar).toMatch(/select code,\s*name into v_codigo,\s*v_nome/i);
+    expect(materializar).toMatch(/'code',\s*v_codigo/i);
     expect(materializar).toMatch(/'novo',\s*v_novo/i);
   });
 });

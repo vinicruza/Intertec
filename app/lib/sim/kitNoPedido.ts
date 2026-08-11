@@ -14,7 +14,7 @@ import { numeroDigitado } from "../format";
 //
 // Antes eram duas telas: criar o kit e depois puxar o código no simulador.
 // A decisão inverteu — o kit nasce dentro do pedido, e o código oficial só é
-// gerado quando o pedido é ganho. Enquanto isso, o sistema precisa de duas
+// gerado ao Gerar Pedido. Enquanto isso, o sistema precisa de duas
 // coisas em tempo real:
 //
 //  1. o CMV daquela composição, para a margem aparecer na hora;

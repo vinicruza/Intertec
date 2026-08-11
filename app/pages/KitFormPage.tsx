@@ -120,6 +120,37 @@ export default function KitFormPage() {
     };
   }, [itensValidos, embalagemValida, custoPorProduto, todosInsumos]);
 
+  const pendenciasFormulario = useMemo(() => {
+    const pendencias: string[] = [];
+    if (!nome.trim()) pendencias.push("Informe o nome do kit.");
+
+    const produtosParciais = itens.some(
+      (i) => (i.produtoId && i.quantidade.trim() === "") || (!i.produtoId && i.quantidade.trim() !== "")
+    );
+    if (produtosParciais) pendencias.push("Complete produto e quantidade em todas as linhas da composição.");
+    if (itensValidos.length === 0) pendencias.push("Inclua ao menos um produto no kit.");
+    if (itensValidos.some((i) => !numeroPositivo(String(i.quantidade)))) {
+      pendencias.push("As quantidades dos produtos precisam ser maiores que zero.");
+    }
+
+    const embalagemParcial = embalagem.some(
+      (e) => (e.insumoId && e.quantidade.trim() === "") || (!e.insumoId && e.quantidade.trim() !== "")
+    );
+    if (embalagemParcial) pendencias.push("Complete insumo e quantidade nas linhas de embalagem.");
+    if (embalagemValida.some((e) => !numeroPositivo(e.quantidade))) {
+      pendencias.push("As quantidades de embalagem precisam ser maiores que zero.");
+    }
+
+    if (itensValidos.length > 0 && previa && previa.custo === null) {
+      pendencias.push("Existe produto sem custo vigente; o kit ficaria sem CMV calculável.");
+    }
+    if (itensValidos.length > 0 && !previa) {
+      pendencias.push("Não foi possível calcular a assinatura do kit. Confira composição e embalagem.");
+    }
+
+    return pendencias;
+  }, [nome, itens, itensValidos, embalagem, embalagemValida, previa]);
+
   const salvar = useMutation({
     mutationFn: () =>
       salvarKit(id ?? null, {
@@ -157,7 +188,7 @@ export default function KitFormPage() {
     detalhe: p.cmv === null ? "sem custo vigente" : undefined,
   }));
 
-  // Kit que nasceu de pedido ganho: composição imutável. O código já foi para
+  // Kit que nasceu de pedido gerado: composição imutável. O código já foi para
   // o papel e para a nota — mudar o que ele significa quebra a promessa de
   // "um código, uma composição", e muda por baixo o custo de cotações em
   // aberto que usam este kit. O banco recusa; aqui a tela evita a digitação.
@@ -239,8 +270,7 @@ export default function KitFormPage() {
           e.preventDefault();
           setErro(null);
           setDuplicado(null);
-          if (!nome.trim()) return setErro("Informe o nome do kit.");
-          if (itensValidos.length === 0) return setErro("Inclua ao menos um produto no kit.");
+          if (pendenciasFormulario.length > 0) return setErro(pendenciasFormulario.join(" "));
           salvar.mutate();
         }}
       >
@@ -270,14 +300,14 @@ export default function KitFormPage() {
             )}
           </div>
 
-          {/* Kit que nasceu de pedido ganho: o código já circulou em papel e em
+          {/* Kit que nasceu de pedido gerado: o código já circulou em papel e em
               nota. Mudar a composição faria o código deixar de valer para quem
               o recebeu — e cotações em aberto que usam este kit passariam a
               valer outro custo, sem aviso. O banco recusa; aqui a tela explica
               antes de a pessoa digitar. */}
           {composicaoTravada && (
             <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
-              Este kit nasceu de um pedido ganho, então a composição dele não muda mais: o código{" "}
+              Este kit nasceu de um pedido gerado, então a composição dele não muda mais: o código{" "}
               <strong className="font-mono">{codigo}</strong> já foi para o papel e para a nota, e
               precisa continuar significando exatamente isto. <strong>Nome e descrição</strong> você
               pode ajustar aqui. Para uma composição diferente,{" "}
@@ -476,10 +506,18 @@ export default function KitFormPage() {
             </Link>
           </div>
         )}
+        {pendenciasFormulario.length > 0 && !erro && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {pendenciasFormulario.slice(0, 2).join(" ")}
+            {pendenciasFormulario.length > 2 ? ` Mais ${pendenciasFormulario.length - 2} pendência(s).` : ""}
+          </p>
+        )}
         {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={salvar.isPending}>{salvar.isPending ? "Salvando…" : "Salvar"}</Button>
+          <Button type="submit" disabled={salvar.isPending || pendenciasFormulario.length > 0}>
+            {salvar.isPending ? "Salvando…" : "Salvar"}
+          </Button>
           <Button type="button" className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate("/kits")}>
             Cancelar
           </Button>
@@ -487,4 +525,11 @@ export default function KitFormPage() {
       </form>
     </div>
   );
+}
+
+function numeroPositivo(valor: string): boolean {
+  const normalizado = valor.trim().replace(",", ".");
+  if (!normalizado) return false;
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) && numero > 0;
 }
