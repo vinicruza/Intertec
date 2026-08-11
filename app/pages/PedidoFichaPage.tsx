@@ -113,7 +113,7 @@ export default function PedidoFichaPage() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <Dado rotulo="Cód. cliente" valor={codigoCliente ?? null} />
             <Dado rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
-            <Dado rotulo="Empresa" valor={cliente?.name} className="col-span-2" />
+            <Dado rotulo="Cliente" valor={cliente?.name} className="col-span-2" />
             <Dado rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
             <Dado rotulo="Data" valor={dataCurta(pedido.created_at)} />
             <Dado rotulo="CEP faturamento" valor={formatarCep(cliente?.billing_zip) || null} />
