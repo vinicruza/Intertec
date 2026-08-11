@@ -206,8 +206,8 @@ export default function SimuladorPage() {
   const podeEscolherVendedor = perfil?.perfil === "admin";
   const podeEditarComissao = perfil?.perfil === "admin";
   // Comercial lança pedido só em nome próprio. Administrador lança por
-  // qualquer vendedor. A tela esconde a escolha para não sugerir uma permissão
-  // que não existe; a trava definitiva fica no banco.
+  // qualquer vendedor. O tipo de venda, porém, pode variar pedido a pedido:
+  // Interno, Revendas, Descpro etc. A trava definitiva fica no banco.
   const soMeuVendedor = perfil?.perfil === "comercial";
   const vendedoresDisponiveis = useMemo(() => {
     if (!ctx) return [];
@@ -545,7 +545,7 @@ export default function SimuladorPage() {
               </select>
             </div>
           )}
-          {podeEscolherVendedor && (
+          {vendedor && (
             <div>
               <Label>Tipo de venda</Label>
               <select
@@ -556,19 +556,12 @@ export default function SimuladorPage() {
                   setComissao(null);
                   setAplicaDifalOverride(null);
                 }}
-                disabled={!vendedor}
               >
                 <option value="">Selecione…</option>
                 {ctx.canais.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-            </div>
-          )}
-          {!podeEscolherVendedor && vendedor && (
-            <div>
-              <Label>Tipo de venda</Label>
-              <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">{canal?.name ?? vendedor.canalNome}</p>
             </div>
           )}
           <div>
