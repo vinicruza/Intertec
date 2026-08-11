@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
 import { formatarCep, formatarCnpjCpf, formatarTelefone } from "../../lib/cadastro/documentos";
 import { Button } from "@components/ui/primitives";
+import { IntertechLogo } from "@components/brand/IntertechLogo";
 
 // ============================================================
 // Ficha do pedido (reunião Intertech 16/07/2026; formulário 05/08/2026)
@@ -65,11 +66,14 @@ export default function PedidoFichaPage() {
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
   // senão vale o do cadastro. É a única regra de precedência da folha.
   const cepEntrega = pedido.shipping_zip ?? cliente?.shipping_zip ?? null;
+  const cidadeEntrega = pedido.shipping_zip ? null : cliente?.shipping_city ?? null;
+  const ufEntrega = pedido.shipping_zip ? pedido.uf : cliente?.shipping_state ?? pedido.uf;
   const transportadora = pedido.carriers?.requires_name
     ? pedido.carrier_other ?? "Outra"
     : pedido.carriers?.name ?? null;
   const modoPagamento = pedido.payment_terms?.label ??
     (pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null);
+  const impressoEm = formatarDataHora(new Date());
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -86,15 +90,18 @@ export default function PedidoFichaPage() {
 
       <div className="space-y-5 rounded-lg border border-[var(--cor-borda)] bg-white p-8 text-sm text-black print:border-0 print:p-0">
         <div className="flex items-start justify-between border-b border-black/20 pb-3">
-          <div>
-            <h1 className="text-xl font-bold">Intertech Surgical</h1>
-            <p className="text-xs">Ficha do pedido</p>
+          <div className="pt-2">
+            <IntertechLogo compact className="print:translate-y-1" />
           </div>
           <div className="text-right">
+            <p className="text-xs font-semibold uppercase tracking-normal">
+              {fechado ? "Pedido gerado do orçamento" : "Orçamento"}
+            </p>
             <p className="font-mono text-lg font-bold">{pedido.quote_number ?? "—"}</p>
             <p className="text-xs">
-              {fechado ? `Ganho em ${dataCurta(pedido.closed_at)}` : "Em cotação"}
+              {fechado ? `Aprovado em ${dataCurta(pedido.closed_at)}` : "Em cotação"}
             </p>
+            <p className="text-xs">Impresso em {impressoEm}</p>
           </div>
         </div>
 
@@ -107,12 +114,13 @@ export default function PedidoFichaPage() {
             <Dado rotulo="Empresa" valor={cliente?.name} className="col-span-2" />
             <Dado rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
             <Dado rotulo="Data" valor={dataCurta(pedido.created_at)} />
-            <Dado rotulo="CEP fat." valor={formatarCep(cliente?.billing_zip) || null} />
-            <Dado rotulo="CEP ent." valor={formatarCep(cepEntrega) || null} />
+            <Dado rotulo="CEP faturamento" valor={formatarCep(cliente?.billing_zip) || null} />
+            <Dado rotulo="Cidade/UF faturamento" valor={cidadeUf(cliente?.billing_city, cliente?.billing_state)} />
+            <Dado rotulo="CEP entrega" valor={formatarCep(cepEntrega) || null} />
+            <Dado rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} />
             <Dado rotulo="Contato" valor={cliente?.contact_name} />
             <Dado rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
             <Dado rotulo="E-mail" valor={cliente?.email} className="col-span-2" />
-            <Dado rotulo="UF" valor={pedido.uf} />
             <Dado rotulo="Vendedor" valor={pedido.sellers?.name} />
           </div>
           {/* Endereço de entrega diferente do de sempre precisa saltar aos
@@ -202,7 +210,7 @@ export default function PedidoFichaPage() {
         {/* ---------- Condições ---------- */}
         <div>
           <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Condições</h2>
-          <Dado rotulo="Modo de pagamento" valor={modoPagamento} />
+          <Dado rotulo="Condição de pagamento" valor={modoPagamento} />
           <p className="mt-2">
             <strong>Obs.:</strong>{" "}
             {pedido.order_notes ? (
@@ -271,12 +279,6 @@ export default function PedidoFichaPage() {
           </div>
         )}
 
-        {!verNumeros && (
-          <p className="text-xs italic">
-            Os valores de custo e margem constam na via de conferência.
-          </p>
-        )}
-
         <div className="grid grid-cols-2 gap-8 pt-8 text-xs">
           <div className="border-t border-black/40 pt-1 text-center">Conferido por</div>
           <div className="border-t border-black/40 pt-1 text-center">
@@ -306,6 +308,21 @@ function Dado({
       {valor ? valor : <span className="inline-block min-w-32 border-b border-black/30" />}
     </p>
   );
+}
+
+function cidadeUf(cidade: string | null | undefined, uf: string | null | undefined): string | null {
+  const partes = [cidade?.trim(), uf?.trim()].filter(Boolean);
+  return partes.length > 0 ? partes.join(" / ") : null;
+}
+
+function formatarDataHora(data: Date): string {
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function Linha({ rotulo, valor, negrito }: { rotulo: string; valor?: string; negrito?: boolean }) {

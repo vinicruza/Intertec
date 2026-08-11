@@ -119,7 +119,7 @@ export default function ShellLayout() {
 
   return (
     <div className="flex h-full min-w-0 bg-[var(--cor-fundo)]">
-      <aside className="hidden w-[17rem] shrink-0 flex-col bg-[var(--cor-primaria)] lg:flex">{lateral}</aside>
+      <aside className="no-print hidden w-[17rem] shrink-0 flex-col bg-[var(--cor-primaria)] lg:flex">{lateral}</aside>
 
       {menuAberto && (
         <div className="fixed inset-0 z-50 lg:hidden">
@@ -129,7 +129,7 @@ export default function ShellLayout() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex min-h-16 items-center justify-between border-b border-[var(--cor-borda)] bg-white/95 px-4 backdrop-blur md:px-7">
+        <header className="no-print flex min-h-16 items-center justify-between border-b border-[var(--cor-borda)] bg-white/95 px-4 backdrop-blur md:px-7">
           <div className="flex items-center gap-3">
             <button
               aria-label="Abrir menu"
