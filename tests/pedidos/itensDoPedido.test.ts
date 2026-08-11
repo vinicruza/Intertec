@@ -23,6 +23,7 @@ const CATALOGO: ItemVendavelResumo[] = [
   { tipo: "produto", id: "prod-avental", nome: "Avental TNT 40g", cmvUnitario: "1.537605" },
   { tipo: "produto", id: "prod-campo", nome: "Campo Cirúrgico Catarata", cmvUnitario: "2.9354" },
   { tipo: "produto", id: "prod-sem-custo", nome: "Produto sem ficha técnica", cmvUnitario: null },
+  { tipo: "produto", id: "prod-kit-aleatorio", nome: "Kit Aleatório", cmvUnitario: "20" },
   { tipo: "kit", id: "kit-catarata", nome: "[Kit] Kit Catarata", cmvUnitario: "6.52863" },
 ];
 
@@ -92,6 +93,11 @@ describe("resolver a linha escolhida pelo vendedor", () => {
     const r = resolverLinhaDoPedido(linha({ itemId: "prod-sem-custo" }), CATALOGO, catalogoDeKit());
     expect(r?.cmvUnitario).toBeNull();
     expect(r?.erro).toBeNull(); // quem barra é o motor, com o nome do item
+  });
+
+  it("não deixa Kit Aleatório entrar como produto simples sem composição", () => {
+    const r = resolverLinhaDoPedido(linha({ itemId: "prod-kit-aleatorio" }), CATALOGO, catalogoDeKit());
+    expect(r?.erro).toContain("precisa ser montado pelo botão + Montar kit");
   });
 
   it("linha em branco não resolve nada", () => {

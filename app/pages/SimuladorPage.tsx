@@ -12,6 +12,7 @@ import {
   montarItensDaCotacao,
   montarItensParaMotor,
   nomeSugeridoParaKit,
+  produtoKitAleatorioExigeComposicao,
   removerFreteDestacadoDasLinhas,
   resolverLinhaDoPedido,
   resumoDoKit,
@@ -261,7 +262,11 @@ export default function SimuladorPage() {
         id: i.id,
         codigo: i.codigo,
         nome: i.nome,
-        detalhe: i.cmvUnitario === null ? "sem custo vigente" : undefined,
+        detalhe: produtoKitAleatorioExigeComposicao(i)
+          ? "use + Montar kit"
+          : i.cmvUnitario === null
+            ? "sem custo vigente"
+            : undefined,
       })),
     [ctx]
   );

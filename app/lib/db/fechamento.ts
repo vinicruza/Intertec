@@ -172,6 +172,29 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
     .eq("revised_from_order_id", id)
     .order("created_at", { ascending: false });
   if (e3) throw e3;
+  // A ficha precisa abrir a composição também quando o item já é um kit de
+  // catálogo. Pedido fechado normalmente tem snapshot, mas cotação em aberto
+  // ou dado antigo pode não ter; aí buscamos a receita atual do kit.
+  const kitIds = [
+    ...new Set((itens ?? []).flatMap((item) => (item.kit_id ? [item.kit_id as string] : []))),
+  ];
+  const composicaoPorKit = new Map<string, Array<{ nome: string; quantidade: string }>>();
+  if (kitIds.length > 0) {
+    const { data: kitItems, error: e4 } = await supabase
+      .from("kit_items")
+      .select("kit_id, quantity, products(name)")
+      .in("kit_id", kitIds);
+    if (e4) throw e4;
+    for (const ki of kitItems ?? []) {
+      const lista = composicaoPorKit.get(ki.kit_id as string) ?? [];
+      const produto = Array.isArray(ki.products) ? ki.products[0] ?? null : ki.products;
+      lista.push({
+        nome: (produto as { name?: string } | null)?.name ?? "?",
+        quantidade: String(ki.quantity),
+      });
+      composicaoPorKit.set(ki.kit_id as string, lista);
+    }
+  }
   // Nome dos produtos que só existem dentro de um kit montado no pedido (esses
   // não têm product_id na linha, então não vêm pela relação `products`).
   const idsAdHoc = [
@@ -199,6 +222,9 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
       unit_price: String(item.unit_price),
       cmv_unit_snapshot: item.cmv_unit_snapshot == null ? null : String(item.cmv_unit_snapshot),
       expense_unit_snapshot: item.expense_unit_snapshot == null ? null : String(item.expense_unit_snapshot),
+      kit_composition_snapshot:
+        item.kit_composition_snapshot ??
+        (item.kit_id ? composicaoPorKit.get(item.kit_id as string) ?? null : null),
       ad_hoc_kit_composicao:
         composicao.length === 0
           ? null

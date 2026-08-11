@@ -45,6 +45,18 @@ export type ItemVendavelResumo = {
   cmvUnitario: string | null;
 };
 
+function nomeNormalizado(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function produtoKitAleatorioExigeComposicao(item: ItemVendavelResumo): boolean {
+  return item.tipo === "produto" && nomeNormalizado(item.nome) === "kit aleatorio";
+}
+
 // O que a linha representa depois de resolvida: nome, CMV unitário e, quando é
 // kit montado na hora, a assinatura e o kit de catálogo que já tem essa mesma
 // composição (para avisar em vez de duplicar).
@@ -68,6 +80,17 @@ export function resolverLinhaDoPedido(
   if (linha.itemId && linha.itemId !== KIT_NOVO) {
     const item = itensVendaveis.find((i) => i.id === linha.itemId);
     if (!item) return null;
+    if (produtoKitAleatorioExigeComposicao(item)) {
+      return {
+        nome: item.nome,
+        cmvUnitario: item.cmvUnitario,
+        assinatura: null,
+        kitExistente: null,
+        erro: "Kit Aleatório precisa ser montado pelo botão + Montar kit, com a composição informada. Não salve como produto simples.",
+        linhasProdutos: [],
+        linhasEmbalagem: [],
+      };
+    }
     return {
       nome: item.nome,
       cmvUnitario: item.cmvUnitario,
