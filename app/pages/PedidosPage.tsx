@@ -21,12 +21,12 @@ function statusLogico(p: PedidoResumo): StatusFiltro {
 
 function rotuloStatus(p: PedidoResumo): string {
   if (p.cancelled_at) return `Cancelado ${dataCurta(p.cancelled_at)}`;
-  if (p.status === "closed") return `Ganho ${dataCurta(p.closed_at)}`;
+  if (p.status === "closed") return `Pedido gerado ${dataCurta(p.closed_at)}`;
   if (p.status === "lost") return `Perdida ${dataCurta(p.lost_at)}`;
   if (p.approval_status === "pendente") return "Enviado para aprovação";
-  if (p.approval_status === "aprovado") return `Aprovado ${dataCurta(p.approved_at)}`;
+  if (p.approval_status === "aprovado") return "Pronto para gerar pedido";
   if (p.approval_status === "recusado") return "Aprovação recusada";
-  return "Em cotação";
+  return "Orçamento em aberto";
 }
 
 function receitaLiquidaDoHistorico(p: PedidoResumo): string | null | undefined {
@@ -111,9 +111,9 @@ export default function PedidosPage() {
 
       <Card className={`grid gap-3 p-4 md:grid-cols-3 ${veEquipe ? "xl:grid-cols-9" : "xl:grid-cols-7"}`}>
         <select className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as StatusFiltro)}>
-          <option value="todos">Todos os status</option><option value="rascunho">Em cotação</option>
-          <option value="pendente">Enviados para aprovação</option><option value="aprovado">Aprovados</option>
-          <option value="recusado">Aprovação recusada</option><option value="closed">Ganhos</option><option value="lost">Perdidas</option>
+          <option value="todos">Todos os status</option><option value="rascunho">Orçamentos em aberto</option>
+          <option value="pendente">Enviados para aprovação</option><option value="aprovado">Prontos para gerar pedido</option>
+          <option value="recusado">Aprovação recusada</option><option value="closed">Pedidos gerados</option><option value="lost">Perdidas</option>
           <option value="cancelled">Cancelados</option>
         </select>
         <Input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Período" />

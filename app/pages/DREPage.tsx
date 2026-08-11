@@ -69,7 +69,7 @@ export default function DREPage() {
           <p className="text-sm text-[var(--cor-texto-suave)]">
             Nenhum pedido fechado neste mês. Simulações são projeções e não entram na DRE realizada.
           </p>
-          <Button className="mt-3" onClick={() => navigate("/pedidos")}>Ver simulações e fechar pedido</Button>
+          <Button className="mt-3" onClick={() => navigate("/pedidos")}>Ver simulações e gerar pedido</Button>
         </Card>
       )}
 

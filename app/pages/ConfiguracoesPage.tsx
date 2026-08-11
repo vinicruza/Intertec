@@ -212,7 +212,7 @@ function AbaAprovacao() {
           onChange={(e) => mudar({ require_approval: e.target.checked })}
         />
         <span>
-          <strong>Exigir aprovação para fechar o pedido</strong>
+          <strong>Exigir aprovação para gerar pedido</strong>
           <span className="block text-xs text-[var(--cor-texto-suave)]">
             Equivale ao papel que hoje vai para a mesa da conferência, só que com a margem à vista.
           </span>

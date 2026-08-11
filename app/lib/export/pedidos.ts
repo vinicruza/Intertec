@@ -29,12 +29,12 @@ function nomeNFDoItem(i: ItemDoPedido): string {
 
 function statusDoPedido(p: PedidoResumo): string {
   if (p.cancelled_at) return "Cancelado";
-  if (p.status === "closed") return "Ganho";
+  if (p.status === "closed") return "Pedido gerado";
   if (p.status === "lost") return "Perdida";
   if (p.approval_status === "pendente") return "Enviado para aprovação";
-  if (p.approval_status === "aprovado") return "Aprovado";
+  if (p.approval_status === "aprovado") return "Pronto para gerar pedido";
   if (p.approval_status === "recusado") return "Aprovação recusada";
-  return "Em cotação";
+  return "Orçamento em aberto";
 }
 
 export async function exportarHistoricoPedidos(pedidos: PedidoResumo[]): Promise<void> {

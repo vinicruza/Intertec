@@ -105,7 +105,7 @@ export default function PedidoDetalhePage() {
       setKitsCriados(kits);
       recarregar();
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao fechar."),
+    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao gerar pedido."),
   });
   const reabrir = useMutation({
     mutationFn: () => reabrirPedido(id!),
@@ -168,6 +168,17 @@ export default function PedidoDetalhePage() {
       !seloExigeAprovacao(seloDaCascata) &&
       (perfil?.perfil === "admin" || perfil?.perfil === "comercial")
   );
+  const podeGerarPedido = !fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval || podeFecharDiretoPeloSelo);
+  const statusFluxo = statusDoFluxoDoPedido({
+    pedido,
+    fechado,
+    perdida,
+    cancelado,
+    aprovacao,
+    seloDaCascata,
+    exigeAprovacaoPeloSelo,
+    podeGerarPedido,
+  });
   // Segregação de funções: quem enviou a cotação não pode ser quem aprova —
   // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
   // jeito (mesma regra vale no banco, é a garantia real).
@@ -178,8 +189,8 @@ export default function PedidoDetalhePage() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Pedido — {pedido.customers?.name ?? "sem cliente"}</h1>
-          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Ganho em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : "Em cotação"}</Badge>
+          <h1 className="text-2xl font-semibold">Orçamento / Pedido — {pedido.customers?.name ?? "sem cliente"}</h1>
+          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Pedido gerado em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : "Orçamento em aberto"}</Badge>
           {!cancelado && !perdida && aprovacao !== "rascunho" && (
             <Badge>
               {aprovacao === "pendente" ? "Aguardando aprovação"
@@ -190,7 +201,7 @@ export default function PedidoDetalhePage() {
         </div>
         <div className="flex gap-2">
           <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate(`/pedidos/${pedido.id}/ficha`)}>
-            Ficha do pedido
+            Ficha
           </Button>
           <Button className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]" onClick={() => navigate("/pedidos")}>
             Voltar
@@ -211,6 +222,22 @@ export default function PedidoDetalhePage() {
         {pedido.revised_from_order_id && <p className="text-sm">Revisão do pedido <button className="text-[var(--cor-primaria)] underline" onClick={() => navigate(`/pedidos/${pedido.revised_from_order_id}`)}>{pedido.revised_from_order_id.slice(0, 8)}</button></p>}
         {pedido.revisoes.length > 0 && <p className="text-sm">Revisões vinculadas: {pedido.revisoes.map((r, indice) => <span key={r.id}>{indice > 0 ? ", " : ""}<button className="text-[var(--cor-primaria)] underline" onClick={() => navigate(`/pedidos/${r.id}`)}>{r.id.slice(0, 8)}</button></span>)}</p>}
       </Card>
+
+      {!cancelado && !perdida && (
+        <Card className={`space-y-2 ${statusFluxo.classe}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold">{statusFluxo.titulo}</h2>
+              <p className="mt-1 text-sm">{statusFluxo.descricao}</p>
+            </div>
+            {seloDaCascata && cascata?.ok && !fechado && (
+              <span className={`rounded-full px-4 py-2 text-sm font-semibold ${CORES_SELO_MARGEM[seloDaCascata.color] ?? "bg-gray-100 text-gray-800"}`}>
+                {seloDaCascata.label} · {percentual(cascata.margemContribuicaoPct)}
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
 
       {!cancelado && <BlocoExpedicao pedido={pedido} />}
 
@@ -382,17 +409,17 @@ export default function PedidoDetalhePage() {
             {enviar.isPending ? "Enviando…" : "Enviar para aprovação"}
           </Button>
         )}
-        {!fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval || podeFecharDiretoPeloSelo) && (
+        {podeGerarPedido && (
           <Button
             disabled={fechar.isPending}
             onClick={() => {
               setErro(null);
-              if (window.confirm("Fechar o pedido? Os custos serão CONGELADOS e não mudarão mais (snapshot imutável).")) {
+              if (window.confirm("Gerar pedido? Os custos serão congelados e esta versão não mudará mais.")) {
                 fechar.mutate();
               }
             }}
           >
-            {fechar.isPending ? "Fechando…" : "Fechar pedido (congela custos)"}
+            {fechar.isPending ? "Gerando…" : "Gerar Pedido"}
           </Button>
         )}
         {fechado && !cancelado && perfil?.perfil === "admin" && (
@@ -532,24 +559,41 @@ export default function PedidoDetalhePage() {
       {(versoesQuery.data ?? []).length > 1 && <Card className="space-y-2">
         <h2 className="font-semibold">Versões da cotação</h2>
         <p className="text-sm text-[var(--cor-texto-suave)]">
-          Cada alteração pedida pelo cliente ficou registrada. A versão mais alta é a atual.
+          Cada alteração pedida pelo cliente ficou registrada. A versão mais alta é a atual;
+          a faixa mostra se aquela versão seguiria direto ou dependeria de aprovação.
         </p>
         <table className="w-full text-sm">
           <thead><tr className="text-left text-[var(--cor-texto-suave)]">
             <th className="py-1 font-medium">Versão</th><th className="py-1 font-medium">Quando</th><th className="py-1 font-medium">Usuário</th>
-            <th className="py-1 text-right font-medium">Receita</th><th className="py-1 text-right font-medium">Margem contrib.</th>
+            <th className="py-1 text-right font-medium">Receita</th><th className="py-1 text-right font-medium">Margem</th>
+            <th className="py-1 text-right font-medium">Faixa</th><th className="py-1 text-right font-medium">Aprovação</th>
           </tr></thead>
           <tbody>
             {(versoesQuery.data ?? []).map((v) => {
               const foto = v.snapshot as Record<string, string | undefined>;
               const usuario = Array.isArray(v.profiles) ? v.profiles[0]?.full_name : v.profiles?.full_name;
+              const margemPctVersao = margemPctDaVersao(foto);
+              const seloVersao = margemPctVersao ? seloMargemComercial(dec(margemPctVersao)) : null;
               return (
                 <tr key={v.version} className="border-t border-[var(--cor-borda)]">
                   <td className="py-1">v{v.version}</td>
                   <td className="py-1 text-[var(--cor-texto-suave)]">{dataCurta(v.created_at)}</td>
                   <td className="py-1">{usuario ?? "—"}</td>
                   <td className="py-1 text-right">{reais(foto.receita_bruta)}</td>
-                  <td className="py-1 text-right">{reais(foto.margem_contribuicao)}</td>
+                  <td className="py-1 text-right">
+                    {reais(foto.margem_contribuicao)}
+                    <span className="ml-1 text-[var(--cor-texto-suave)]">({percentual(margemPctVersao)})</span>
+                  </td>
+                  <td className="py-1 text-right">
+                    {seloVersao ? (
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${CORES_SELO_MARGEM[seloVersao.color] ?? "bg-gray-100 text-gray-800"}`}>
+                        {seloVersao.label}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td className="py-1 text-right text-[var(--cor-texto-suave)]">
+                    {seloVersao ? (seloExigeAprovacao(seloVersao) ? "Exige aprovação" : "Aprovação automática") : "—"}
+                  </td>
                 </tr>
               );
             })}
@@ -558,6 +602,111 @@ export default function PedidoDetalhePage() {
       </Card>}
     </div>
   );
+}
+
+function statusDoFluxoDoPedido({
+  pedido,
+  fechado,
+  perdida,
+  cancelado,
+  aprovacao,
+  seloDaCascata,
+  exigeAprovacaoPeloSelo,
+  podeGerarPedido,
+}: {
+  pedido: PedidoCompleto;
+  fechado: boolean;
+  perdida: boolean;
+  cancelado: boolean;
+  aprovacao: PedidoCompleto["approval_status"];
+  seloDaCascata: ReturnType<typeof seloMargemComercial> | null;
+  exigeAprovacaoPeloSelo: boolean;
+  podeGerarPedido: boolean;
+}) {
+  if (cancelado) {
+    return {
+      titulo: "Pedido cancelado",
+      descricao: "Este registro fica preservado para histórico, sem seguir para pedido.",
+      classe: "border-red-200 bg-red-50 text-red-800",
+    };
+  }
+  if (perdida) {
+    return {
+      titulo: "Cotação perdida",
+      descricao: "A cotação foi encerrada como perdida. Reabra apenas se ela voltar para negociação.",
+      classe: "border-amber-200 bg-amber-50 text-amber-900",
+    };
+  }
+  if (fechado) {
+    return {
+      titulo: "Pedido gerado",
+      descricao: `O pedido ${pedido.order_number ?? ""} foi gerado e os custos desta versão estão congelados.`,
+      classe: "border-green-200 bg-green-50 text-green-900",
+    };
+  }
+  if (aprovacao === "pendente") {
+    return {
+      titulo: "Aguardando aprovação",
+      descricao: "Esta versão está em faixa que exige aprovação. Depois de aprovada, a ação Gerar Pedido fica liberada.",
+      classe: "border-amber-200 bg-amber-50 text-amber-900",
+    };
+  }
+  if (aprovacao === "recusado") {
+    return {
+      titulo: "Aprovação recusada",
+      descricao: "Ajuste a cotação, salve uma nova versão e envie novamente para aprovação.",
+      classe: "border-red-200 bg-red-50 text-red-800",
+    };
+  }
+  if (podeGerarPedido && seloDaCascata && !exigeAprovacaoPeloSelo) {
+    return {
+      titulo: "Pronto para Gerar Pedido",
+      descricao: `Margem ${seloDaCascata.label.toLowerCase()} aprovada automaticamente. O código de pedido já está reservado; clique em Gerar Pedido para congelar esta versão.`,
+      classe: "border-green-200 bg-green-50 text-green-900",
+    };
+  }
+  if (seloDaCascata && exigeAprovacaoPeloSelo) {
+    return {
+      titulo: "Precisa enviar para aprovação",
+      descricao: `Margem ${seloDaCascata.label.toLowerCase()} exige aprovação antes de gerar pedido.`,
+      classe: "border-amber-200 bg-amber-50 text-amber-900",
+    };
+  }
+  if (podeGerarPedido) {
+    return {
+      titulo: "Pronto para Gerar Pedido",
+      descricao: "A cotação está liberada para virar pedido. Ao gerar, os custos da versão atual serão congelados.",
+      classe: "border-green-200 bg-green-50 text-green-900",
+    };
+  }
+  return {
+    titulo: "Orçamento em aberto",
+    descricao: "Complete os dados da cotação para o sistema indicar se ela pode virar pedido direto ou se precisa de aprovação.",
+    classe: "border-[var(--cor-borda)]",
+  };
+}
+
+function valorDoSnapshot(foto: Record<string, unknown>, chave: string, chavePedido?: string): string | null {
+  const direto = foto[chave];
+  const pedido = foto.pedido as Record<string, unknown> | undefined;
+  const aninhado = chavePedido ? pedido?.[chavePedido] : undefined;
+  const valor = direto ?? aninhado;
+  return valor == null || valor === "" ? null : String(valor);
+}
+
+function margemPctDaVersao(foto: Record<string, unknown>): string | null {
+  const pct = valorDoSnapshot(foto, "margem_contribuicao_pct", "contribution_margin_pct_snapshot");
+  if (pct) return pct;
+  const margem = valorDoSnapshot(foto, "margem_contribuicao", "contribution_margin_snapshot");
+  const receitaLiquida = valorDoSnapshot(foto, "receita_liquida", "net_revenue_snapshot");
+  if (!margem || !receitaLiquida) return null;
+  try {
+    const receita = dec(receitaLiquida);
+    if (receita.isZero()) return null;
+    return dec(margem).div(receita).toString();
+  } catch {
+    return null;
+  }
 }
 
 function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
