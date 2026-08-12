@@ -101,3 +101,56 @@ test("o menu lateral leva a todas as telas do Administrador", async ({ page }) =
     await expect(page.getByText("Nao foi possivel abrir esta tela")).toHaveCount(0);
   }
 });
+
+test("auditoria de kits mostra indicadores, filtros e dados de rastreabilidade", async ({ page }) => {
+  const errosDeConsole: string[] = [];
+  page.on("pageerror", (e) => errosDeConsole.push(String(e)));
+
+  await page.goto("/kits");
+  const conteudo = page.locator("main");
+  await expect(conteudo).not.toContainText("Carregando", { timeout: 20_000 });
+  await expect(page.getByText("Nao foi possivel abrir esta tela")).toHaveCount(0);
+
+  if (await page.getByText("Nenhum kit ainda").isVisible()) {
+    test.skip(true, "Ambiente sem kits cadastrados para auditar.");
+  }
+
+  await expect(page.getByText("Kits no catálogo")).toBeVisible();
+  await expect(page.getByText("Sem composição")).toBeVisible();
+  await expect(page.getByText("CMV pendente")).toBeVisible();
+  await expect(page.getByText("Usados em pedidos")).toBeVisible();
+  await expect(page.getByText("Nunca usados")).toBeVisible();
+
+  await expect(page.getByPlaceholder("Código, kit, produto, cliente, orçamento ou pedido...")).toBeVisible();
+  const filtro = page.locator("select").filter({ hasText: "Com risco" }).first();
+  await filtro.selectOption("risco");
+  await expect(filtro).toHaveValue("risco");
+  await filtro.selectOption("todos");
+
+  await expect(conteudo).toContainText("Auditoria");
+  await expect(conteudo).toContainText("Composição e CMV");
+  await expect(conteudo).toContainText("Uso em pedidos");
+  expect(errosDeConsole, "Erro de JavaScript na auditoria de kits").toEqual([]);
+});
+
+test("histórico usa a linguagem de orçamento e pedido operacional", async ({ page }) => {
+  await page.goto("/pedidos");
+  const conteudo = page.locator("main");
+  await expect(conteudo).not.toContainText("Carregando", { timeout: 20_000 });
+  await expect(page.getByText("Nao foi possivel abrir esta tela")).toHaveCount(0);
+
+  await expect(page.getByRole("heading", { name: "Cotações e pedidos" })).toBeVisible();
+  await expect(conteudo).toContainText("Orçamento / pedido");
+  await expect(page.locator("select").filter({ hasText: "Prontos para gerar pedido" }).first()).toBeVisible();
+
+  const primeiraLinha = page.locator("tbody tr").first();
+  if ((await primeiraLinha.count()) === 0) {
+    test.skip(true, "Ambiente sem cotações/pedidos para abrir o detalhe.");
+  }
+
+  await primeiraLinha.click();
+  await expect(page.getByRole("heading", { name: /Orçamento \/ Pedido/ })).toBeVisible({ timeout: 20_000 });
+  await expect(conteudo).toContainText("Orçamento:");
+  await expect(conteudo).toContainText("Pedido:");
+  await expect(conteudo).toContainText(/Gerar Pedido|Pedido gerado|Aguardando aprovação|Orçamento em aberto/);
+});
