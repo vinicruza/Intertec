@@ -86,7 +86,8 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
   const resultado = calcularPedido({
     itens: itensCalculados,
     frete: freteUsado,
-    fretePorContaCliente: !freteDestacado,
+    fretePorContaCliente: true,
+    tributarFreteInformado: freteDestacado,
     aliquotaImposto: entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,

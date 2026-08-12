@@ -1071,7 +1071,7 @@ export default function SimuladorPage() {
               />
               <LinhaCascata
                 rotulo="(−) Frete destacado / cliente"
-                detalhe={freteCliente ? "Frete em linha própria, sem alterar a base da comissão" : "Frete só registrado na expedição"}
+                detalhe={freteCliente ? `Cliente paga ${reais(simulacao.freteUsado.toString())}; não reduz a margem` : "Frete só registrado na expedição"}
                 valor={simulacao.resultado.frete.negated().toString()}
               />
               <LinhaCascata
@@ -1105,7 +1105,7 @@ export default function SimuladorPage() {
             </tbody>
           </table>}
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
-            Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; o frete destacado e o imposto sobre frete aparecem em linhas separadas.
+            Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; frete cliente não reduz a margem, mas o imposto sobre frete aparece separado.
           </p>}
 
           {simulacao.avisos.map((a, i) => (

@@ -216,7 +216,7 @@ describe("ciclo da cotação", () => {
 
   it("só vermelho e amarelo dependem de aprovação; verde e azul fecham direto pelo selo", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
-    expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ v_net end/i);
+    expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ abs\(v_net\) end/i);
     expect(fechar).toMatch(/v_margin_pct > 0\.50/i);
     expect(fechar).toMatch(/v_role in \('admin', 'comercial'\)/i);
     expect(fechar).toMatch(/approval_status=case when v_self_approved_by_margin then 'aprovado'::approval_status/i);

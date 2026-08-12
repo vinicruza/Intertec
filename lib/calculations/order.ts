@@ -17,6 +17,7 @@ export type ParametrosPedido = {
   itens: ItemPedido[];
   frete: EntradaDecimal;
   fretePorContaCliente?: boolean;   // flag "Frete Cliente": cliente paga o frete
+  tributarFreteInformado?: boolean; // frete cliente destacado: não deduz frete, mas tributa
   aliquotaImposto: EntradaDecimal;  // ICSM total da UF de destino (ex.: 0,1625 = 16,25%)
   aliquotaDifal: EntradaDecimal;    // DIFAL da UF; 0 se o canal não aplica ou UF interna
   aliquotaComissao: EntradaDecimal; // padrão do canal (ex.: 0,025 = 2,5%)
@@ -93,9 +94,10 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   const cmvTotal = itens.reduce((s, i) => s.plus(i.cmvTotal), zero);
   const despesaTotal = itens.reduce((s, i) => s.plus(i.despesaTotal), zero);
 
-  // Frete por conta do cliente: o frete não existe neste pedido. Nem o frete,
-  // nem o imposto sobre ele — não há transporte pago pela Intertech para ser
-  // tributado.
+  // Frete por conta do cliente: o valor do frete não reduz a margem porque é
+  // repassado ao cliente fora da venda dos itens. Quando o frete está
+  // destacado, porém, a planilha oficial mantém o imposto sobre esse frete em
+  // linha própria.
   //
   // Antes daqui saía um "ajuste_frete = −frete" que era SOMADO a uma conta que
   // já tinha subtraído o frete: ele saía duas vezes, e um frete alto derrubava
@@ -104,9 +106,10 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   // entre parênteses que o cliente devolve o frete. Corrigido em 04/08/2026.
   const freteInformado = dec(p.frete);
   const frete = p.fretePorContaCliente ? zero : freteInformado;
+  const baseImpostoFrete = p.tributarFreteInformado ? freteInformado : frete;
 
   const aliquotaImposto = dec(p.aliquotaImposto);
-  const impostoFrete = aliquotaImposto.times(frete);
+  const impostoFrete = aliquotaImposto.times(baseImpostoFrete);
   const imposto = aliquotaImposto.times(receitaBruta);
   const difal = dec(p.aliquotaDifal).times(receitaBruta);
   const comissao = dec(p.aliquotaComissao).times(receitaBruta);

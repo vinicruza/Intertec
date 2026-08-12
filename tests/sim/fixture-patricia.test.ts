@@ -52,7 +52,8 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
     expect(toMoney(s.resultado.comissao)).toBe("420.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10219.50");
+    expect(toMoney(s.resultado.frete)).toBe("0.00");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11219.50");
   });
 
   it("canal Revendas (sem DIFAL): margem sobe e o DIFAL zera", () => {

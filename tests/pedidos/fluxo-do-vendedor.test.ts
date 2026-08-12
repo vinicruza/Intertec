@@ -465,7 +465,8 @@ describe("escolhas do vendedor que mudam a conta", () => {
     const comFrete = montarPedido(base).simulacao!;
     expect(toMoney(s.resultado.receitaBruta)).toBe(toMoney(comFrete.resultado.receitaBruta));
     expect(toMoney(s.resultado.comissao)).toBe(toMoney(comFrete.resultado.comissao));
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10219.50");
+    expect(toMoney(s.resultado.frete)).toBe("0.00");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11219.50");
   });
 
   it("frete desmarcado fica só na expedição e não entra na margem", () => {
