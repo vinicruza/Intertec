@@ -151,3 +151,60 @@ export async function obterOrigemKit(kitId: string): Promise<OrigemKit | null> {
   if (error) throw error;
   return ((data as OrigemKit[] | null) ?? [])[0] ?? null;
 }
+
+export type PedidoRecenteDoKit = {
+  order_id: string;
+  quote_number: string | null;
+  order_number: string | null;
+  status: "simulation" | "closed" | "lost" | string;
+  customer_name: string | null;
+  quantity: string;
+  used_at: string | null;
+};
+
+export type AuditoriaKit = {
+  kit_id: string;
+  created_at: string;
+  created_by_name: string | null;
+  source_order_id: string | null;
+  source_order_quote_number: string | null;
+  source_order_number: string | null;
+  source_order_customer_name: string | null;
+  source_order_status: "simulation" | "closed" | "lost" | string | null;
+  used_in_orders_count: number;
+  generated_orders_count: number;
+  total_quantity: string;
+  last_used_at: string | null;
+  recent_orders: PedidoRecenteDoKit[];
+};
+
+type AuditoriaKitBruta = Omit<
+  AuditoriaKit,
+  "used_in_orders_count" | "generated_orders_count" | "total_quantity" | "recent_orders"
+> & {
+  used_in_orders_count: number | string;
+  generated_orders_count: number | string;
+  total_quantity: number | string;
+  recent_orders: unknown;
+};
+
+function normalizarAuditoriaKit(linha: AuditoriaKitBruta): AuditoriaKit {
+  return {
+    ...linha,
+    used_in_orders_count: Number(linha.used_in_orders_count ?? 0),
+    generated_orders_count: Number(linha.generated_orders_count ?? 0),
+    total_quantity: String(linha.total_quantity ?? "0"),
+    recent_orders: Array.isArray(linha.recent_orders)
+      ? (linha.recent_orders as PedidoRecenteDoKit[]).map((p) => ({
+          ...p,
+          quantity: String(p.quantity ?? "0"),
+        }))
+      : [],
+  };
+}
+
+export async function listarAuditoriaKits(): Promise<AuditoriaKit[]> {
+  const { data, error } = await supabase.rpc("get_kits_audit");
+  if (error) throw error;
+  return ((data ?? []) as unknown as AuditoriaKitBruta[]).map(normalizarAuditoriaKit);
+}
