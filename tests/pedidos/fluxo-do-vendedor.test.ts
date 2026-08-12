@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { ErroCalculoBloqueante, assinaturaKitCompleta, dec, toMoney, toPercent, type CustoProdutoKit } from "@calc";
 import {
   KIT_NOVO,
-  aplicarPrecosCalculadosAosItensDaCotacao,
   montarItensDaCotacao,
   montarItensParaMotor,
   resolverKitAdHocDoPedido,
@@ -145,10 +144,7 @@ function montarPedido(p: Pedido) {
     }
   }
 
-  const itensDaCotacao =
-    simulacao && p.fretePorContaCliente
-      ? aplicarPrecosCalculadosAosItensDaCotacao(itensBaseDaCotacao, simulacao.itensCalculados)
-      : itensBaseDaCotacao;
+  const itensDaCotacao = itensBaseDaCotacao;
 
   return { resolvidas, paraMotor, itensDaCotacao, simulacao, erroDoMotor, calcular };
 }
@@ -458,16 +454,18 @@ describe("escolhas do vendedor que mudam a conta", () => {
     frete: "1000",
   };
 
-  it("frete destacado rateia o frete no preço unitário e mantém o frete no pedido", () => {
+  it("frete destacado aparece separado na cascata sem inflar o preço unitário", () => {
     const pedido = montarPedido({ ...base, fretePorContaCliente: true });
     const s = pedido.simulacao!;
     expect(toMoney(s.freteUsado)).toBe("1000.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    expect(toMoney(dec(s.itensCalculados[0].precoVenda))).toBe("4.45");
-    expect(toMoney(dec(pedido.itensDaCotacao[0].precoVenda))).toBe("4.45");
-    // Receita bruta sobe exatamente o valor do frete destacado.
+    expect(toMoney(dec(s.itensCalculados[0].precoVenda))).toBe("4.20");
+    expect(toMoney(dec(pedido.itensDaCotacao[0].precoVenda))).toBe("4.20");
+    // Receita bruta continua sendo só a venda; frete é uma dedução separada.
     const comFrete = montarPedido(base).simulacao!;
-    expect(Number(s.resultado.receitaBruta) - Number(comFrete.resultado.receitaBruta)).toBeCloseTo(1000, 2);
+    expect(toMoney(s.resultado.receitaBruta)).toBe(toMoney(comFrete.resultado.receitaBruta));
+    expect(toMoney(s.resultado.comissao)).toBe(toMoney(comFrete.resultado.comissao));
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10219.50");
   });
 
   it("frete desmarcado fica só na expedição e não entra na margem", () => {

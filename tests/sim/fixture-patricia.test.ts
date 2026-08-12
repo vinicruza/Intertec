@@ -47,10 +47,12 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS)?.label).toBe("Boa");
   });
 
-  it("frete destacado ligado considera frete e imposto sobre frete na margem", () => {
+  it("frete destacado ligado mantém a base da venda e deduz frete/imposto frete em linhas próprias", () => {
     const s = simular({ ...entrada, fretePorContaCliente: true });
+    expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
+    expect(toMoney(s.resultado.comissao)).toBe("420.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10897.00");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10219.50");
   });
 
   it("canal Revendas (sem DIFAL): margem sobe e o DIFAL zera", () => {

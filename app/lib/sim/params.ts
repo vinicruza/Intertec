@@ -76,16 +76,12 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     }
   }
 
-  // Frete destacado: quando ligado, o frete entra no preço dos itens e também
-  // na cascata da margem. Quando desligado, o frete fica registrado para a
-  // expedição, mas não derruba a margem; é a leitura da rentabilidade antiga.
-  // Quando a simulação vem de um pedido salvo, os preços já estão destacados no
-  // banco e não podem receber o frete de novo.
+  // Frete destacado segue a planilha oficial: o frete entra na cascata como
+  // linha própria, com imposto sobre frete, mas NÃO infla a receita dos itens
+  // nem a base de comissão/impostos da venda. O "final com frete" é só leitura
+  // comercial para o vendedor, não a base da rentabilidade.
   const freteDestacado = entrada.fretePorContaCliente;
-  const itensCalculados =
-    freteDestacado && !entrada.freteJaDestacadoNosPrecos
-      ? aplicarFreteDestacadoAosItens(entrada.itens, freteUsado)
-      : entrada.itens;
+  const itensCalculados = entrada.itens;
 
   const resultado = calcularPedido({
     itens: itensCalculados,

@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ErroCalculoBloqueante, toMoney } from "@calc";
-import { seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
+import { ErroCalculoBloqueante } from "@calc";
+import { aplicarFreteDestacadoAosItens, seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import {
   KIT_NOVO,
-  aplicarPrecosCalculadosAosItensDaCotacao,
   kitNovoAPartirDe,
   montarItensDaCotacao,
   montarItensParaMotor,
   nomeSugeridoParaKit,
   pendenciasDosKits,
   produtoKitAleatorioExigeComposicao,
-  removerFreteDestacadoDasLinhas,
   resolverLinhaDoPedido,
   resumoDoKit,
   resumoFinanceiroLinhaKit,
@@ -218,10 +216,7 @@ export default function SimuladorPage() {
         },
       };
     });
-    const linhasParaEdicao = p.freight_paid_by_customer
-      ? removerFreteDestacadoDasLinhas(linhasCarregadas, p.freight)
-      : linhasCarregadas;
-    setLinhas(linhasParaEdicao.length > 0 ? linhasParaEdicao : [LINHA_VAZIA]);
+    setLinhas(linhasCarregadas.length > 0 ? linhasCarregadas : [LINHA_VAZIA]);
   }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
   const podeEscolherVendedor = perfil?.perfil === "admin";
@@ -338,10 +333,7 @@ export default function SimuladorPage() {
       if (simulacao.estado !== "ok" || !vendedor || !canal || !ctx) throw new Error("Cotação incompleta.");
       if (pendenciasKit.length > 0) throw new Error(pendenciasKit.join(" "));
 
-      const itensBase = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
-      const itens = freteCliente
-        ? aplicarPrecosCalculadosAosItensDaCotacao(itensBase, simulacao.itensCalculados)
-        : itensBase;
+      const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
 
       // A foto da cotação vai junto na versão, para a análise do que não vingou.
       const foto = {
@@ -543,10 +535,11 @@ export default function SimuladorPage() {
   const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
   const precoFinalPorLinha = new Map<number, string>();
   if (simulacao.estado === "ok" && freteCliente) {
+    const itensComFreteParaExibicao = aplicarFreteDestacadoAosItens(simulacao.itensCalculados, simulacao.freteUsado);
     let itemCalculado = 0;
     linhas.forEach((linha, i) => {
       if (resolvidas[i] && linha.quantidade.trim() !== "" && linha.preco.trim() !== "") {
-        const precoFinal = simulacao.itensCalculados[itemCalculado]?.precoVenda;
+        const precoFinal = itensComFreteParaExibicao[itemCalculado]?.precoVenda;
         if (precoFinal) precoFinalPorLinha.set(i, String(precoFinal));
         itemCalculado += 1;
       }
@@ -555,6 +548,7 @@ export default function SimuladorPage() {
   const transportadora = ctx.transportadoras.find((t) => t.id === transportadoraId) ?? null;
   const transportadoraPedeNome = transportadora?.pedeNome ?? false;
   const clienteEscolhido = ctx.clientes.find((c) => c.id === clienteId) ?? null;
+  const tabelaAtual = uf ? ctx.tabelaPorUF.get(uf) ?? null : null;
   // O que falta no cadastro do cliente para a ficha sair completa. Avisar
   // aqui, e não na hora de imprimir, é o que dá tempo de resolver antes de o
   // papel chegar à mesa da conferência.
@@ -1070,9 +1064,37 @@ export default function SimuladorPage() {
 
           {verNumeros && <table className="w-full text-sm">
             <tbody>
-              <LinhaCascata rotulo="Receita bruta" valor={simulacao.resultado.receitaBruta.toString()} />
-              <LinhaCascata rotulo="(−) Impostos sobre venda + DIFAL" valor={simulacao.resultado.imposto.plus(simulacao.resultado.difal).negated().toString()} />
-              <LinhaCascata rotulo="= Receita líquida (após frete/comissão)" valor={simulacao.resultado.receitaLiquida.toString()} pct="100,00%" destaque />
+              <LinhaCascata
+                rotulo="Receita venda"
+                detalhe="Soma dos itens: quantidade × preço sem frete"
+                valor={simulacao.resultado.receitaBruta.toString()}
+              />
+              <LinhaCascata
+                rotulo="(−) Frete destacado / cliente"
+                detalhe={freteCliente ? "Frete em linha própria, sem alterar a base da comissão" : "Frete só registrado na expedição"}
+                valor={simulacao.resultado.frete.negated().toString()}
+              />
+              <LinhaCascata
+                rotulo="(−) Impostos sobre venda"
+                detalhe={`${tabelaAtual ? percentual(tabelaAtual.aliquotaIcsm.toString()) : "0,00%"} sobre ${reais(simulacao.resultado.receitaBruta.toString())}`}
+                valor={simulacao.resultado.imposto.negated().toString()}
+              />
+              <LinhaCascata
+                rotulo="(−) DIFAL"
+                detalhe={`${percentual(simulacao.difalAplicado.toString())} sobre ${reais(simulacao.resultado.receitaBruta.toString())}`}
+                valor={simulacao.resultado.difal.negated().toString()}
+              />
+              <LinhaCascata
+                rotulo="(−) Imposto sobre frete"
+                detalhe={`${tabelaAtual ? percentual(tabelaAtual.aliquotaIcsm.toString()) : "0,00%"} sobre ${reais(simulacao.resultado.frete.toString())}`}
+                valor={simulacao.resultado.impostoFrete.negated().toString()}
+              />
+              <LinhaCascata
+                rotulo="(−) Comissão"
+                detalhe={`${percentual(simulacao.comissaoUsada.toString())} sobre ${reais(simulacao.resultado.receitaBruta.toString())}`}
+                valor={simulacao.resultado.comissao.negated().toString()}
+              />
+              <LinhaCascata rotulo="= Receita líquida" valor={simulacao.resultado.receitaLiquida.toString()} pct="100,00%" destaque />
               <LinhaCascata rotulo="(−) CMV" valor={simulacao.resultado.cmvTotal.negated().toString()} />
               <LinhaCascata
                 rotulo="= MARGEM DE CONTRIBUIÇÃO (métrica oficial)"
@@ -1083,9 +1105,7 @@ export default function SimuladorPage() {
             </tbody>
           </table>}
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
-            Deduções da receita líquida: frete {toMoney(simulacao.resultado.frete).replace(".", ",")} · imposto frete{" "}
-            {toMoney(simulacao.resultado.impostoFrete).replace(".", ",")} · comissão {toMoney(simulacao.resultado.comissao).replace(".", ",")}
-            {freteCliente ? " · frete destacado nos preços dos itens" : ""}
+            Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; o frete destacado e o imposto sobre frete aparecem em linhas separadas.
           </p>}
 
           {simulacao.avisos.map((a, i) => (
@@ -1480,10 +1500,25 @@ function AvisoDeNumero({ valor }: { valor: string }) {
   return <p className="mt-1 w-28 text-[0.65rem] leading-tight text-amber-700">{aviso}</p>;
 }
 
-function LinhaCascata({ rotulo, valor, pct, destaque }: { rotulo: string; valor: string; pct?: string; destaque?: boolean }) {
+function LinhaCascata({
+  rotulo,
+  detalhe,
+  valor,
+  pct,
+  destaque,
+}: {
+  rotulo: string;
+  detalhe?: string;
+  valor: string;
+  pct?: string;
+  destaque?: boolean;
+}) {
   return (
     <tr className={destaque ? "font-semibold" : ""}>
-      <td className="py-1">{rotulo}</td>
+      <td className="py-1">
+        <div>{rotulo}</div>
+        {detalhe && <div className="text-xs font-normal text-[var(--cor-texto-suave)]">{detalhe}</div>}
+      </td>
       <td className="py-1 text-right">{reais(valor)}</td>
       <td className="w-24 py-1 text-right text-[var(--cor-texto-suave)]">{pct ?? ""}</td>
     </tr>
