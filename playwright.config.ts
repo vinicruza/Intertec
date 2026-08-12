@@ -8,6 +8,7 @@ const valorOuPadrao = (valor: string | undefined, padrao: string) =>
   valor && valor.trim() !== "" ? valor : padrao;
 
 const externo = valorOuPadrao(process.env.E2E_BASE_URL, "");
+const browserChannel = valorOuPadrao(process.env.E2E_BROWSER_CHANNEL, "");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -19,7 +20,13 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [{
+    name: browserChannel ? `chromium-${browserChannel}` : "chromium",
+    use: {
+      ...devices["Desktop Chrome"],
+      channel: browserChannel || undefined,
+    },
+  }],
   webServer: externo ? undefined : {
     command: "npm run dev -- --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173/login",
