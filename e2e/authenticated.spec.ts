@@ -115,11 +115,11 @@ test("auditoria de kits mostra indicadores, filtros e dados de rastreabilidade",
     test.skip(true, "Ambiente sem kits cadastrados para auditar.");
   }
 
-  await expect(page.getByText("Kits no catálogo")).toBeVisible();
-  await expect(page.getByText("Sem composição")).toBeVisible();
-  await expect(page.getByText("CMV pendente")).toBeVisible();
-  await expect(page.getByText("Usados em pedidos")).toBeVisible();
-  await expect(page.getByText("Nunca usados")).toBeVisible();
+  await expect(conteudo.locator("div").filter({ hasText: /^Kits no catálogo$/ }).first()).toBeVisible();
+  await expect(conteudo.locator("div").filter({ hasText: /^Sem composição$/ }).first()).toBeVisible();
+  await expect(conteudo.locator("div").filter({ hasText: /^CMV pendente$/ }).first()).toBeVisible();
+  await expect(conteudo.locator("div").filter({ hasText: /^Usados em pedidos$/ }).first()).toBeVisible();
+  await expect(conteudo.locator("div").filter({ hasText: /^Nunca usados$/ }).first()).toBeVisible();
 
   await expect(page.getByPlaceholder("Código, kit, produto, cliente, orçamento ou pedido...")).toBeVisible();
   const filtro = page.locator("select").filter({ hasText: "Com risco" }).first();
