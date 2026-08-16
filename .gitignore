@@ -13,3 +13,7 @@ test-results/
 supabase/.temp/
 .vercel
 .env*
+
+# Python (scripts avulsos de análise)
+__pycache__/
+*.pyc
