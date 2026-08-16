@@ -19,6 +19,16 @@ python3 scripts/ordem-producao/gerar_planilha.py
 Sai um `CMV_Ordem_de_Producao_jul_ago_2026.xlsx` no diretório atual, com as abas
 Resumo, Itens, Pedidos, Kits — composição, Dicionário e Pendências.
 
+Para o de-para que vai ao cliente conferir, com as mesmas variáveis de ambiente:
+
+```sh
+python3 scripts/ordem-producao/gerar_depara.py
+```
+
+Sai um `De-Para_Abreviacoes_Ordem_de_Producao.xlsx` com as abas Como preencher,
+1. Dúvidas, 2. Kits sem composição, 3. De-para completo e 4. Regras de leitura —
+as colunas de resposta ficam em branco, com lista Sim/Não onde faz sentido.
+
 Para rodar outros meses, troque as abas em `gerar_planilha.py::coleta` (hoje
 `jul26` e `ago26`).
 
@@ -29,4 +39,5 @@ Para rodar outros meses, troque as abas em `gerar_planilha.py::coleta` (hoje
 | `catalogo.py` | lê a aba Alocação Despesa e indexa por nome-base + estéril/gramatura/origem |
 | `resolver.py` | o dicionário: traduz `catarata CH não` no produto do catálogo |
 | `pedidos.py` | separa a Ordem de Produção em pedidos (blocos entre linhas vazias) |
-| `gerar_planilha.py` | junta tudo e escreve a planilha de entrega |
+| `gerar_planilha.py` | junta tudo e escreve a planilha de CMV |
+| `gerar_depara.py` | escreve o de-para de conferência para o cliente |

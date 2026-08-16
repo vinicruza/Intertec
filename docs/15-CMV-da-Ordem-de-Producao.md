@@ -82,6 +82,12 @@ Os 43 sem CMV são quase todos kits escritos só como `kit`, `kit 1`, `kit padr�
 o único buraco grande, e ele não se resolve com mais engenharia reversa — precisa
 do cadastro do kit de cada cliente.
 
+O **de-para para conferência do cliente** sai de `gerar_depara.py`: uma linha por
+abreviação distinta (268 nos dois meses), com o que foi entendido, o produto do
+catálogo, o volume, e duas colunas em branco para a resposta. Vem com quatro
+abas: as dúvidas priorizadas por impacto em R$, os kits que precisam de
+composição, o de-para completo e as regras gerais de leitura.
+
 **Perguntas em aberto para o cliente** (as três primeiras valem dinheiro):
 
 1. Composição dos kits fixos (`kit`, `kit 1`, `kit 2`, `kit padrão`, `kit vet
@@ -123,7 +129,8 @@ O CMV lido bate com os golden tests: `Campo Catarata 1,00 x 1,20 GR40` =
 | Leitura e índice do catálogo (com a correção do §9.3) | `scripts/ordem-producao/catalogo.py` |
 | Dicionário de abreviações e resolução de produto/kit | `scripts/ordem-producao/resolver.py` |
 | Separação da Ordem de Produção em pedidos | `scripts/ordem-producao/pedidos.py` |
-| Geração da planilha de entrega | `scripts/ordem-producao/gerar_planilha.py` |
+| Geração da planilha de CMV | `scripts/ordem-producao/gerar_planilha.py` |
+| Geração da planilha de-para, para o cliente confirmar | `scripts/ordem-producao/gerar_depara.py` |
 
 Isto é uma **análise avulsa**, não um módulo do produto: nenhuma tela e nenhuma
 função de `lib/calculations/` foi tocada. Se o cliente aprovar o dicionário, o
