@@ -58,3 +58,60 @@ export type ParametroUF = {
   uf: string;
   valores: (Decimal | null)[]; // colunas numéricas da linha, na ordem
 };
+
+// ------------------------------------------------------------
+// Abas de vendedor (Camada 4 — Calculations.md §6 e §8)
+// ------------------------------------------------------------
+// As 12 abas de pedido são cópias que divergiram entre si: mudam a linha do
+// total, a presença do DIFAL, a base da comissão e até a fonte da alíquota.
+// Por isso a extração é guiada por RÓTULO (coluna M), nunca por linha fixa —
+// uma aba sem a linha "Difal" empurra todas as de baixo para cima.
+
+export type ItemPedidoImportado = {
+  linha: number;
+  nome: string;
+  precoVenda: Decimal | null;
+  quantidade: Decimal | null;
+  receitaPlanilha: Decimal | null; // coluna F
+  cmvUnitario: Decimal | null;     // coluna H (SUMIF na Alocação)
+  despesaUnitaria: Decimal | null; // coluna J (idem)
+};
+
+// O bloco de deduções do pedido, lido por rótulo.
+export type DeducoesImportadas = {
+  frete: Decimal | null;
+  impostoFrete: Decimal | null;
+  imposto: Decimal | null;
+  difal: Decimal | null;          // null quando a aba não tem a linha
+  comissao: Decimal | null;
+  percentualComissao: Decimal | null; // só nas abas com % editável (Externos)
+  aliquotaSimples: Decimal | null;    // só no Descpro (alíquota própria, fora da ICSM)
+  freteCliente: boolean;              // flag "X"/"x" marcada
+  receitaLiquida: Decimal | null;
+  margemContribuicao: Decimal | null; // fração já calculada pela planilha
+};
+
+export type PedidoImportado = {
+  aba: string;
+  cliente: string | null;
+  uf: string | null;              // como está na planilha (pode vir minúsculo)
+  vendedor: string | null;
+  linhaTotal: number;             // linha do "Total do Pedido"
+  itens: ItemPedidoImportado[];
+  receitaPlanilha: Decimal | null; // coluna F da linha de total
+  cmvPlanilha: Decimal | null;     // coluna J da linha de total
+  despesaPlanilha: Decimal | null; // coluna K da linha de total
+  deducoes: DeducoesImportadas;
+};
+
+// Uma linha das tabelas de parâmetro (ICSM, DIFAL, Portal).
+export type LinhaTabelaFiscal = {
+  uf: string;
+  valores: (Decimal | null)[]; // colunas numéricas da linha, na ordem
+};
+
+export type TabelasFiscais = {
+  icsm: LinhaTabelaFiscal[];   // [PIS/COFINS, alíquota ICMS, soma]
+  difal: LinhaTabelaFiscal[];  // [pobreza/FCP, alíquota, DIFAL final]
+  portal: LinhaTabelaFiscal[]; // [% de frete sobre a receita]
+};

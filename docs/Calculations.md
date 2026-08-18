@@ -278,9 +278,17 @@ Colunas: Pobreza (FCP) + Alíquota → DIFAL final. **SP não tem linha** (venda
 
 Percentual da receita por UF (ex.: SP 9%... AM 27%). Usado apenas nas abas Mari e Temporaria Patricia: `frete = %(UF) × receita_pedido`. Nas demais abas o frete é digitado.
 
+> **Observado em 18/08/2026** na planilha `Rentabilidade_2026_3.xlsx`: o percentual de SP passou de
+> 9% para **3,6%**. Atualização de parâmetro, não erro — entra na tabela editável de Configurações.
+
 ### 7.4 Comissão
 
 2,5% hardcoded em todas as abas, exceto Externos (campo editável, hoje 6,1%). No sistema: parâmetro por vendedor/canal.
+
+> **⚠️ Observado em 18/08/2026, pendente de decisão do cliente (docs/15-Validacao-Camada-4.md §4.1).**
+> Na planilha nova, 8 das 12 abas passaram a calcular `2,5% × (receita + frete)` — e as outras 4
+> continuam sobre a receita só. A regra desta seção (comissão sobre a receita) **não foi alterada**
+> no motor: mudar a base muda quanto cada vendedor recebe, e isso é decisão da empresa.
 
 ---
 
@@ -296,6 +304,18 @@ As 12 abas são cópias que divergiram. O sistema unifica em um modelo só com p
 | Revendas | manual | **não** | 2,5% | tabela ICSM | sem DIFAL (venda a contribuinte — confirmar se intencional) |
 | Descpro | manual | **não** | 2,5% | **10% hardcoded (N37)** | não usa a tabela ICSM |
 | Edmilson | manual | **não** | 2,5% | tabela ICSM | **bug grave — Seção 9, item 2** |
+
+> **⚠️ Observado em 18/08/2026** ao conferir a planilha `Rentabilidade_2026_3.xlsx` contra o motor
+> (relatório completo em `docs/15-Validacao-Camada-4.md`). A tabela acima descreve a planilha
+> antiga; na nova, três linhas mudaram e **nenhuma decisão foi tomada ainda**:
+>
+> - **Revendas** não desconta mais imposto nenhum — as células "Imposto" e "Imposto Frete" estão
+>   vazias, sem fórmula. Impacto medido: 7,5 pontos de margem (§4.2 do doc 15).
+> - **Descpro** usa **6,5%** ("Alíquota Simples"), não os 10% registrados acima (§4.3 do doc 15).
+> - **Edmilson** continua com o bug do item 2 da Seção 9, agora com `F44` vazio: o imposto do
+>   pedido dá **R$ 0,00** e a margem exibida fica 15 pontos acima da real (§5.1 do doc 15).
+>
+> Enquanto o cliente não decide, o sistema segue as regras já documentadas aqui.
 
 ---
 

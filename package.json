@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "reconcile": "tsx scripts/reconcile.ts"
+    "reconcile": "tsx scripts/reconcile.ts",
+    "validar:pedidos": "tsx scripts/validar-pedidos.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
