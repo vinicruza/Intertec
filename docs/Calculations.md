@@ -198,7 +198,7 @@ receita_pedido   = Σ receita_itens
 imposto_frete    = aliquota_ICSM(UF) × frete
 imposto          = aliquota_ICSM(UF) × receita_pedido
 DIFAL            = aliquota_DIFAL(UF) × receita_pedido
-comissao         = 2,5% × receita_pedido                    (fixo, exceto Externos)
+comissao         = 2,5% × (receita_pedido + frete)          (fixo, exceto Externos — ver §6.2)
 frete            = 0, se flag "Frete Cliente" = X           (ver correção abaixo)
 imposto_frete    = 0 quando o frete é 0
 receita_liquida  = receita_pedido − frete − imposto_frete − imposto − DIFAL − comissao
@@ -239,13 +239,53 @@ Cliente Unimed Salto Itu, UF **BA**, item: Avental TNT Sem Manga Não Estéril, 
 | Imposto frete | 16,25% × 1.000 | 162,50 |
 | Imposto | 16,25% × 16.800 | 2.730,00 |
 | DIFAL | 13,5% × 16.800 | 2.268,00 |
-| Comissão | 2,5% × 16.800 | 420,00 |
-| Receita líquida | 16.800 − 6.580,50 | 10.219,50 |
-| **Margem (fórmula da planilha)** | (10.219,50 − 6.150,42) ÷ 10.219,50 | **39,82%** |
-| Margem se descontasse a despesa | (10.219,50 − 6.150,42 − 3.115,13) ÷ 10.219,50 | **9,33%** |
+| Comissão | 2,5% × (16.800 + 1.000) | 445,00 |
+| Receita líquida | 16.800 − 6.605,50 | 10.194,50 |
+| **Margem (fórmula da planilha)** | (10.194,50 − 6.150,42) ÷ 10.194,50 | **39,67%** |
+| Margem se descontasse a despesa | (10.194,50 − 6.150,42 − 3.115,13) ÷ 10.194,50 | **9,11%** |
 | Margem por item (col. P) | (16.800 − 6.150,42 − 3.115,13) ÷ 16.800 | 44,85% |
 
-O mesmo pedido exibe três "margens" diferentes (39,82%, 9,33% implícita, 44,85%). Ver Seção 10, decisão 1.
+O mesmo pedido exibe três "margens" diferentes (39,67%, 9,11% implícita, 44,85%). Ver Seção 10, decisão 1.
+
+### 6.2 Base da comissão: receita + frete (18/08/2026)
+
+**Decisão do cliente, comunicada em 18/08/2026.** A comissão do vendedor passa a incidir sobre a
+receita **mais o frete do pedido**:
+
+```
+base_comissao = receita_pedido + frete_informado
+comissao      = aliquota_comissao × base_comissao
+```
+
+**O que mudou e o que não mudou.** A alíquota continua a mesma (2,5% padrão, 6,1% no Externos, com
+override por pedido — D6). Só a base mudou. Antes desta data o sistema comissionava apenas a
+receita dos itens, como este documento descrevia a partir da planilha antiga.
+
+**Vale para todos os canais.** Na planilha `Rentabilidade_2026_3`, 8 das 12 abas já usavam
+`=2,5%*($F$24+$N$6)` e 4 continuavam com `=2,5%*$F$24` (Externos, Revendas, Edmilson e Temporária
+Patricia). O cliente confirmou que essas 4 são cópias que ficaram para trás, não exceções: o
+sistema aplica a regra nova em todos os canais. Enquanto a planilha não for atualizada, a
+conferência de `scripts/validar-pedidos.ts` vai acusar divergência de comissão nessas 4 abas — e
+o divergente ali é a planilha.
+
+**Usa o frete INFORMADO, não o efetivo.** Quando o frete é por conta do cliente, a dedução do frete
+vai a zero (§6, correção de 04/08/2026) — mas a base da comissão **não** cai junto. O transporte foi
+vendido, e o vendedor comissiona sobre ele. É também o que a planilha faz: a fórmula aponta para a
+célula do frete digitado (`$N$6`), não para a linha já líquida do estorno. Golden test T16b.
+
+**Efeito no pedido-fixture** (BA, receita 16.800, frete 1.000):
+
+| | Antes | Depois |
+|---|---|---|
+| Base da comissão | 16.800,00 | 17.800,00 |
+| Comissão (2,5%) | 420,00 | **445,00** |
+| Receita líquida | 10.219,50 | **10.194,50** |
+| Margem de contribuição | 39,82% | **39,67%** |
+
+O resultado passa a expor `base_comissao` como linha própria — a memória de cálculo tem de ficar
+visível, senão ninguém explica ao vendedor de onde saíram os R$ 445,00.
+
+Golden tests T16, T16b, T16c e T16d.
 
 ### 6.1 Ficha impressa do pedido (05/08/2026)
 
@@ -285,10 +325,8 @@ Percentual da receita por UF (ex.: SP 9%... AM 27%). Usado apenas nas abas Mari 
 
 2,5% hardcoded em todas as abas, exceto Externos (campo editável, hoje 6,1%). No sistema: parâmetro por vendedor/canal.
 
-> **⚠️ Observado em 18/08/2026, pendente de decisão do cliente (docs/15-Validacao-Camada-4.md §4.1).**
-> Na planilha nova, 8 das 12 abas passaram a calcular `2,5% × (receita + frete)` — e as outras 4
-> continuam sobre a receita só. A regra desta seção (comissão sobre a receita) **não foi alterada**
-> no motor: mudar a base muda quanto cada vendedor recebe, e isso é decisão da empresa.
+> **✅ DECIDIDO em 18/08/2026 pelo cliente — a base da comissão inclui o frete.**
+> Ver §6.2 abaixo. A alíquota (2,5% padrão, 6,1% Externos) não mudou; o que mudou foi a base.
 
 ---
 
@@ -321,7 +359,7 @@ As 12 abas são cópias que divergiram. O sistema unifica em um modelo só com p
 
 ## 9. Bugs e inconsistências encontrados (corrigir na migração, não copiar)
 
-**1. Margem do pedido ignora a despesa alocada.** A planilha calcula a despesa por item (coluna K), mas a fórmula de margem do pedido usa só a receita líquida menos CMV. No pedido-fixture: 39,82% exibido vs 9,33% se a despesa entrasse. Enquanto isso, a margem por item (col. P) desconta a despesa mas ignora impostos/frete/comissão. Nenhuma das duas é a margem completa. → Decisão 1.
+**1. Margem do pedido ignora a despesa alocada.** A planilha calcula a despesa por item (coluna K), mas a fórmula de margem do pedido usa só a receita líquida menos CMV. No pedido-fixture: 39,67% exibido vs 9,11% se a despesa entrasse. Enquanto isso, a margem por item (col. P) desconta a despesa mas ignora impostos/frete/comissão. Nenhuma das duas é a margem completa. → Decisão 1.
 
 **2. Aba Edmilson: imposto calculado sobre a base errada.** `Imposto = alíquota × F44`, onde F44 = 3.102 (um bloco secundário de células), enquanto a receita do pedido é F24 = 15.198. O imposto do pedido real dessa aba está calculado sobre ~20% da receita — margem superestimada. Todas as outras abas usam a receita total.
 
@@ -351,7 +389,7 @@ Receita bruta
 (−) Frete líquido + Comissão              = MARGEM DE CONTRIBUIÇÃO  ← métrica oficial, dispara alertas
 (−) Despesa alocada (rateio)              = Resultado após rateio    ← informativo por pedido
 ```
-A margem de contribuição coincide numericamente com a margem que a planilha já exibe (39,82% no pedido-fixture), preservando a intuição do time. O resultado após rateio aparece sempre ao lado, com nome próprio.
+A margem de contribuição coincide numericamente com a margem que a planilha já exibe (39,67% no pedido-fixture), preservando a intuição do time. O resultado após rateio aparece sempre ao lado, com nome próprio.
 
 **D2 — Denominador dos percentuais = receita líquida.** Padrão de DRE e compatível com a planilha atual; as faixas de status (40/25/10%) permanecem válidas. Valores em R$ sempre exibidos junto ao %.
 
@@ -401,7 +439,7 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T3 | cmv_produto | ficha da Seção 3 | 2,935400 |
 | T4 | despesa_unitaria | Avental: 20.000; 70; total 450.000; Σpesos 14.445.616 | 2,180592 |
 | T5 | despesa_unitaria | Campo Catarata GR40: 10.000; 100 | 3,115132 |
-| T6 | pedido completo | fixture Seção 6 (BA, 16.800, frete 1.000) | RL 10.219,50; margem 39,82% |
+| T6 | pedido completo | fixture Seção 6 (BA, 16.800, frete 1.000) | RL 10.194,50; margem 39,67% |
 | T7 | pedido, UF=SP | mesmos valores, UF SP | imposto 27,25%; DIFAL 0 |
 | T8 | kit em cascata | alterar preço da Bobina SMS e recalcular kit que contém Avental | CMV do kit reflete a mudança |
 | T9 | validação | produto sem ficha ou CMV=0 em pedido | erro bloqueante (não zero silencioso) |
@@ -413,6 +451,10 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T13 | explosão de consumo | 10 aventais + 4 campos, fichas da §3 | bobina 14,121212; punho 20; caixa 0,026667 |
 | T14 | frete por conta do cliente | fixture T6 com a flag marcada | frete 0 e imposto_frete 0; RL 11.382,00 (não 9.219,50 nem −217) |
 | T15 | sinal da margem | margem −320,85 sobre RL −217,50 | −147,52% e faixa "Negativa" (nunca "Boa") |
+| T16 | base da comissão | fixture T6 (receita 16.800, frete 1.000), 2,5% | base 17.800; comissão 445,00 |
+| T16b | comissão com frete do cliente | fixture T6 com a flag marcada | frete 0, mas base 17.800 e comissão 445,00 |
+| T16c | comissão sem frete | fixture T6 com frete 0 | base 16.800; comissão 420,00 |
+| T16d | comissão do Externos | fixture T6, alíquota 6,1% | 1.085,80 (6,1% × 17.800) |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
 

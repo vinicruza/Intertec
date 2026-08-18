@@ -112,7 +112,11 @@ describe("Camada 4 — pedido completo", () => {
     despesaUnitaria: "0.778783",
   };
 
-  it("T6 — pedido UF BA: receita líquida 10.219,50 e margem 39,82%", () => {
+  // ⚠️ Valores revisados em 18/08/2026: a base da comissão passou a incluir o
+  // frete (ver T16). O pedido-fixture é o mesmo da planilha; o que mudou foi a
+  // regra que o cliente confirmou, não o exemplo. Antes desta data este teste
+  // esperava comissão 420,00, RL 10.219,50 e margem 39,82%.
+  it("T6 — pedido UF BA: receita líquida 10.194,50 e margem 39,67%", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
@@ -125,13 +129,14 @@ describe("Camada 4 — pedido completo", () => {
     esperarProximo(r.cmvTotal, "6150.42");
     esperarProximo(r.imposto, "2730");
     esperarProximo(r.difal, "2268");
-    esperarProximo(r.comissao, "420");
+    esperarProximo(r.baseComissao, "17800"); // 16.800 de venda + 1.000 de frete
+    esperarProximo(r.comissao, "445");
     esperarProximo(r.impostoFrete, "162.50");
-    esperarProximo(r.receitaLiquida, "10219.50");
-    esperarProximo(r.margemContribuicao, "4069.08");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("39.82");
-    // O mesmo pedido, se descontasse a despesa rateada, cairia para 9,33% (§6).
-    expect(toPercent(r.resultadoAposRateioPct)).toBe("9.33");
+    esperarProximo(r.receitaLiquida, "10194.50");
+    esperarProximo(r.margemContribuicao, "4044.08");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
+    // O mesmo pedido, se descontasse a despesa rateada, cairia para 9,11% (§6).
+    expect(toPercent(r.resultadoAposRateioPct)).toBe("9.11");
   });
 
   it("T7 — mesmo pedido em UF SP: imposto 27,25% e DIFAL 0", () => {
@@ -495,10 +500,13 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
     esperarProximo(r.frete, "0");
     esperarProximo(r.impostoFrete, "0");
     esperarProximo(r.freteInformado, "1000"); // o que veio na entrada, para auditoria
-    // 16.800 − 2.730 − 2.268 − 420. Nem 9.219,50 (frete saindo duas vezes,
-    // como era antes), nem 10.219,50 (frete saindo uma vez).
-    esperarProximo(r.receitaLiquida, "11382");
-    esperarProximo(r.margemContribuicao, "5231.58");
+    // 16.800 − 2.730 − 2.268 − 445. Nem 9.219,50 (frete saindo duas vezes,
+    // como era antes), nem 10.194,50 (frete saindo uma vez).
+    esperarProximo(r.receitaLiquida, "11357");
+    esperarProximo(r.margemContribuicao, "5206.58");
+    // A comissão NÃO cai junto com o frete: o transporte foi vendido, e a base
+    // segue o frete informado (T16).
+    esperarProximo(r.comissao, "445");
   });
 
   it("T14b — sem a flag, o pedido continua exatamente igual ao T6", () => {
@@ -510,8 +518,77 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaDifal: "0.135",
       aliquotaComissao: "0.025",
     });
-    esperarProximo(r.receitaLiquida, "10219.50");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("39.82");
+    esperarProximo(r.receitaLiquida, "10194.50");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
+  });
+
+  // ============================================================
+  // T16 — base da comissão inclui o frete (cliente, 18/08/2026)
+  // ------------------------------------------------------------
+  // Regra nova. Até 18/08/2026 a comissão saía só sobre a receita dos itens,
+  // como o Calculations.md §6/§7.4 descrevia a partir da planilha antiga. A
+  // planilha Rentabilidade 2026 passou a somar o frete na base, e o cliente
+  // confirmou que vale para TODOS os canais.
+  //
+  // Este teste existe para que a regra não se perca: se alguém voltar a
+  // comissionar só a receita, ele quebra aqui e não em produção, no
+  // contracheque do vendedor.
+  // ============================================================
+
+  it("T16 — comissão sai sobre receita + frete informado", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    // 2,5% × (16.800 + 1.000) = 445,00 — e não 420,00 (2,5% × 16.800).
+    esperarProximo(r.baseComissao, "17800");
+    esperarProximo(r.comissao, "445");
+  });
+
+  it("T16b — frete por conta do cliente NÃO reduz a base da comissão", () => {
+    // O frete deixa de ser dedução do resultado, mas o transporte foi vendido:
+    // a base da comissão segue o frete INFORMADO, como na planilha.
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      fretePorContaCliente: true,
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    esperarProximo(r.frete, "0");
+    esperarProximo(r.baseComissao, "17800");
+    esperarProximo(r.comissao, "445");
+  });
+
+  it("T16c — sem frete, a base da comissão é a receita pura", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "0",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    esperarProximo(r.baseComissao, "16800");
+    esperarProximo(r.comissao, "420");
+  });
+
+  it("T16d — a regra vale para qualquer alíquota, inclusive Externos 6,1%", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.061",
+    });
+
+    esperarProximo(r.comissao, "1085.80"); // 6,1% × 17.800
   });
 
   it("T15 — prejuízo nunca devolve percentual positivo", () => {

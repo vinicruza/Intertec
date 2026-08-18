@@ -221,6 +221,33 @@ describe("ciclo da cotação", () => {
     expect(fechar).toMatch(/v_role in \('admin', 'comercial'\)/i);
     expect(fechar).toMatch(/approval_status=case when v_self_approved_by_margin then 'aprovado'::approval_status/i);
   });
+
+  // A validação de fechamento REFAZ a cascata no banco e recusa o pedido se
+  // algum total não reconciliar com o que o navegador mandou. Isso significa
+  // que toda regra de cálculo vive em dois lugares — e mudar só um deles
+  // derruba o fechamento em produção.
+  //
+  // Já aconteceu com o override de DIFAL em 05/08/2026 (Calculations.md
+  // §12.1). Este teste existe para que a base da comissão (§6.2) não repita a
+  // história: se alguém trocar a base no motor em TypeScript e esquecer o SQL,
+  // quebra aqui.
+  it("a base da comissão no banco é receita + frete, igual ao motor (§6.2)", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    expect(fechar).toMatch(/v_commission_base := v_gross\+p_freight/i);
+    expect(fechar).toMatch(/v_commission := p_commission_rate\*v_commission_base/i);
+    // A base NÃO pode voltar a ser só a receita bruta.
+    expect(fechar).not.toMatch(/v_commission := p_commission_rate\*v_gross(?![a-z_])/i);
+  });
+
+  // Frete por conta do cliente zera a DEDUÇÃO do frete, mas não a base da
+  // comissão: o transporte foi vendido (golden test T16b). Se o SQL passasse a
+  // olhar a flag para montar a base, o banco pagaria comissão diferente do
+  // motor justamente nos pedidos com frete do cliente.
+  it("o frete do cliente não encolhe a base da comissão no banco", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    const linhaBase = /v_commission_base := [^;]+;/i.exec(fechar)?.[0] ?? "";
+    expect(linhaBase).not.toMatch(/freight_paid_by_customer/i);
+  });
 });
 
 describe("comercial lança pedido em nome próprio", () => {

@@ -64,7 +64,17 @@ contribuinte. O relatório marca como "linha ausente" só para deixar claro que 
 Estas **não existiam** na versão da planilha que originou o Calculations.md. Nenhuma foi alterada
 no código: o sistema segue com a regra documentada até o cliente decidir.
 
-### 4.1 A comissão passou a incidir sobre receita **+ frete** 🔴
+### 4.1 A comissão passou a incidir sobre receita **+ frete** — ✅ RESOLVIDO em 18/08/2026
+
+> **O cliente confirmou a regra nova: a comissão incide sobre receita + frete, em todos os canais.**
+> Implementado em `lib/calculations/order.ts` (golden tests T16–T16d) e documentado no
+> Calculations.md §6.2. Depois da mudança, **Patricia, Priscilene e Mari passaram a fechar 100%**
+> com a planilha. As 4 abas que na planilha ficaram com `=2,5%*$F$24` (Externos, Revendas,
+> Edmilson e Temporária Patricia) agora divergem — e ali o divergente é a planilha, que precisa
+> ser atualizada do lado do cliente.
+>
+> O texto abaixo fica como registro do achado.
+
 
 O Calculations.md §6 e §7.4 dizem `comissão = 2,5% × receita do pedido`. Nesta versão, 8 das 12
 abas mudaram para `2,5% × (receita + frete)`:
@@ -170,9 +180,13 @@ Mari e Edmilson perderam divergências que eram falso positivo). Tem teste de re
 Nada foi mudado no motor de cálculo. Antes de mexer, precisamos da resposta de três perguntas —
 todas de negócio, nenhuma técnica:
 
-1. **Comissão incide sobre o frete?** (§4.1 — vale dinheiro para o vendedor)
+1. ~~**Comissão incide sobre o frete?**~~ ✅ **Respondida em 18/08/2026: sim, em todos os canais.**
+   Implementada (§4.1), com golden tests T16–T16d.
 2. **Revenda paga imposto sobre a venda?** (§4.2 — 7,5 pontos de margem)
 3. **Descpro é Simples 6,5% ou ICMS por UF?** (§4.3 — 6 pontos de margem)
 
-Respondidas, cada uma vira uma alteração pequena e com golden test próprio. Enquanto isso, o
-sistema continua com as regras do Calculations.md, que é o combinado.
+Cada resposta vira uma alteração pequena e com golden test próprio. Enquanto as duas restantes não
+chegam, o sistema continua com as regras do Calculations.md, que é o combinado.
+
+**Situação após a mudança da comissão:** 3 abas fecham 100% (Patricia, Priscilene, Mari e
+Temporária Patricia perdeu o empate só por causa da fórmula antiga na planilha), contra 1 antes.

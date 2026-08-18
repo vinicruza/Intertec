@@ -31,16 +31,20 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     uf: { aliquotaIcsm: "0.1625", difalFinal: "0.135", fretePortalPct: "0.17" },
   };
 
-  it("reproduz a cascata com frete desmarcado: RL 11.382,00 e margem 45,96% (status Boa)", () => {
+  // ⚠️ Valores revisados em 18/08/2026: a base da comissão passou a incluir o
+  // frete (golden test T16). Antes desta data: comissão 420,00, RL 11.382,00 e
+  // margem 45,96%.
+  it("reproduz a cascata com frete desmarcado: RL 11.357,00 e margem 45,84% (status Boa)", () => {
     const s = simular(entrada);
     expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
     expect(toMoney(s.resultado.imposto)).toBe("2730.00");
     expect(toMoney(s.resultado.difal)).toBe("2268.00");
-    expect(toMoney(s.resultado.comissao)).toBe("420.00");
+    expect(toMoney(s.resultado.baseComissao)).toBe("17800.00"); // 16.800 + frete 1.000
+    expect(toMoney(s.resultado.comissao)).toBe("445.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11382.00");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("45.96");
-    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("18.59");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11357.00");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("45.84");
+    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("18.42");
     expect(s.avisos).toHaveLength(0);
 
     // Com o frete desmarcado, a margem segue a leitura da rentabilidade antiga.
@@ -50,16 +54,16 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
   it("frete destacado ligado mantém a base da venda e deduz frete/imposto frete em linhas próprias", () => {
     const s = simular({ ...entrada, fretePorContaCliente: true });
     expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
-    expect(toMoney(s.resultado.comissao)).toBe("420.00");
+    expect(toMoney(s.resultado.comissao)).toBe("445.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
     expect(toMoney(s.resultado.frete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11219.50");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11194.50");
   });
 
   it("canal Revendas (sem DIFAL): margem sobe e o DIFAL zera", () => {
     const s = simular({ ...entrada, canal: { ...entrada.canal, aplicaDifal: false } });
     expect(toMoney(s.difalAplicado)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("13650.00"); // 11.382,00 + 2.268
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("13625.00"); // 11.357,00 + 2.268
   });
 
   it("canal Marketplace: frete vira % da receita por UF (BA 17%)", () => {
@@ -74,7 +78,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
 
   it("override de comissão é respeitado (Externos 6,1%)", () => {
     const s = simular({ ...entrada, comissao: "0.061" });
-    expect(toMoney(s.resultado.comissao)).toBe("1024.80"); // 6,1% × 16.800
+    expect(toMoney(s.resultado.comissao)).toBe("1085.80"); // 6,1% × 17.800 (receita + frete)
   });
 
   // Override de DIFAL por pedido (05/08/2026): o canal decide o padrão, mas
@@ -88,7 +92,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(s.aplicaDifalUsado).toBe(false);
     expect(toMoney(s.difalAplicado)).toBe("0.00"); // alíquota usada, zerada
     expect(toMoney(s.resultado.difal)).toBe("0.00"); // valor em R$
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("13650.00"); // igual ao canal Revendas
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("13625.00"); // igual ao canal Revendas
   });
 
   it("override liga o DIFAL mesmo com o canal não aplicando por padrão", () => {
@@ -100,7 +104,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(s.aplicaDifalUsado).toBe(true);
     expect(s.difalAplicado.toString()).toBe("0.135"); // alíquota usada
     expect(toMoney(s.resultado.difal)).toBe("2268.00"); // valor em R$
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11382.00"); // igual ao padrão
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11357.00"); // igual ao padrão
   });
 
   it("sem override (null/undefined), usa o padrão do canal — comportamento antigo preservado", () => {

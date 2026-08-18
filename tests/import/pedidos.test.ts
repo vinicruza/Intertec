@@ -69,7 +69,7 @@ function abaPadrao(extra: Record<string, string | number> = {}) {
     M9: "Difal",
     N9: 2268,
     M10: "Comissão",
-    N10: 420,
+    N10: 445, // 2,5% × (16.800 + 1.000 de frete) — regra confirmada em 18/08/2026
     M11: "Frete Cliente",
     N11: 0,
     F23: "Total do Pedido",
@@ -77,9 +77,9 @@ function abaPadrao(extra: Record<string, string | number> = {}) {
     J24: 6150.42,
     K24: 3115.132,
     M14: "Receita Liquida",
-    N14: 10219.5,
+    N14: 10194.5,
     M16: "Margem de Contribuição",
-    N16: 0.3982,
+    N16: 0.3966923341,
     ...extra,
   };
 }
@@ -233,20 +233,22 @@ describe("conferência do motor contra a aba", () => {
 
     expect(c.bloqueio).toBeNull();
     expect(c.divergencias).toHaveLength(0);
-    expect(c.resultado!.receitaLiquida.toFixed(2)).toBe("10219.50");
+    expect(c.resultado!.receitaLiquida.toFixed(2)).toBe("10194.50");
   });
 
-  it("acusa a comissão calculada sobre receita + frete (regra nova da planilha)", () => {
-    // 2,5% × (16.800 + 1.000) = 445,00 na planilha, contra 420,00 do sistema.
+  it("acusa a aba que ficou com a comissão só sobre a receita (fórmula antiga)", () => {
+    // Desde 18/08/2026 o sistema comissiona receita + frete (golden test T16).
+    // Quatro abas da planilha ficaram para trás com `=2,5%*$F$24` — e é ESSA
+    // que agora aparece como divergência, invertendo o sinal do achado.
     const p = planilhaFalsa({
-      Patricia: abaPadrao({ N10: 445, N14: 10194.5, N16: 0.39697 }),
+      Revendas: abaPadrao({ N10: 420, N14: 10219.5, N16: 0.3982 }),
     });
-    const c = conferirPedido(extrairPedido(p, "Patricia")!, TABELAS, CANAL_PADRAO);
+    const c = conferirPedido(extrairPedido(p, "Revendas")!, TABELAS, CANAL_PADRAO);
 
     const comissao = c.divergencias.find((d) => d.campo === "Comissão")!;
-    expect(comissao.sistema!.toFixed(2)).toBe("420.00");
-    expect(comissao.planilha!.toFixed(2)).toBe("445.00");
-    expect(comissao.diferenca!.toFixed(2)).toBe("-25.00");
+    expect(comissao.sistema!.toFixed(2)).toBe("445.00");
+    expect(comissao.planilha!.toFixed(2)).toBe("420.00");
+    expect(comissao.diferenca!.toFixed(2)).toBe("25.00");
   });
 
   it("recusa o pedido que a planilha aceitou com CMV zerado (T9)", () => {

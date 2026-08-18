@@ -1091,7 +1091,11 @@ export default function SimuladorPage() {
               />
               <LinhaCascata
                 rotulo="(−) Comissão"
-                detalhe={`${percentual(simulacao.comissaoUsada.toString())} sobre ${reais(simulacao.resultado.receitaBruta.toString())}`}
+                detalhe={`${percentual(simulacao.comissaoUsada.toString())} sobre ${reais(simulacao.resultado.baseComissao.toString())}${
+                  simulacao.resultado.freteInformado.gt(0)
+                    ? ` (venda ${reais(simulacao.resultado.receitaBruta.toString())} + frete ${reais(simulacao.resultado.freteInformado.toString())})`
+                    : ""
+                }`}
                 valor={simulacao.resultado.comissao.negated().toString()}
               />
               <LinhaCascata rotulo="= Receita líquida" valor={simulacao.resultado.receitaLiquida.toString()} pct="100,00%" destaque />

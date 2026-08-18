@@ -34,6 +34,7 @@ export type ResultadoPedido = {
   impostoFrete: Decimal;
   imposto: Decimal;           // imposto sobre a receita (ICSM)
   difal: Decimal;
+  baseComissao: Decimal;      // receita + frete informado — a memória de cálculo da comissão
   comissao: Decimal;
   receitaLiquida: Decimal;    // receita menos frete, impostos, DIFAL e comissão
   // Nível oficial: MARGEM DE CONTRIBUIÇÃO (dispara os alertas de status)
@@ -56,11 +57,12 @@ export type ResultadoItem = {
 //   imposto_frete    = aliquota_imposto × frete
 //   imposto          = aliquota_imposto × receita_pedido
 //   DIFAL            = aliquota_difal × receita_pedido
-//   comissao         = aliquota_comissao × receita_pedido
+//   base_comissao    = receita_pedido + frete_informado
+//   comissao         = aliquota_comissao × base_comissao
 //   frete            = 0, se o frete é por conta do cliente (e então imposto_frete = 0)
 //   receita_liquida  = receita − frete − imposto_frete − imposto − DIFAL − comissao
-//   margem_contrib.  = receita_liquida − CMV_pedido      ← métrica oficial (= 39,82% no fixture)
-//   result_rateio    = margem_contribuicao − despesa_pedido  ← informativo (= 9,33% no fixture)
+//   margem_contrib.  = receita_liquida − CMV_pedido      ← métrica oficial (= 39,67% no fixture)
+//   result_rateio    = margem_contribuicao − despesa_pedido  ← informativo (= 9,11% no fixture)
 //
 // Golden tests T6 (BA) e T7 (SP). A validação de CMV=0 é o T9.
 export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
@@ -112,7 +114,21 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   const impostoFrete = aliquotaImposto.times(baseImpostoFrete);
   const imposto = aliquotaImposto.times(receitaBruta);
   const difal = dec(p.aliquotaDifal).times(receitaBruta);
-  const comissao = dec(p.aliquotaComissao).times(receitaBruta);
+
+  // Base da comissão = receita + FRETE INFORMADO (regra confirmada pelo cliente
+  // em 18/08/2026, alinhando o sistema à planilha Rentabilidade 2026).
+  //
+  // Até esta data o sistema pagava comissão só sobre a receita dos itens, como
+  // o Calculations.md §6 e §7.4 descreviam. A planilha nova passou a somar o
+  // frete na base — em 8 das 12 abas — e o cliente confirmou que a regra vale
+  // para TODOS os canais, incluindo os 4 que na planilha ficaram para trás.
+  //
+  // Usa o frete INFORMADO, não o efetivo: mesmo quando o cliente paga o frete
+  // (e a dedução vai a zero), o transporte foi vendido e o vendedor comissiona
+  // sobre ele. É o que a planilha faz — a fórmula aponta para a célula do frete
+  // digitado, não para a linha já líquida de estorno.
+  const baseComissao = receitaBruta.plus(freteInformado);
+  const comissao = dec(p.aliquotaComissao).times(baseComissao);
 
   const receitaLiquida = receitaBruta
     .minus(frete)
@@ -133,6 +149,7 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
     impostoFrete,
     imposto,
     difal,
+    baseComissao,
     comissao,
     receitaLiquida,
     margemContribuicao,
