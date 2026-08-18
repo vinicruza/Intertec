@@ -88,6 +88,7 @@ export function montarSnapshot(
         impostos: toMoney(r.imposto),
         imposto_frete: toMoney(r.impostoFrete),
         difal: toMoney(r.difal),
+        base_difal: toMoney(r.baseDifal),
         comissao: toMoney(r.comissao),
         base_comissao: toMoney(r.baseComissao),
         frete: toMoney(simulacao.freteUsado),

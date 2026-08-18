@@ -33,11 +33,11 @@ describe("snapshot de fechamento — fixture Patricia", () => {
   ]);
 
   it("congela os totais em precisão total e o display a 2 casas", () => {
-    expect(snap.pedido.net_revenue_snapshot).toBe("11357");
-    expect(snap.pedido.totals_display.receita_liquida).toBe("11357.00");
-    expect(snap.pedido.totals_display.margem_contribuicao).toBe("5206.58");
+    expect(snap.pedido.net_revenue_snapshot).toBe("11222");
+    expect(snap.pedido.totals_display.receita_liquida).toBe("11222.00");
+    expect(snap.pedido.totals_display.margem_contribuicao).toBe("5071.58");
     expect(snap.pedido.totals_display.cmv).toBe("6150.42");
-    expect(snap.pedido.totals_display.difal).toBe("2268.00");
+    expect(snap.pedido.totals_display.difal).toBe("2403.00");
   });
 
   it("congela alíquotas, comissão e frete rateado por item", () => {

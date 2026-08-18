@@ -197,7 +197,7 @@ margem_item   = (receita_item − CMV_total − despesa_total) ÷ receita_item
 receita_pedido   = Σ receita_itens
 imposto_frete    = aliquota_ICSM(UF) × frete
 imposto          = aliquota_ICSM(UF) × receita_pedido
-DIFAL            = aliquota_DIFAL(UF) × receita_pedido
+DIFAL            = aliquota_DIFAL(UF) × (receita_pedido + frete)   (ver §6.3)
 comissao         = 2,5% × (receita_pedido + frete)          (fixo, exceto Externos — ver §6.2)
 frete            = 0, se flag "Frete Cliente" = X           (ver correção abaixo)
 imposto_frete    = 0 quando o frete é 0
@@ -238,14 +238,14 @@ Cliente Unimed Salto Itu, UF **BA**, item: Avental TNT Sem Manga Não Estéril, 
 | Frete (manual) | | 1.000,00 |
 | Imposto frete | 16,25% × 1.000 | 162,50 |
 | Imposto | 16,25% × 16.800 | 2.730,00 |
-| DIFAL | 13,5% × 16.800 | 2.268,00 |
+| DIFAL | 13,5% × (16.800 + 1.000) | 2.403,00 |
 | Comissão | 2,5% × (16.800 + 1.000) | 445,00 |
-| Receita líquida | 16.800 − 6.605,50 | 10.194,50 |
-| **Margem (fórmula da planilha)** | (10.194,50 − 6.150,42) ÷ 10.194,50 | **39,67%** |
-| Margem se descontasse a despesa | (10.194,50 − 6.150,42 − 3.115,13) ÷ 10.194,50 | **9,11%** |
+| Receita líquida | 16.800 − 6.740,50 | 10.059,50 |
+| **Margem (fórmula da planilha)** | (10.059,50 − 6.150,42) ÷ 10.059,50 | **38,86%** |
+| Margem se descontasse a despesa | (10.059,50 − 6.150,42 − 3.115,13) ÷ 10.059,50 | **7,89%** |
 | Margem por item (col. P) | (16.800 − 6.150,42 − 3.115,13) ÷ 16.800 | 44,85% |
 
-O mesmo pedido exibe três "margens" diferentes (39,67%, 9,11% implícita, 44,85%). Ver Seção 10, decisão 1.
+O mesmo pedido exibe três "margens" diferentes (38,86%, 7,89% implícita, 44,85%). Ver Seção 10, decisão 1.
 
 ### 6.2 Base da comissão: receita + frete (18/08/2026)
 
@@ -286,6 +286,47 @@ O resultado passa a expor `base_comissao` como linha própria — a memória de 
 visível, senão ninguém explica ao vendedor de onde saíram os R$ 445,00.
 
 Golden tests T16, T16b, T16c e T16d.
+
+### 6.3 Base do DIFAL: receita + frete (18/08/2026)
+
+**Decisão do cliente, comunicada em 18/08/2026**, no mesmo dia e na mesma direção da comissão (§6.2).
+
+```
+base_com_frete = receita_pedido + frete_informado
+DIFAL          = aliquota_DIFAL(UF) × base_com_frete
+```
+
+**Por que o ICMS não mudou junto.** O imposto sobre venda já alcança o frete, mas por outro caminho:
+a linha **"Imposto sobre frete"**, separada, aplica a mesma alíquota da UF sobre o frete. Somando as
+duas linhas, o ICMS já incide sobre receita + frete. O DIFAL **não tem linha equivalente** — somar o
+frete na base é exatamente como se tributa o frete nele. O resultado é o mesmo tratamento para os
+dois impostos, escrito de duas formas. Quem "consertar" o ICMS somando o frete na base dele também
+vai tributar o frete duas vezes; há teste travando isso.
+
+**Origem.** A planilha `Rentabilidade_2026_3` trocou `*F24` por `*(F24+N6)` na linha do DIFAL em
+**9 das 12 abas**. As 3 que não mudaram (Revendas, Descpro, Edmilson) não têm linha de DIFAL — a
+regra não se aplica a elas. A **tabela** `difal_rates` não mudou: mesmos 26 estados, mesmos 4
+valores manuais de AL/MA/PI/RN (D5).
+
+**Usa o frete INFORMADO, não o efetivo** — mesma regra da comissão. Frete por conta do cliente zera
+a dedução do frete, mas não a base do DIFAL: o transporte foi vendido e o estado cobra sobre ele.
+Golden test T17b.
+
+**Não muda quem decide se o DIFAL roda.** O override por pedido (§12.1) continua igual: o canal dá o
+padrão, o pedido pode ligar/desligar. Só a base mudou. Golden test T17c.
+
+**Efeito no pedido-fixture** (BA, receita 16.800, frete 1.000):
+
+| | Antes | Depois |
+|---|---|---|
+| Base do DIFAL | 16.800,00 | 17.800,00 |
+| DIFAL (13,5%) | 2.268,00 | **2.403,00** |
+| Receita líquida | 10.194,50 | **10.059,50** |
+| Margem de contribuição | 39,67% | **38,86%** |
+
+Golden tests T17, T17b, T17c e T17d. A mudança saiu também na função de fechamento do banco
+(migração `20260818210000`) — a validação de fechamento recalcula a cascata do lado do banco, e
+mudar num lado só recusaria todo pedido com frete.
 
 ### 6.1 Ficha impressa do pedido (05/08/2026)
 
@@ -359,7 +400,7 @@ As 12 abas são cópias que divergiram. O sistema unifica em um modelo só com p
 
 ## 9. Bugs e inconsistências encontrados (corrigir na migração, não copiar)
 
-**1. Margem do pedido ignora a despesa alocada.** A planilha calcula a despesa por item (coluna K), mas a fórmula de margem do pedido usa só a receita líquida menos CMV. No pedido-fixture: 39,67% exibido vs 9,11% se a despesa entrasse. Enquanto isso, a margem por item (col. P) desconta a despesa mas ignora impostos/frete/comissão. Nenhuma das duas é a margem completa. → Decisão 1.
+**1. Margem do pedido ignora a despesa alocada.** A planilha calcula a despesa por item (coluna K), mas a fórmula de margem do pedido usa só a receita líquida menos CMV. No pedido-fixture: 38,86% exibido vs 7,89% se a despesa entrasse. Enquanto isso, a margem por item (col. P) desconta a despesa mas ignora impostos/frete/comissão. Nenhuma das duas é a margem completa. → Decisão 1.
 
 **2. Aba Edmilson: imposto calculado sobre a base errada.** `Imposto = alíquota × F44`, onde F44 = 3.102 (um bloco secundário de células), enquanto a receita do pedido é F24 = 15.198. O imposto do pedido real dessa aba está calculado sobre ~20% da receita — margem superestimada. Todas as outras abas usam a receita total.
 
@@ -389,7 +430,7 @@ Receita bruta
 (−) Frete líquido + Comissão              = MARGEM DE CONTRIBUIÇÃO  ← métrica oficial, dispara alertas
 (−) Despesa alocada (rateio)              = Resultado após rateio    ← informativo por pedido
 ```
-A margem de contribuição coincide numericamente com a margem que a planilha já exibe (39,67% no pedido-fixture), preservando a intuição do time. O resultado após rateio aparece sempre ao lado, com nome próprio.
+A margem de contribuição coincide numericamente com a margem que a planilha já exibe (38,86% no pedido-fixture), preservando a intuição do time. O resultado após rateio aparece sempre ao lado, com nome próprio.
 
 **D2 — Denominador dos percentuais = receita líquida.** Padrão de DRE e compatível com a planilha atual; as faixas de status (40/25/10%) permanecem válidas. Valores em R$ sempre exibidos junto ao %.
 
@@ -439,7 +480,7 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T3 | cmv_produto | ficha da Seção 3 | 2,935400 |
 | T4 | despesa_unitaria | Avental: 20.000; 70; total 450.000; Σpesos 14.445.616 | 2,180592 |
 | T5 | despesa_unitaria | Campo Catarata GR40: 10.000; 100 | 3,115132 |
-| T6 | pedido completo | fixture Seção 6 (BA, 16.800, frete 1.000) | RL 10.194,50; margem 39,67% |
+| T6 | pedido completo | fixture Seção 6 (BA, 16.800, frete 1.000) | RL 10.059,50; margem 38,86% |
 | T7 | pedido, UF=SP | mesmos valores, UF SP | imposto 27,25%; DIFAL 0 |
 | T8 | kit em cascata | alterar preço da Bobina SMS e recalcular kit que contém Avental | CMV do kit reflete a mudança |
 | T9 | validação | produto sem ficha ou CMV=0 em pedido | erro bloqueante (não zero silencioso) |
@@ -455,6 +496,10 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T16b | comissão com frete do cliente | fixture T6 com a flag marcada | frete 0, mas base 17.800 e comissão 445,00 |
 | T16c | comissão sem frete | fixture T6 com frete 0 | base 16.800; comissão 420,00 |
 | T16d | comissão do Externos | fixture T6, alíquota 6,1% | 1.085,80 (6,1% × 17.800) |
+| T17 | base do DIFAL | fixture T6 (receita 16.800, frete 1.000), 13,5% | base 17.800; DIFAL 2.403,00 |
+| T17b | DIFAL com frete do cliente | fixture T6 com a flag marcada | frete 0, mas base 17.800 e DIFAL 2.403,00 |
+| T17c | canal sem DIFAL | fixture T6, alíquota 0 | base 17.800, DIFAL 0 |
+| T17d | mesma base | fixture T6 com frete 737,42 | base do DIFAL = base da comissão = 17.537,42 |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
 

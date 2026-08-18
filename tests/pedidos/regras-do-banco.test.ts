@@ -233,7 +233,8 @@ describe("ciclo da cotação", () => {
   // quebra aqui.
   it("a base da comissão no banco é receita + frete, igual ao motor (§6.2)", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
-    expect(fechar).toMatch(/v_commission_base := v_gross\+p_freight/i);
+    expect(fechar).toMatch(/v_base_with_freight := v_gross\+p_freight/i);
+    expect(fechar).toMatch(/v_commission_base := v_base_with_freight/i);
     expect(fechar).toMatch(/v_commission := p_commission_rate\*v_commission_base/i);
     // A base NÃO pode voltar a ser só a receita bruta.
     expect(fechar).not.toMatch(/v_commission := p_commission_rate\*v_gross(?![a-z_])/i);
@@ -245,8 +246,31 @@ describe("ciclo da cotação", () => {
   // motor justamente nos pedidos com frete do cliente.
   it("o frete do cliente não encolhe a base da comissão no banco", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
-    const linhaBase = /v_commission_base := [^;]+;/i.exec(fechar)?.[0] ?? "";
+    const linhaBase = /v_base_with_freight := [^;]+;/i.exec(fechar)?.[0] ?? "";
     expect(linhaBase).not.toMatch(/freight_paid_by_customer/i);
+  });
+
+  // Mesma trava para o DIFAL (§6.3), decidido no mesmo dia que a comissão.
+  it("a base do DIFAL no banco é receita + frete, igual ao motor (§6.3)", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    expect(fechar).toMatch(/v_base_with_freight := v_gross\+p_freight/i);
+    expect(fechar).toMatch(/v_difal := v_difal_rate\*v_base_with_freight/i);
+    // Não pode voltar a ser só a receita bruta.
+    expect(fechar).not.toMatch(/v_difal := v_difal_rate\*v_gross(?![a-z_])/i);
+  });
+
+  it("o frete do cliente não encolhe a base do DIFAL no banco", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    const linhaBase = /v_base_with_freight := [^;]+;/i.exec(fechar)?.[0] ?? "";
+    expect(linhaBase).not.toMatch(/freight_paid_by_customer/i);
+  });
+
+  // O ICMS continua sobre a receita: ele alcança o frete pela linha própria de
+  // imposto sobre frete. Se alguém "consertar" isso somando o frete aqui
+  // também, o frete passa a ser tributado duas vezes.
+  it("o ICMS continua sobre a receita, não sobre receita + frete", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    expect(fechar).toMatch(/v_tax := v_tax_rate\*v_gross(?![a-z_])/i);
   });
 });
 

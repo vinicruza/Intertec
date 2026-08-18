@@ -33,6 +33,7 @@ export type ResultadoPedido = {
   freteInformado: Decimal;    // o que foi digitado/calculado, antes da regra acima
   impostoFrete: Decimal;
   imposto: Decimal;           // imposto sobre a receita (ICSM)
+  baseDifal: Decimal;         // receita + frete informado — a memória de cálculo do DIFAL
   difal: Decimal;
   baseComissao: Decimal;      // receita + frete informado — a memória de cálculo da comissão
   comissao: Decimal;
@@ -56,9 +57,9 @@ export type ResultadoItem = {
 //   receita_pedido   = Σ (preco_venda × quantidade)
 //   imposto_frete    = aliquota_imposto × frete
 //   imposto          = aliquota_imposto × receita_pedido
-//   DIFAL            = aliquota_difal × receita_pedido
-//   base_comissao    = receita_pedido + frete_informado
-//   comissao         = aliquota_comissao × base_comissao
+//   base_com_frete   = receita_pedido + frete_informado
+//   DIFAL            = aliquota_difal × base_com_frete
+//   comissao         = aliquota_comissao × base_com_frete
 //   frete            = 0, se o frete é por conta do cliente (e então imposto_frete = 0)
 //   receita_liquida  = receita − frete − imposto_frete − imposto − DIFAL − comissao
 //   margem_contrib.  = receita_liquida − CMV_pedido      ← métrica oficial (= 39,67% no fixture)
@@ -113,21 +114,33 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   const aliquotaImposto = dec(p.aliquotaImposto);
   const impostoFrete = aliquotaImposto.times(baseImpostoFrete);
   const imposto = aliquotaImposto.times(receitaBruta);
-  const difal = dec(p.aliquotaDifal).times(receitaBruta);
 
-  // Base da comissão = receita + FRETE INFORMADO (regra confirmada pelo cliente
-  // em 18/08/2026, alinhando o sistema à planilha Rentabilidade 2026).
+  // Base de receita + FRETE INFORMADO — usada pela COMISSÃO e pelo DIFAL.
   //
-  // Até esta data o sistema pagava comissão só sobre a receita dos itens, como
-  // o Calculations.md §6 e §7.4 descreviam. A planilha nova passou a somar o
-  // frete na base — em 8 das 12 abas — e o cliente confirmou que a regra vale
-  // para TODOS os canais, incluindo os 4 que na planilha ficaram para trás.
+  // Comissão: confirmado pelo cliente em 18/08/2026.
+  // DIFAL: confirmado pelo cliente em 18/08/2026, na mesma direção.
+  //
+  // Por que os dois e o ICMS não. O imposto sobre venda (ICSM) já alcança o
+  // frete, mas por outro caminho: a linha "Imposto sobre frete", separada, que
+  // aplica a mesma alíquota sobre o frete. Somando as duas linhas, o ICMS já
+  // incide sobre receita + frete. O DIFAL não tem linha própria de frete — daí
+  // somar o frete na base ser exatamente como tributá-lo. O resultado final é
+  // o mesmo tratamento para os dois impostos, escrito de duas formas.
   //
   // Usa o frete INFORMADO, não o efetivo: mesmo quando o cliente paga o frete
-  // (e a dedução vai a zero), o transporte foi vendido e o vendedor comissiona
-  // sobre ele. É o que a planilha faz — a fórmula aponta para a célula do frete
-  // digitado, não para a linha já líquida de estorno.
-  const baseComissao = receitaBruta.plus(freteInformado);
+  // (e a dedução vai a zero), o transporte foi vendido — o vendedor comissiona
+  // sobre ele e o estado cobra sobre ele. É o que a planilha faz: a fórmula
+  // aponta para a célula do frete digitado, não para a linha já líquida de
+  // estorno. Golden tests T16b e T17b.
+  const baseComFrete = receitaBruta.plus(freteInformado);
+
+  // Expostos com nomes próprios: são duas linhas distintas da cascata, cada uma
+  // com a sua memória de cálculo na tela. Hoje a base é a mesma; se um dia uma
+  // delas mudar, muda sozinha.
+  const baseComissao = baseComFrete;
+  const baseDifal = baseComFrete;
+
+  const difal = dec(p.aliquotaDifal).times(baseDifal);
   const comissao = dec(p.aliquotaComissao).times(baseComissao);
 
   const receitaLiquida = receitaBruta
@@ -148,6 +161,7 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
     freteInformado,
     impostoFrete,
     imposto,
+    baseDifal,
     difal,
     baseComissao,
     comissao,

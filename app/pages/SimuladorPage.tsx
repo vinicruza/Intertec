@@ -1081,7 +1081,11 @@ export default function SimuladorPage() {
               />
               <LinhaCascata
                 rotulo="(−) DIFAL"
-                detalhe={`${percentual(simulacao.difalAplicado.toString())} sobre ${reais(simulacao.resultado.receitaBruta.toString())}`}
+                detalhe={`${percentual(simulacao.difalAplicado.toString())} sobre ${reais(simulacao.resultado.baseDifal.toString())}${
+                  simulacao.resultado.freteInformado.gt(0)
+                    ? ` (venda ${reais(simulacao.resultado.receitaBruta.toString())} + frete ${reais(simulacao.resultado.freteInformado.toString())})`
+                    : ""
+                }`}
                 valor={simulacao.resultado.difal.negated().toString()}
               />
               <LinhaCascata

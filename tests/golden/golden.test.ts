@@ -112,11 +112,14 @@ describe("Camada 4 — pedido completo", () => {
     despesaUnitaria: "0.778783",
   };
 
-  // ⚠️ Valores revisados em 18/08/2026: a base da comissão passou a incluir o
-  // frete (ver T16). O pedido-fixture é o mesmo da planilha; o que mudou foi a
-  // regra que o cliente confirmou, não o exemplo. Antes desta data este teste
-  // esperava comissão 420,00, RL 10.219,50 e margem 39,82%.
-  it("T6 — pedido UF BA: receita líquida 10.194,50 e margem 39,67%", () => {
+  // ⚠️ Valores revisados DUAS VEZES em 18/08/2026, o cliente decidindo nas duas:
+  //   1) a comissão passou a incidir sobre receita + frete (T16)
+  //   2) o DIFAL passou a incidir sobre receita + frete (T17)
+  // O pedido-fixture é o mesmo da planilha; o que mudou foi a regra, não o
+  // exemplo. Histórico: comissão 420,00 / DIFAL 2.268,00 / RL 10.219,50 /
+  // margem 39,82%  →  comissão 445,00 / DIFAL 2.403,00 / RL 10.059,50 /
+  // margem 38,86%.
+  it("T6 — pedido UF BA: receita líquida 10.059,50 e margem 38,86%", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
@@ -128,15 +131,16 @@ describe("Camada 4 — pedido completo", () => {
     esperarProximo(r.receitaBruta, "16800");
     esperarProximo(r.cmvTotal, "6150.42");
     esperarProximo(r.imposto, "2730");
-    esperarProximo(r.difal, "2268");
-    esperarProximo(r.baseComissao, "17800"); // 16.800 de venda + 1.000 de frete
+    esperarProximo(r.baseDifal, "17800"); // 16.800 de venda + 1.000 de frete
+    esperarProximo(r.difal, "2403");
+    esperarProximo(r.baseComissao, "17800");
     esperarProximo(r.comissao, "445");
     esperarProximo(r.impostoFrete, "162.50");
-    esperarProximo(r.receitaLiquida, "10194.50");
-    esperarProximo(r.margemContribuicao, "4044.08");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
-    // O mesmo pedido, se descontasse a despesa rateada, cairia para 9,11% (§6).
-    expect(toPercent(r.resultadoAposRateioPct)).toBe("9.11");
+    esperarProximo(r.receitaLiquida, "10059.50");
+    esperarProximo(r.margemContribuicao, "3909.08");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("38.86");
+    // O mesmo pedido, se descontasse a despesa rateada, cairia para 7,89% (§6).
+    expect(toPercent(r.resultadoAposRateioPct)).toBe("7.89");
   });
 
   it("T7 — mesmo pedido em UF SP: imposto 27,25% e DIFAL 0", () => {
@@ -500,10 +504,10 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
     esperarProximo(r.frete, "0");
     esperarProximo(r.impostoFrete, "0");
     esperarProximo(r.freteInformado, "1000"); // o que veio na entrada, para auditoria
-    // 16.800 − 2.730 − 2.268 − 445. Nem 9.219,50 (frete saindo duas vezes,
-    // como era antes), nem 10.194,50 (frete saindo uma vez).
-    esperarProximo(r.receitaLiquida, "11357");
-    esperarProximo(r.margemContribuicao, "5206.58");
+    // 16.800 − 2.730 − 2.403 − 445. Nem 9.219,50 (frete saindo duas vezes,
+    // como era antes), nem 10.059,50 (frete saindo uma vez).
+    esperarProximo(r.receitaLiquida, "11222");
+    esperarProximo(r.margemContribuicao, "5071.58");
     // A comissão NÃO cai junto com o frete: o transporte foi vendido, e a base
     // segue o frete informado (T16).
     esperarProximo(r.comissao, "445");
@@ -518,8 +522,8 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaDifal: "0.135",
       aliquotaComissao: "0.025",
     });
-    esperarProximo(r.receitaLiquida, "10194.50");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
+    esperarProximo(r.receitaLiquida, "10059.50");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("38.86");
   });
 
   // ============================================================
@@ -589,6 +593,72 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
     });
 
     esperarProximo(r.comissao, "1085.80"); // 6,1% × 17.800
+  });
+
+  // ============================================================
+  // T17 — base do DIFAL inclui o frete (cliente, 18/08/2026)
+  // ------------------------------------------------------------
+  // Mesma decisão da comissão (T16), tomada no mesmo dia, depois que a planilha
+  // Rentabilidade 2026 trocou `*F24` por `*(F24+N6)` em 9 das 12 abas.
+  //
+  // O ICMS não precisou mudar: ele já alcança o frete pela linha "Imposto sobre
+  // frete", separada. O DIFAL não tem linha equivalente — somar o frete na base
+  // é como se tributa o frete nele.
+  // ============================================================
+
+  it("T17 — DIFAL sai sobre receita + frete informado", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    // 13,5% × (16.800 + 1.000) = 2.403,00 — e não 2.268,00 (13,5% × 16.800).
+    esperarProximo(r.baseDifal, "17800");
+    esperarProximo(r.difal, "2403");
+  });
+
+  it("T17b — frete por conta do cliente NÃO reduz a base do DIFAL", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      fretePorContaCliente: true,
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    esperarProximo(r.frete, "0");
+    esperarProximo(r.baseDifal, "17800");
+    esperarProximo(r.difal, "2403");
+  });
+
+  it("T17c — canal sem DIFAL continua zerando: a base existe, a alíquota não", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0",
+      aliquotaComissao: "0.025",
+    });
+
+    esperarProximo(r.baseDifal, "17800");
+    esperarProximo(r.difal, "0");
+  });
+
+  it("T17d — DIFAL e comissão partem da MESMA base", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "737.42",
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+
+    expect(r.baseDifal.equals(r.baseComissao)).toBe(true);
+    esperarProximo(r.baseDifal, "17537.42");
   });
 
   it("T15 — prejuízo nunca devolve percentual positivo", () => {

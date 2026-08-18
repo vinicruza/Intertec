@@ -166,14 +166,14 @@ describe("pedido só com produtos individuais", () => {
     const s = pedido.simulacao!;
     expect(toMoney(s.resultado.receitaBruta)).toBe("17550.00"); // 16.800 + 750
     expect(toMoney(s.resultado.imposto)).toBe("2851.88"); // 16,25%
-    expect(toMoney(s.resultado.difal)).toBe("2369.25"); // 13,5%
+    expect(toMoney(s.resultado.difal)).toBe("2504.25"); // 13,5% × (17.550 + 1.000 de frete)
     expect(toMoney(s.resultado.comissao)).toBe("463.75"); // 2,5% × (17.550 + 1.000 de frete)
     expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11865.13");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11730.13");
     // CMV: 4000 × 1,537605 + 500 × 0,412
     expect(toMoney(s.resultado.cmvTotal)).toBe("6356.42");
-    expect(toMoney(s.resultado.margemContribuicao)).toBe("5508.71");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("46.43");
+    expect(toMoney(s.resultado.margemContribuicao)).toBe("5373.71");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("45.81");
     expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS_MARGEM)?.label).toBe("Boa");
   });
 
@@ -466,7 +466,7 @@ describe("escolhas do vendedor que mudam a conta", () => {
     expect(toMoney(s.resultado.receitaBruta)).toBe(toMoney(comFrete.resultado.receitaBruta));
     expect(toMoney(s.resultado.comissao)).toBe(toMoney(comFrete.resultado.comissao));
     expect(toMoney(s.resultado.frete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11194.50");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("11059.50");
   });
 
   it("frete desmarcado fica só na expedição e não entra na margem", () => {
@@ -484,7 +484,7 @@ describe("escolhas do vendedor que mudam a conta", () => {
 
   it("DIFAL marcado num canal que não aplica também vale — é decisão do pedido", () => {
     const s = montarPedido({ ...base, canal: CANAL_REVENDAS, aplicaDifal: true }).simulacao!;
-    expect(toMoney(s.resultado.difal)).toBe("2268.00");
+    expect(toMoney(s.resultado.difal)).toBe("2403.00");
   });
 
   it("comissão digitada substitui a do canal", () => {

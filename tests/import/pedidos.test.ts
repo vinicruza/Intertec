@@ -67,7 +67,7 @@ function abaPadrao(extra: Record<string, string | number> = {}) {
     M8: "Imposto",
     N8: 2730,
     M9: "Difal",
-    N9: 2268,
+    N9: 2403, // 13,5% × (16.800 + 1.000 de frete) — regra confirmada em 18/08/2026
     M10: "Comissão",
     N10: 445, // 2,5% × (16.800 + 1.000 de frete) — regra confirmada em 18/08/2026
     M11: "Frete Cliente",
@@ -77,9 +77,9 @@ function abaPadrao(extra: Record<string, string | number> = {}) {
     J24: 6150.42,
     K24: 3115.132,
     M14: "Receita Liquida",
-    N14: 10194.5,
+    N14: 10059.5,
     M16: "Margem de Contribuição",
-    N16: 0.3966923341,
+    N16: 0.3885710035,
     ...extra,
   };
 }
@@ -143,7 +143,7 @@ describe("extração da aba de vendedor", () => {
     expect(pedido.itens).toHaveLength(1);
     expect(pedido.receitaPlanilha?.toString()).toBe("16800");
     expect(pedido.deducoes.frete?.toString()).toBe("1000");
-    expect(pedido.deducoes.difal?.toString()).toBe("2268");
+    expect(pedido.deducoes.difal?.toString()).toBe("2403");
     expect(pedido.deducoes.freteCliente).toBe(false);
   });
 
@@ -233,7 +233,7 @@ describe("conferência do motor contra a aba", () => {
 
     expect(c.bloqueio).toBeNull();
     expect(c.divergencias).toHaveLength(0);
-    expect(c.resultado!.receitaLiquida.toFixed(2)).toBe("10194.50");
+    expect(c.resultado!.receitaLiquida.toFixed(2)).toBe("10059.50");
   });
 
   it("acusa a aba que ficou com a comissão só sobre a receita (fórmula antiga)", () => {
@@ -241,7 +241,7 @@ describe("conferência do motor contra a aba", () => {
     // Quatro abas da planilha ficaram para trás com `=2,5%*$F$24` — e é ESSA
     // que agora aparece como divergência, invertendo o sinal do achado.
     const p = planilhaFalsa({
-      Revendas: abaPadrao({ N10: 420, N14: 10219.5, N16: 0.3982 }),
+      Revendas: abaPadrao({ N10: 420, N14: 10084.5, N16: 0.3902 }),
     });
     const c = conferirPedido(extrairPedido(p, "Revendas")!, TABELAS, CANAL_PADRAO);
 
