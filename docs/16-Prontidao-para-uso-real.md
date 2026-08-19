@@ -202,83 +202,89 @@ que tem 3. **Hoje, todo orçamento feito na planilha com esses dois produtos sai
 Com dois valores diferentes: 4,668095 e 2,629723. O segundo é o CMV do `Campo de Mesa 1,50 x 1,50
 Não Estéril`. No sistema ficou um produto só, com 4,668095, e o 1,50 x 1,50 com o seu próprio valor.
 
-## 3.8 Pedido do comercial em 19/08: tamanho da compressa e avental com toalha
+## 3.8 Tamanho da compressa nos aventais — RESOLVIDO em 19/08
 
-A Patrícia levantou três pontos. Conferi os dois lados — **o sistema está fiel à planilha nos três**.
-Não é falha de carga: é o catálogo que nunca teve essas variações.
+A Patrícia apontou que "Avental com Compressa" não diz o tamanho da compressa. Estava certa: os **16**
+produtos de avental com compressa usavam, na planilha e no sistema, sempre a `Compressa P Medihouse`,
+e o nome não dizia isso. Não era falha de carga — o catálogo nunca teve a versão G.
 
-### a) "Avental com Compressa" não diz o tamanho da compressa
+**Decisão da Patrícia (19/08): "Pode colocar com comp P e G. Com fio não precisa."**
 
-Os **16** produtos de avental com compressa usam, na planilha e no sistema, sempre a mesma:
-`Compressa P Medihouse`. Não existe nenhum com a G. O nome esconde isso, e quem cota não tem como
-saber o que está vendendo.
+### O que foi feito no sistema
 
-São eles: Avental, Avental G, Avental GG, Avental EGG — cada um com Compressa, com Compressa e Tag,
-e as versões Não Estéril; mais Avental M com Compressa e Tag (estéril e não estéril).
+| | Antes | Depois |
+|---|---:|---:|
+| Aventais com compressa | 16 (todos P, sem dizer) | **32** — 16 com P e 16 com G |
+| Produtos ativos | 356 | **372** |
 
-**Duas decisões, separadas:**
+1. Os 16 existentes foram **renomeados** para `... com Compressa P ...`. O CMV não mudou em nenhum:
+   é o mesmo produto, agora com o nome dizendo o que sempre foi.
+2. Foram **criados** os 16 com `... com Compressa G ...`, copiando a ficha e trocando uma linha:
+   sai `Compressa P Medihouse` (R$ 0,654750 sem imposto), entra `Compressa G Medihouse 40x40`
+   (R$ 0,989400). Tudo o mais é idêntico — mesmo tecido, costura, envelope e esterilização.
+3. A diferença ficou **exatamente R$ 0,334650** nos 16 pares, conferida um a um.
+4. A versão **com fio** (`Compressa G Medihouse com fio 40x40`) não foi criada, conforme decidido.
 
-1. **Renomear** para deixar o "P" explícito (`Avental com Compressa P`). Não muda custo nenhum, só o
-   nome. Precisa ser feito **na planilha e no sistema ao mesmo tempo** — o nome é a chave que liga
-   os dois, e mudar de um lado só cria 16 divergências na conferência.
-2. **Criar a variação com Compressa G**, que hoje não existe em lugar nenhum.
+Nenhum pedido foi afetado. O único pedido fechado que usava um desses produtos (ORC-2026-0025)
+manteve o nome congelado no snapshot — `Avental com Compressa` — como manda a decisão D7.
 
-### b) Quanto custaria a variação com Compressa G
+### CMV das 16 versões novas
 
-A diferença é o insumo: Compressa G Medihouse 40x40 custa R$ 0,9894 sem imposto contra R$ 0,6548 da
-P — **+ R$ 0,3347 por unidade**, igual em todos, porque todos consomem 1 compressa.
-
-| Produto (versão G) | CMV hoje (P) | CMV se for G |
+| Produto | com P | com G |
 |---|---:|---:|
 | Avental com Compressa | 4,6979 | **5,0326** |
 | Avental com Compressa Não Estéril | 3,4662 | **3,8008** |
 | Avental G com Compressa | 4,8706 | **5,2052** |
 | Avental G com Compressa Não Estéril | 3,6388 | **3,9735** |
+| Avental G com Compressa e Tag | 5,0906 | **5,4252** |
+| Avental G com Compressa e Tag Não Estéril | 3,8588 | **4,1935** |
 | Avental GG com Compressa | 5,3562 | **5,6908** |
 | Avental GG com Compressa Não Estéril | 4,0121 | **4,3467** |
+| Avental GG com Compressa e Tag | 5,5762 | **5,9108** |
+| Avental GG com Compressa e Tag Não Estéril | 4,2321 | **4,5667** |
 | Avental EGG com Compressa | 6,1793 | **6,5140** |
 | Avental EGG com Compressa Não Estéril | 4,6668 | **5,0014** |
-| (as 8 versões "com Compressa e Tag" seguem o mesmo + 0,3347) | | |
+| Avental EGG com Compressa e Tag | 6,3993 | **6,7340** |
+| Avental EGG com Compressa e Tag Não Estéril | 4,8868 | **5,2214** |
+| Avental M com Compressa e Tag | 4,9179 | **5,2526** |
+| Avental M com Compressa e Tag Não Estéril | 3,6862 | **4,0208** |
 
-Existe também `Compressa G Medihouse com fio 40x40` (R$ 1,1058 sem imposto), hoje **sem nenhum
-produto usando**. Se a variação for com fio, o acréscimo é R$ 0,4511.
+### O que o Bryan precisa fazer na planilha
 
-### c) Além dos aventais, quem mais usa a Compressa P
+Até isso ser feito, `npm run conferir:base` vai acusar 32 divergências de nome — **esperado**, não é
+defeito. São duas tarefas na aba `Input Preço`:
 
-Se a variação de tamanho valer "em todos os produtos que utilizam este item", entram mais **4 kits**:
-Kit Catarata com 1 e Kit Catarata com 2 (estéril e não estéril). Os produtos avulsos `Compressa P` e
-`Compressa G` já existem nos dois tamanhos.
+1. **Renomear** os 16 blocos de `... com Compressa ...` para `... com Compressa P ...` (linha 2 do
+   bloco, e a lista da Alocação). Não muda fórmula nenhuma.
+2. **Criar** os 16 blocos `... com Compressa G ...`, copiando o bloco da versão P e trocando a linha
+   da compressa: em vez da `Compressa P Medihouse` (linha 23), apontar para a
+   `Compressa G Medihouse 40x40` (linha 25). O CMV tem de bater com a coluna "com G" da tabela acima.
 
-### d) "Avental com toalha de mão" não existe — nem na planilha
+As abas de vendedor puxam o custo da Alocação por nome, então os 32 nomes precisam entrar lá também.
 
-O insumo `Compressa Wiper/Toalha de mão` (R$ 0,1897 sem imposto) é usado em 10 produtos, mas **nenhum
-é um avental**: só o avulso `Compressa Wiper` e os kits (Odonto Implante, Odonto Pério, Universal Com
-Avental, Veterinário — todos com 2 unidades).
+## 3.9 Pendências que a Patrícia ainda não respondeu
 
-É produto novo. Com **1 toalha** por avental o custo fica:
+### a) "Tag" ou "Toalha"? O catálogo se contradiz
 
-| Produto novo | CMV do avental | CMV com toalha |
-|---|---:|---:|
-| Avental com Toalha de mão | 4,0432 | **4,2328** |
-| Avental com Toalha de mão Não Estéril | 2,8114 | **3,0011** |
-| Avental G com Toalha de mão | 4,2158 | **4,4055** |
-| Avental G com Toalha de mão Não Estéril | 2,9841 | **3,1737** |
-| Avental GG com Toalha de mão | 4,7014 | **4,8911** |
-| Avental GG com Toalha de mão Não Estéril | 3,3573 | **3,5470** |
-| Avental EGG com Toalha de mão | 5,5246 | **5,7142** |
-| Avental EGG com Toalha de mão Não Estéril | 4,0120 | **4,2017** |
+Investigando o pedido dela do "Avental com toalha de mão", apareceu uma inconsistência que **não é
+segura de resolver sem ela**:
 
-### e) O que precisa ser respondido antes de cadastrar
+Os 8 produtos `... com Compressa ... e Tag` estão na categoria **"Avental com Toalha"**, com prefixo
+de código **AVT** (Avental com Toalha), e a descrição de nota fiscal diz **"com Compressa e Toalha"**.
+Mas a ficha consome o insumo **`Tag`** (R$ 0,22), e não o insumo
+**`Compressa Wiper/Toalha de mão`** (R$ 0,1897) — que é o que os kits usam como toalha.
 
-Nada disso pode ser criado por conta própria — são produtos de catálogo, e cada um precisa de preço
-de venda além do custo:
+Ou seja: ou o insumo `Tag` é o que a Intertech chama de toalha de mão e o nome do insumo está errado,
+ou a categoria e a descrição de NF é que estão erradas. **Se for o primeiro caso, o "Avental com
+toalha de mão" que a Patrícia procura já existe — é o "com Tag".** Precisa da resposta dela antes de
+mexer, porque isso decide se há produto novo a criar ou apenas nome a corrigir.
 
-1. A variação com Compressa G vale para **os 16 aventais** ou só para os três que a Patrícia citou?
-2. É a Compressa G **com fio** ou **sem fio**?
-3. Os 4 Kits Catarata também ganham versão G?
-4. O avental com toalha leva **1 toalha ou 2**? (nos kits são 2)
-5. Quais tamanhos de avental com toalha, e em estéril e não estéril?
-6. A renomeação para "Compressa P" vai junto? Se sim, precisa sair na planilha na mesma hora.
+### b) Os 4 Kits Catarata também ganham versão G?
+
+A Patrícia escreveu "em todos os produtos que utiliza este item na composição". Além dos 16 aventais,
+quem consome `Compressa P Medihouse` são os `Kit Catarata com 1` e `com 2` (estéril e não estéril).
+Não foram tocados: o "1" e o "2" do nome já indicam a quantidade de compressas, e não há lugar óbvio
+para o P/G — precisa ela dizer como quer chamar.
 
 ## 4. O que ainda precisa acontecer antes de liberar
 
