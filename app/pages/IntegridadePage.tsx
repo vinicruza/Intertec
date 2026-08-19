@@ -14,6 +14,9 @@ const ITENS = [
   ["orders_without_items", "Pedidos sem itens"],
   ["closed_orders_without_snapshot", "Pedidos fechados sem snapshot completo"],
   ["customers_without_uf", "Clientes ativos sem UF"],
+  // Trava a pessoa sem explicar: sem vendedor não há canal, e a simulação
+  // nunca fecha. O nome do acesso precisa bater com o do vendedor cadastrado.
+  ["commercial_users_without_seller", "Usuários do comercial sem vendedor vinculado"],
 ] as const;
 
 export default function IntegridadePage() {

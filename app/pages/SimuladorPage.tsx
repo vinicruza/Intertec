@@ -232,6 +232,9 @@ export default function SimuladorPage() {
     return ctx.vendedores.find((v) => normalizarNome(v.name) === nomePerfilLogado) ?? null;
   }, [ctx, soMeuVendedor, perfil?.nome]);
   const vendedorIdEfetivo = vendedorId || (soMeuVendedor ? ctx?.meuVendedorId ?? vendedorDoPerfil?.id ?? "" : "");
+  // Só é "sem vínculo" para quem lança em nome próprio: o administrador escolhe
+  // o vendedor na lista e não depende de casar nome nenhum.
+  const semVendedorVinculado = soMeuVendedor && Boolean(ctx) && !vendedorIdEfetivo;
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
   const canalIdEfetivo = canalId || vendedor?.channel_id || "";
   const canal = ctx?.canais.find((c) => c.id === canalIdEfetivo) ?? null;
@@ -1033,7 +1036,22 @@ export default function SimuladorPage() {
         </div>
       </Card>
 
-      {simulacao.estado === "incompleto" && linhas.some((l) => l.itemId && l.quantidade && l.preco) && (
+      {/* Comercial sem vendedor vinculado: a lista de vendedores dele vem vazia,
+          entao "falta preencher: vendedor" manda fazer o que a tela nao deixa.
+          O vinculo casa `sellers.name` com `profiles.full_name`; uma letra de
+          diferenca ("Suelen" x "Suellen") derruba o casamento e trava a pessoa
+          sem dizer por que. Aconteceu em 19/08/2026 com duas vendedoras. */}
+      {ctx && semVendedorVinculado && (
+        <p className="rounded-md bg-red-50 px-3 py-3 text-sm text-red-700">
+          🛑 O seu acesso não está vinculado a nenhum vendedor cadastrado, então o sistema não sabe
+          quais regras de comissão e imposto aplicar — e a simulação não tem como sair.
+          {perfil?.nome ? ` O seu usuário está como "${perfil.nome}".` : ""} Peça ao administrador
+          para conferir se existe um vendedor ativo com exatamente esse nome. Não é erro seu, e não
+          há nada a preencher nesta tela até isso ser ajustado.
+        </p>
+      )}
+
+      {simulacao.estado === "incompleto" && !semVendedorVinculado && linhas.some((l) => l.itemId && l.quantidade && l.preco) && (
         <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
           Para calcular a cascata, falta preencher: {"pendencias" in simulacao ? simulacao.pendencias.join(", ") : "dados do pedido"}.
         </p>

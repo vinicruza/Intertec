@@ -8,6 +8,7 @@ export type ResumoIntegridade = {
   orders_without_items: number;
   closed_orders_without_snapshot: number;
   customers_without_uf: number;
+  commercial_users_without_seller: number;
   active_products_without_open_allocation: number;
   checked_at: string;
 };
