@@ -55,9 +55,41 @@ para o RN: R$ 124,80 contra R$ 312,00.
 
 ### 2.4 Abas da planilha que ficaram para trás
 
-Externos, Revendas, Edmilson e Temporária Patricia ainda calculam a comissão com a fórmula antiga
-(`=2,5%*$F$24`, sem o frete). O sistema já usa a regra nova em todos os canais, conforme decidido.
-Aqui **a planilha é que está desatualizada** — vale corrigir as 4 fórmulas antes da comparação.
+Conferido na planilha viva em 19/08, restam **2 abas** com a comissão antiga (as outras duas já
+foram corrigidas):
+
+| Aba | Fórmula da comissão | |
+|---|---|---|
+| Externos | `=N10*$F$24` | usa uma célula de alíquota e ignora o frete |
+| Temporária Patricia | `=2,5%*$F$24` | regra antiga |
+
+O sistema já usa a regra nova em todos os canais. Aqui **a planilha é que está desatualizada**.
+
+### 2.5 A planilha cobra o imposto sobre o frete DUAS vezes — 10 das 12 abas
+
+Achado em 19/08, comparando o orçamento da Seguemed (Revendas, R$ 16.556,00, frete R$ 520,00).
+
+A cascata tem duas linhas de imposto, e a de cima já embute o frete:
+
+```
+Imposto Frete  =alíquota * N6              -> 110,50
+Imposto        =alíquota * (F24 + N6)      -> 3.628,65   <- o frete entra aqui também
+Receita Líquida =F24 - SOMA(N6:N11)                       <- subtrai as duas
+```
+
+Resultado: o frete é tributado em 110,50 na linha própria **e mais 110,50 dentro da linha
+"Imposto"** — R$ 221,00 no total, quando o devido é R$ 110,50. O sistema cobra uma vez só.
+
+**A correção é trocar `*(F24+N6)` por `*F24` na linha "Imposto".** A aba Patricia já está assim —
+serve de modelo.
+
+| Aba | Linha "Imposto" | |
+|---|---|---|
+| Patricia, Temporária Patricia | `*F24` | ✅ correta |
+| Camila, Isabela, Suellen, Descpro, Priscilene, Nathalia, Mari, Externos, Revendas, Edmilson | `*(F24+N6)` | ❌ cobra em dobro |
+
+Enquanto não for corrigido, **todo orçamento com frete > 0 nessas 10 abas mostra margem menor do
+que a real**, e vai divergir do sistema pelo valor do imposto sobre o frete.
 
 ## 3. Dados — o que foi encontrado em 18/08
 
