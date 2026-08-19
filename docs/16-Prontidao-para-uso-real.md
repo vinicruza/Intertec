@@ -202,6 +202,84 @@ que tem 3. **Hoje, todo orçamento feito na planilha com esses dois produtos sai
 Com dois valores diferentes: 4,668095 e 2,629723. O segundo é o CMV do `Campo de Mesa 1,50 x 1,50
 Não Estéril`. No sistema ficou um produto só, com 4,668095, e o 1,50 x 1,50 com o seu próprio valor.
 
+## 3.8 Pedido do comercial em 19/08: tamanho da compressa e avental com toalha
+
+A Patrícia levantou três pontos. Conferi os dois lados — **o sistema está fiel à planilha nos três**.
+Não é falha de carga: é o catálogo que nunca teve essas variações.
+
+### a) "Avental com Compressa" não diz o tamanho da compressa
+
+Os **16** produtos de avental com compressa usam, na planilha e no sistema, sempre a mesma:
+`Compressa P Medihouse`. Não existe nenhum com a G. O nome esconde isso, e quem cota não tem como
+saber o que está vendendo.
+
+São eles: Avental, Avental G, Avental GG, Avental EGG — cada um com Compressa, com Compressa e Tag,
+e as versões Não Estéril; mais Avental M com Compressa e Tag (estéril e não estéril).
+
+**Duas decisões, separadas:**
+
+1. **Renomear** para deixar o "P" explícito (`Avental com Compressa P`). Não muda custo nenhum, só o
+   nome. Precisa ser feito **na planilha e no sistema ao mesmo tempo** — o nome é a chave que liga
+   os dois, e mudar de um lado só cria 16 divergências na conferência.
+2. **Criar a variação com Compressa G**, que hoje não existe em lugar nenhum.
+
+### b) Quanto custaria a variação com Compressa G
+
+A diferença é o insumo: Compressa G Medihouse 40x40 custa R$ 0,9894 sem imposto contra R$ 0,6548 da
+P — **+ R$ 0,3347 por unidade**, igual em todos, porque todos consomem 1 compressa.
+
+| Produto (versão G) | CMV hoje (P) | CMV se for G |
+|---|---:|---:|
+| Avental com Compressa | 4,6979 | **5,0326** |
+| Avental com Compressa Não Estéril | 3,4662 | **3,8008** |
+| Avental G com Compressa | 4,8706 | **5,2052** |
+| Avental G com Compressa Não Estéril | 3,6388 | **3,9735** |
+| Avental GG com Compressa | 5,3562 | **5,6908** |
+| Avental GG com Compressa Não Estéril | 4,0121 | **4,3467** |
+| Avental EGG com Compressa | 6,1793 | **6,5140** |
+| Avental EGG com Compressa Não Estéril | 4,6668 | **5,0014** |
+| (as 8 versões "com Compressa e Tag" seguem o mesmo + 0,3347) | | |
+
+Existe também `Compressa G Medihouse com fio 40x40` (R$ 1,1058 sem imposto), hoje **sem nenhum
+produto usando**. Se a variação for com fio, o acréscimo é R$ 0,4511.
+
+### c) Além dos aventais, quem mais usa a Compressa P
+
+Se a variação de tamanho valer "em todos os produtos que utilizam este item", entram mais **4 kits**:
+Kit Catarata com 1 e Kit Catarata com 2 (estéril e não estéril). Os produtos avulsos `Compressa P` e
+`Compressa G` já existem nos dois tamanhos.
+
+### d) "Avental com toalha de mão" não existe — nem na planilha
+
+O insumo `Compressa Wiper/Toalha de mão` (R$ 0,1897 sem imposto) é usado em 10 produtos, mas **nenhum
+é um avental**: só o avulso `Compressa Wiper` e os kits (Odonto Implante, Odonto Pério, Universal Com
+Avental, Veterinário — todos com 2 unidades).
+
+É produto novo. Com **1 toalha** por avental o custo fica:
+
+| Produto novo | CMV do avental | CMV com toalha |
+|---|---:|---:|
+| Avental com Toalha de mão | 4,0432 | **4,2328** |
+| Avental com Toalha de mão Não Estéril | 2,8114 | **3,0011** |
+| Avental G com Toalha de mão | 4,2158 | **4,4055** |
+| Avental G com Toalha de mão Não Estéril | 2,9841 | **3,1737** |
+| Avental GG com Toalha de mão | 4,7014 | **4,8911** |
+| Avental GG com Toalha de mão Não Estéril | 3,3573 | **3,5470** |
+| Avental EGG com Toalha de mão | 5,5246 | **5,7142** |
+| Avental EGG com Toalha de mão Não Estéril | 4,0120 | **4,2017** |
+
+### e) O que precisa ser respondido antes de cadastrar
+
+Nada disso pode ser criado por conta própria — são produtos de catálogo, e cada um precisa de preço
+de venda além do custo:
+
+1. A variação com Compressa G vale para **os 16 aventais** ou só para os três que a Patrícia citou?
+2. É a Compressa G **com fio** ou **sem fio**?
+3. Os 4 Kits Catarata também ganham versão G?
+4. O avental com toalha leva **1 toalha ou 2**? (nos kits são 2)
+5. Quais tamanhos de avental com toalha, e em estéril e não estéril?
+6. A renomeação para "Compressa P" vai junto? Se sim, precisa sair na planilha na mesma hora.
+
 ## 4. O que ainda precisa acontecer antes de liberar
 
 Os itens de **dados** estão fechados. Sobram os de **regra fiscal** e os de **planilha**:
