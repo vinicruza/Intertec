@@ -3,7 +3,8 @@ import { supabase } from "../supabase";
 import { seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
-import { carregarContextoSimulador, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
+import { carregarContextoSimulador, custosDeEmbalagem, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
+import { type ModoEmbalagem } from "../sim/kitNoPedido";
 
 export type FreteCotadoPedido = {
   id: string;
@@ -360,7 +361,17 @@ export async function simularPedidoComCustosVigentes(
   // ctx.itens. Sem isto o item entrava com CMV 0 e derrubava a conta inteira —
   // e quem sentia era justamente quem ia APROVAR, que via "CMV zerado" no
   // lugar da margem que foi chamado para conferir.
-  const catalogoKit = montarCatalogoDeKit(ctx);
+  // O custo da embalagem dos kits montados no pedido vem do banco — a tela não
+  // recebe o preço dos insumos. Sem isto, o kit ad hoc fecharia sem a embalagem
+  // e a revalidação do servidor recusaria o pedido.
+  const embalagemAdHoc = pedido.itens.flatMap((i) =>
+    (i.ad_hoc_kit_packaging ?? []).map((e) => ({
+      insumoId: e.input_id,
+      modo: (e.quantity_type === "lot" ? "itensPorCaixa" : "porKit") as ModoEmbalagem,
+      quantidade: String(e.quantity_type === "lot" ? e.lot_size : e.quantity),
+    }))
+  );
+  const catalogoKit = montarCatalogoDeKit(ctx, await custosDeEmbalagem(embalagemAdHoc));
   const nomePorProduto = new Map(ctx.produtos.map((p) => [p.id, p.nome]));
 
   // Monta itens do motor e do snapshot com os custos vigentes.

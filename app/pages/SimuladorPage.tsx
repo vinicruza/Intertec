@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante } from "@calc";
 import { aplicarFreteDestacadoAosItens, seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
-import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
+import { chaveDaEmbalagem, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import { mensagemDeErro } from "../lib/erros";
 import {
   KIT_NOVO,
@@ -22,6 +22,7 @@ import {
 } from "../lib/sim/itensDoPedido";
 import {
   carregarContextoSimulador,
+  custosDeEmbalagem,
   montarCatalogoDeKit,
   salvarCotacao,
   type ContextoSimulador,
@@ -253,7 +254,46 @@ export default function SimuladorPage() {
     if (ufDoCliente && ctx.tabelaPorUF.has(ufDoCliente)) setUf(ufDoCliente);
   }, [ctx, clienteId, uf]);
 
-  const catalogo = useMemo(() => (ctx ? montarCatalogoDeKit(ctx) : null), [ctx]);
+  // Custo de cada linha de embalagem, vindo do banco. A tela nunca recebe o
+  // preço do insumo: manda a composição, recebe o custo. Ver `custosDeEmbalagem`.
+  const [custoEmbalagem, setCustoEmbalagem] = useState<Map<string, string | null>>(new Map());
+  const catalogo = useMemo(
+    () => (ctx ? montarCatalogoDeKit(ctx, custoEmbalagem) : null),
+    [ctx, custoEmbalagem]
+  );
+
+  // Todas as linhas de embalagem em uso, de todos os kits montados no pedido.
+  const linhasDeEmbalagem = useMemo(
+    () =>
+      linhas.flatMap((l) =>
+        (l.kitNovo?.embalagem ?? []).filter((e) => e.insumoId && String(e.quantidade).trim() !== "")
+      ),
+    [linhas]
+  );
+
+  // Busca só o que ainda não está no mapa. Sem isto o simulador chamaria o
+  // banco a cada tecla digitada na quantidade.
+  useEffect(() => {
+    const faltando = linhasDeEmbalagem.filter((e) => !custoEmbalagem.has(chaveDaEmbalagem(e)));
+    if (faltando.length === 0) return;
+    let cancelado = false;
+    custosDeEmbalagem(faltando)
+      .then((novos) => {
+        if (cancelado) return;
+        setCustoEmbalagem((atual) => {
+          const mesclado = new Map(atual);
+          for (const [k, v] of novos) mesclado.set(k, v);
+          return mesclado;
+        });
+      })
+      .catch(() => {
+        // Falha de rede não pode virar custo zero: mantém as chaves ausentes,
+        // e o kit continua sem CMV até o cálculo voltar.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [linhasDeEmbalagem, custoEmbalagem]);
 
   // Opções de busca das listas grandes. Cliente também entra aqui porque a
   // Intertech usa um código único do sistema deles para evitar homônimos.

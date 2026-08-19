@@ -1,6 +1,6 @@
-import { Decimal, custoKitCompleto, type CustoProdutoKit, type EmbalagemKit } from "@calc";
+import { Decimal, type CustoProdutoKit } from "@calc";
 import { supabase } from "../supabase";
-import type { CatalogoParaKit } from "../sim/kitNoPedido";
+import { chaveDaEmbalagem, type CatalogoParaKit, type EmbalagemDoKit } from "../sim/kitNoPedido";
 import type { KitParaCopiar } from "../sim/itensDoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 import { numeroDigitado } from "../format";
@@ -84,7 +84,7 @@ export type ContextoSimulador = {
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp, pagamento] = await Promise.all([
+  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("channels").select("id, name, applies_difal, default_commission_rate, freight_model").order("name"),
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
@@ -102,14 +102,21 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // índice único — precisa aparecer no aviso de "esta composição já existe".
     supabase
       .from("kits")
-      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(input_id, quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))")
+      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(input_id, quantity_type, quantity, lot_size)")
       .order("name"),
-    supabase.from("inputs").select("id, name, price_without_tax, is_labor, is_packaging").eq("status", "active").order("name"),
+    // Pela RPC, e não pela tabela: `inputs` é fechada ao Comercial por decisão
+    // de acesso (RLS), e a leitura direta voltava VAZIA para ele — sem erro,
+    // só um seletor de embalagem em branco. A RPC devolve o NOME sem o preço.
+    supabase.rpc("insumos_para_embalagem"),
+    // CMV do kit pronto do servidor: produtos + embalagem. Calcular aqui exigia
+    // o preço dos insumos, que o Comercial não lê — a embalagem sumia e o kit
+    // ficava barato demais na tela, para ser recusado no fechamento depois.
+    supabase.rpc("custo_dos_kits"),
     supabase.rpc("meu_vendedor"),
     supabase.from("carriers").select("id, name, requires_name").eq("active", true).order("sort_order"),
     supabase.from("payment_terms").select("id, label").eq("active", true).order("sort_order"),
   ]);
-  for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, meuVend, transp, pagamento]) {
+  for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento]) {
     if (r.error) throw r.error;
   }
 
@@ -135,38 +142,21 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     quantity_type: "direct" | "lot";
     quantity: string | null;
     lot_size: string | null;
-    inputs?:
-      | { name: string; price_without_tax: string | null; is_labor: boolean }
-      | Array<{ name: string; price_without_tax: string | null; is_labor: boolean }>
-      | null;
   };
 
-  // Kit: CMV = soma ponderada dos produtos + embalagem/esterilização do kit
-  // (Calculations.md §4 — envelope e caixa são consumidos UMA vez por kit).
-  const itensKits: ItemVendavel[] = (kits.data ?? []).filter((k) => k.status === "active").map((k) => {
-    const composicao = (k.kit_items as Array<{ product_id: string; quantity: string }>).map((i) => ({
-      produtoId: i.product_id,
-      quantidade: i.quantity,
-    }));
-    const embalagem: EmbalagemKit[] = ((k.kit_packaging ?? []) as EmbalagemBruta[]).flatMap((e) => {
-      const insumo = Array.isArray(e.inputs) ? e.inputs[0] ?? null : e.inputs ?? null;
-      if (!insumo?.price_without_tax) return [];
-      return [{
-        nome: insumo.name,
-        custoUnitario: insumo.price_without_tax,
-        quantidade: e.quantity_type === "lot"
-          ? { tipo: "lote" as const, tamanhoLote: String(e.lot_size) }
-          : { tipo: "direta" as const, quantidade: String(e.quantity) },
-        maoDeObra: insumo.is_labor,
-      }];
-    });
+  // Kit: CMV = produtos + embalagem/esterilização (Calculations.md §4 — envelope
+  // e caixa são consumidos UMA vez por kit). A conta é feita no banco.
+  const cmvPorKit = new Map<string, string>(
+    ((custoKits.data ?? []) as Array<{ kit_id: string; cmv: string | number }>)
+      .filter((r) => Number(r.cmv) > 0)
+      .map((r) => [r.kit_id, String(r.cmv)])
+  );
 
-    let cmv: string | null = null;
-    try {
-      cmv = custoKitCompleto(composicao, custoPorProduto, embalagem).custoTotal.toString();
-    } catch {
-      cmv = null;
-    }
+  const itensKits: ItemVendavel[] = (kits.data ?? []).filter((k) => k.status === "active").map((k) => {
+    // O CMV do kit (produtos + embalagem) vem calculado do banco: montar a
+    // conta aqui exigiria o preço de cada insumo, e o Comercial não o lê.
+    const cmv = cmvPorKit.get(k.id as string) ?? null;
+
     return {
       tipo: "kit",
       id: k.id as string,
@@ -259,12 +249,19 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       codigo: p.code as string,
       cmv: custoPorProduto.get(p.id as string)?.cmv.toString() ?? null,
     })),
-    insumosEmbalagem: (insumos.data ?? []).map((i) => ({
-      id: i.id as string,
-      nome: i.name as string,
-      precoSemImposto: (i.price_without_tax as string | null) ?? null,
-      maoDeObra: (i.is_labor as boolean | null) ?? false,
-      embalagem: (i.is_packaging as boolean | null) ?? false,
+    insumosEmbalagem: ((insumos.data ?? []) as Array<{
+      id: string;
+      nome: string;
+      embalagem: boolean | null;
+      mao_de_obra: boolean | null;
+    }>).map((i) => ({
+      id: i.id,
+      nome: i.nome,
+      // Sempre nulo: o preço do insumo não trafega para a tela. O custo de cada
+      // linha de embalagem vem do servidor, por `custo_embalagem_kit`.
+      precoSemImposto: null,
+      maoDeObra: i.mao_de_obra ?? false,
+      embalagem: i.embalagem ?? false,
     })),
     kitPorAssinatura,
     kitsParaCopiar,
@@ -284,8 +281,12 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
 // dos insumos de embalagem e as assinaturas já cadastradas). Fica aqui, e não
 // na tela, porque três lugares precisam dele: o simulador, a pré-visualização
 // de quem aprova e o fechamento.
-export function montarCatalogoDeKit(ctx: ContextoSimulador): CatalogoParaKit {
+export function montarCatalogoDeKit(
+  ctx: ContextoSimulador,
+  custoEmbalagemPorChave?: Map<string, string | null>
+): CatalogoParaKit {
   return {
+    custoEmbalagemPorChave,
     custoPorProduto: new Map<string, CustoProdutoKit>(
       ctx.produtos.filter((p) => p.cmv !== null).map((p) => [p.id, { cmv: p.cmv as string }])
     ),
@@ -297,6 +298,30 @@ export function montarCatalogoDeKit(ctx: ContextoSimulador): CatalogoParaKit {
     ),
     kitPorAssinatura: ctx.kitPorAssinatura,
   };
+}
+
+// Custo de cada linha de embalagem, calculado no BANCO.
+//
+// O preço do insumo não trafega para a tela: `inputs` é fechada ao Comercial
+// por decisão de acesso, e mesmo para quem pode ler seria uma segunda
+// implementação da mesma regra. Aqui entra a composição, sai o custo.
+export async function custosDeEmbalagem(
+  linhas: EmbalagemDoKit[]
+): Promise<Map<string, string | null>> {
+  const mapa = new Map<string, string | null>();
+  if (linhas.length === 0) return mapa;
+  const { data, error } = await supabase.rpc("custo_embalagem_kit", {
+    p_linhas: linhas.map((e) => ({
+      input_id: e.insumoId,
+      quantity_type: e.modo === "itensPorCaixa" ? "lot" : "direct",
+      quantity: e.modo === "porKit" ? Number(e.quantidade) : null,
+      lot_size: e.modo === "itensPorCaixa" ? Number(e.quantidade) : null,
+    })),
+  });
+  if (error) throw error;
+  const saida = (data ?? []) as Array<{ custo: string | null }>;
+  linhas.forEach((e, i) => mapa.set(chaveDaEmbalagem(e), saida[i]?.custo ?? null));
+  return mapa;
 }
 
 // ---------- Gravação da simulação ----------

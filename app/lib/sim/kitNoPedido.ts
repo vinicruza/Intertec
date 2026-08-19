@@ -37,10 +37,22 @@ export type ProdutoDoKit = { produtoId: string; quantidade: string };
 export type ModoEmbalagem = "porKit" | "itensPorCaixa";
 export type EmbalagemDoKit = { insumoId: string; modo: ModoEmbalagem; quantidade: string };
 
+// Identidade de uma linha de embalagem para efeito de CUSTO. O custo é
+// calculado no servidor (o Comercial não lê o preço dos insumos), então a tela
+// guarda o resultado num mapa e precisa de uma chave estável para consultá-lo.
+export function chaveDaEmbalagem(e: EmbalagemDoKit): string {
+  return `${e.insumoId}|${e.modo}|${String(e.quantidade).trim()}`;
+}
+
 export type CatalogoParaKit = {
   custoPorProduto: Map<string, CustoProdutoKit>;
-  // Preço sem imposto e flag de mão de obra de cada insumo de embalagem.
+  // Nome e flag de mão de obra de cada insumo de embalagem. O PREÇO não vem:
+  // `inputs` é fechada ao Comercial por decisão de acesso.
   insumoPorId: Map<string, { nome: string; precoSemImposto: string | null; maoDeObra: boolean }>;
+  // Custo já resolvido de cada linha de embalagem, vindo do servidor, indexado
+  // por `chaveDaEmbalagem`. Ausente = ainda calculando; nulo = não deu para
+  // custear (insumo sem preço ou quantidade inválida).
+  custoEmbalagemPorChave?: Map<string, string | null>;
   // Assinatura → kit já cadastrado. Inclui kit INATIVO de propósito: a
   // assinatura é única no banco independentemente do status, então uma
   // composição igual à de um kit inativo não gera código novo — vai cair no
@@ -132,19 +144,34 @@ export function resolverKitDoPedido(
   // insumoId fica de lado (EmbalagemKit não carrega essa chave — é a
   // identidade do PEDIDO, não do cálculo). Guardado em paralelo para religar
   // depois, na mesma ordem, ao resultado de custoKitCompleto.
-  const embalagemValida = embalagem.flatMap((e) => {
+  // Antes daqui, linha sem preço era DESCARTADA — a embalagem simplesmente
+  // sumia da conta e o kit saía barato demais, sem nenhum aviso. Agora falta de
+  // custo é erro: melhor travar o orçamento do que emitir um errado.
+  const custos = catalogo.custoEmbalagemPorChave;
+  const embalagemValida = embalagem.map((e) => {
     const insumo = catalogo.insumoPorId.get(e.insumoId);
-    if (!insumo?.precoSemImposto) return [];
-    return [{
+    const chave = chaveDaEmbalagem(e);
+    const resolvido = custos?.get(chave);
+    return {
       insumoId: e.insumoId,
+      pendente: custos !== undefined && resolvido === undefined,
       item: {
-        nome: insumo.nome,
-        custoUnitario: insumo.precoSemImposto,
+        nome: insumo?.nome ?? "Insumo",
+        // Com o mapa do servidor presente ele é a AUTORIDADE: não cair no preço
+        // local, senão um "não consegui custear esta linha" viraria um número.
+        custoUnitario: custos !== undefined ? undefined : (insumo?.precoSemImposto ?? undefined),
+        custoResolvido: resolvido ?? undefined,
         quantidade: quantidadeDe(e),
-        maoDeObra: insumo.maoDeObra,
+        maoDeObra: insumo?.maoDeObra ?? false,
       } satisfies EmbalagemKit,
-    }];
+    };
   });
+
+  // Enquanto o servidor não devolveu o custo, o kit fica sem CMV em vez de
+  // mostrar um número que ainda vai mudar.
+  if (embalagemValida.some((x) => x.pendente)) {
+    return { ...vazio, assinatura, kitExistente: catalogo.kitPorAssinatura.get(assinatura) ?? null };
+  }
   const linhasEmbalagem: EmbalagemKit[] = embalagemValida.map((x) => x.item);
 
   const kitExistente = catalogo.kitPorAssinatura.get(assinatura) ?? null;

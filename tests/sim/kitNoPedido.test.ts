@@ -151,15 +151,53 @@ describe("kit montado dentro do pedido", () => {
     expect(soma).toBeCloseTo(1, 6);
   });
 
-  it("insumo de embalagem sem preço não derruba o cálculo, só não soma", () => {
+  // Este teste travava o comportamento CONTRÁRIO até 19/08/2026: linha de
+  // embalagem sem custo era descartada e o kit seguia com "custoEmbalagem: 0".
+  // Ou seja, o orçamento saía barato demais e nada na tela dizia isso. Vale
+  // mais travar a cotação do que emitir uma errada — a regra da casa é nunca
+  // zero silencioso, e ela não valia aqui.
+  it("insumo de embalagem sem custo derruba o cálculo em vez de somar zero", () => {
     const r = resolverKitDoPedido(
       [{ produtoId: "avental", quantidade: "1" }],
       [{ insumoId: "semPreco", modo: "porKit", quantidade: "1" }],
       catalogo()
     );
-    expect(r.erro).toBeNull();
-    expect(r.custoEmbalagem).toBe("0");
+    expect(r.cmvUnitario).toBeNull();
+    expect(r.custoEmbalagem).toBeNull();
     // Mas ele CONTA para a identidade do kit — a composição é outra.
     expect(r.assinatura).toContain("semPreco");
+  });
+
+  // A tela nunca recebe o preço do insumo: o custo de cada linha de embalagem
+  // vem calculado do banco (o Comercial não lê `inputs`, por decisão de acesso).
+  describe("custo da embalagem vindo do servidor", () => {
+    const comCustos = (m: Map<string, string | null>) => ({ ...catalogo(), custoEmbalagemPorChave: m });
+
+    it("usa o custo resolvido do servidor em vez de preço × quantidade", () => {
+      const r = resolverKitDoPedido(
+        [{ produtoId: "avental", quantidade: "1" }],
+        [{ insumoId: "semPreco", modo: "porKit", quantidade: "2" }],
+        comCustos(new Map([["semPreco|porKit|2", "3.50"]]))
+      );
+      expect(r.custoEmbalagem).toBe("3.5");
+    });
+
+    it("enquanto o servidor não respondeu, o kit fica SEM CMV — nunca com um número provisório", () => {
+      const r = resolverKitDoPedido(
+        [{ produtoId: "avental", quantidade: "1" }],
+        [{ insumoId: "envelope", modo: "porKit", quantidade: "1" }],
+        comCustos(new Map())
+      );
+      expect(r.cmvUnitario).toBeNull();
+    });
+
+    it("custo nulo do servidor (insumo sem preço) bloqueia o kit", () => {
+      const r = resolverKitDoPedido(
+        [{ produtoId: "avental", quantidade: "1" }],
+        [{ insumoId: "envelope", modo: "porKit", quantidade: "1" }],
+        comCustos(new Map([["envelope|porKit|1", null]]))
+      );
+      expect(r.cmvUnitario).toBeNull();
+    });
   });
 });

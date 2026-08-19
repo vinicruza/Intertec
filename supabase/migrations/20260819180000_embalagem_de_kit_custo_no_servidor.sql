@@ -334,3 +334,38 @@ begin
   where id=p_order_id and tenant_id=v_tenant_id;
 end;
 $function$;
+
+-- ------------------------------------------------------------------
+-- 5. CMV dos kits do catálogo, calculado no servidor.
+--
+-- O contexto do simulador lia o custo dos kits com `inputs` aninhado
+-- (kits → kit_packaging → inputs.price_without_tax). A RLS derruba o aninhado
+-- para o Comercial, então a embalagem sumia e o kit ficava barato demais na
+-- tela — e o fechamento seria recusado depois, porque o banco calcula certo.
+-- Aqui o cálculo sai pronto: produtos + embalagem, sem expor preço de insumo.
+-- ------------------------------------------------------------------
+create or replace function public.custo_dos_kits()
+returns table (kit_id uuid, cmv numeric)
+language sql
+stable
+security definer
+set search_path to 'public', 'pg_temp'
+as $function$
+  select k.id,
+         coalesce((select sum(ki.quantity * pc.cmv)
+                     from public.kit_items ki
+                     join public.product_costs pc on pc.product_id = ki.product_id
+                    where ki.kit_id = k.id and ki.tenant_id = k.tenant_id), 0)
+       + coalesce((select sum(i.price_without_tax
+                              * case when kp.quantity_type = 'lot' then 1 / nullif(kp.lot_size, 0)
+                                     else kp.quantity end)
+                     from public.kit_packaging kp
+                     join public.inputs i on i.id = kp.input_id
+                    where kp.kit_id = k.id and kp.tenant_id = k.tenant_id), 0)
+    from public.kits k
+   where k.tenant_id = public.current_tenant_id()
+     and public.current_user_role() is not null;
+$function$;
+
+revoke execute on function public.custo_dos_kits() from public, anon;
+grant execute on function public.custo_dos_kits() to authenticated;

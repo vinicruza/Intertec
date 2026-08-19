@@ -74,7 +74,16 @@ export function custoKit(
 export type EmbalagemKit = {
   nome: string;
   // Preço sem imposto do insumo (Camada 1), já calculado.
-  custoUnitario: EntradaDecimal;
+  //
+  // Opcional porque nem sempre o preço chega até aqui: o Comercial não tem
+  // acesso à tabela de insumos (decisão de acesso registrada na RLS), então
+  // para ele o custo da linha vem PRONTO do servidor em `custoResolvido`.
+  // Uma das duas precisa existir — sem nenhuma, o cálculo bloqueia em vez de
+  // tratar a linha como zero.
+  custoUnitario?: EntradaDecimal;
+  // Custo da linha já multiplicado pela quantidade, calculado no servidor.
+  // Quando presente, manda: não há preço unitário para multiplicar aqui.
+  custoResolvido?: EntradaDecimal;
   // Como o insumo é consumido. Dois casos, e a diferença é grande:
   //
   //   direta — N unidades por kit. É o envelope: um kit, um envelope.
@@ -222,7 +231,14 @@ export function custoKitCompleto(
         `Quantidade inválida para "${e.nome}" na embalagem do kit.`
       );
     }
-    return { ...e, quantidadeResolvida: qtd, custo: dec(e.custoUnitario).times(qtd) };
+    if (e.custoResolvido === undefined && e.custoUnitario === undefined) {
+      throw new ErroCalculoBloqueante(
+        `Embalagem "${e.nome}" sem custo — o kit não pode ser calculado (nunca zero silencioso).`
+      );
+    }
+    const custo =
+      e.custoResolvido !== undefined ? dec(e.custoResolvido) : dec(e.custoUnitario!).times(qtd);
+    return { ...e, quantidadeResolvida: qtd, custo };
   });
 
   const custoEmbalagem = linhasEmbalagemSemFracao.reduce((s, l) => s.plus(l.custo), new Decimal(0));
