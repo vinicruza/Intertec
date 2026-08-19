@@ -325,3 +325,39 @@ describe("visibilidade de pedidos por perfil", () => {
     expect(visibilidade).toMatch(/o\.id = order_versions\.order_id[\s\S]*o\.seller_id = public\.meu_vendedor\(\)/i);
   });
 });
+
+// A embalagem do kit é a segunda metade do CMV do kit (Calculations.md §4). Em
+// 19/08/2026 o navegador somava produtos + embalagem e o banco só os produtos:
+// o primeiro kit COM embalagem seria recusado no fechamento. Nunca apareceu
+// porque `kit_packaging` estava vazia — a funcionalidade jamais tinha rodado
+// de ponta a ponta.
+describe("embalagem do kit no fechamento", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20260819180000_embalagem_de_kit_custo_no_servidor.sql",
+    "utf8"
+  );
+
+  it("o CMV do kit soma a embalagem, não só os produtos", () => {
+    expect(sql).toMatch(/v_expected_cmv := v_expected_cmv \+ public\.custo_embalagem_do_kit\(/);
+  });
+
+  it("o custo da embalagem é SECURITY DEFINER — senão vira zero para o Comercial", () => {
+    // `close_order_with_snapshots` roda com o perfil de quem fecha, e o
+    // Comercial não lê `inputs`. Sem definer a soma voltaria vazia e o pedido
+    // fecharia com o custo errado em vez de reclamar.
+    const bloco = sql.slice(sql.indexOf("function public.custo_embalagem_do_kit"));
+    expect(bloco.slice(0, 300)).toMatch(/security definer/i);
+  });
+
+  it("linha de embalagem sem custo bloqueia em vez de virar zero", () => {
+    expect(sql).toMatch(/Embalagem do kit sem custo vigente/);
+  });
+
+  it("a lista de insumos para o seletor não devolve preço", () => {
+    const bloco = sql.slice(
+      sql.indexOf("function public.insumos_para_embalagem"),
+      sql.indexOf("revoke execute on function public.insumos_para_embalagem")
+    );
+    expect(bloco).not.toMatch(/price_without_tax|price_with_tax/);
+  });
+});
