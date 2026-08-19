@@ -1,8 +1,10 @@
 # 16 — Prontidão para o primeiro dia de uso real
 
-> Conferência de 18/08/2026, véspera do dia em que a Intertech passa a registrar os orçamentos no
-> sistema. Rodada contra a planilha **viva** (baixada do Google Drive com fórmulas) e contra o
-> **banco de produção**. Nada foi gravado dos dois lados.
+> Conferência de 18/08/2026 e **correção da base em 19/08/2026**, véspera do dia em que a Intertech
+> passa a registrar os orçamentos no sistema. Rodada contra a planilha **viva** (baixada do Google
+> Drive com fórmulas) e contra o **banco de produção**.
+>
+> A §3 descreve o estado encontrado; a §3.6 registra o que foi corrigido e o que sobrou.
 >
 > Comandos: `npm run validar:pedidos` (lógica) e `npm run conferir:base` (dados).
 
@@ -13,7 +15,7 @@ Um sistema só produz o mesmo orçamento que a planilha se **as duas** estiverem
 | | Pergunta | Situação |
 |---|---|---|
 | **Lógica** | O motor calcula igual à planilha? | ✅ alinhado, com 3 exceções conhecidas (§2) |
-| **Dados** | O banco tem os mesmos números da planilha? | ❌ **desalinhado** (§3) |
+| **Dados** | O banco tem os mesmos números da planilha? | ✅ alinhado após a correção de 19/08 (§3.6) |
 
 Motor certo sobre base velha erra o orçamento com a mesma confiança de um motor errado — e sem
 nenhum sintoma na tela. Por isso as duas conferências existem e são independentes.
@@ -57,7 +59,7 @@ Externos, Revendas, Edmilson e Temporária Patricia ainda calculam a comissão c
 (`=2,5%*$F$24`, sem o frete). O sistema já usa a regra nova em todos os canais, conforme decidido.
 Aqui **a planilha é que está desatualizada** — vale corrigir as 4 fórmulas antes da comparação.
 
-## 3. Dados — a base NÃO está alinhada
+## 3. Dados — o que foi encontrado em 18/08
 
 | | Planilha viva | Banco | |
 |---|---:|---:|---|
@@ -106,20 +108,78 @@ outros. A lista completa sai no relatório do `npm run conferir:base`.
 agora tem `1,30 x 2,00` e `1,40 x 2,00`. Parecem os mesmos produtos com as dimensões invertidas no
 nome. **Confirmar antes de cadastrar como novos**, ou o catálogo fica com duplicata.
 
-## 4. O que precisa acontecer antes de liberar
+## 3.6 O que foi corrigido em 19/08 — e o que sobrou
 
-Em ordem de impacto:
+Todos os itens 1 a 4 da lista de pendências foram aplicados no banco de produção. O resultado:
 
-1. **Corrigir o preço do Adere Medical Tape** → resolve 55 produtos.
-2. **Cadastrar os 31 produtos que faltam** (ou aceitar que orçamentos com eles não saem amanhã).
-3. **Resolver as 3 duplicatas de nome** no banco.
-4. **Confirmar as 4 renomeações** antes de cadastrar.
-5. **Responder as duas perguntas fiscais** (Revendas e Descpro) — sem isso, esses dois canais
-   divergem por desenho.
-6. **Corrigir as 4 abas da planilha** que ficaram com a comissão antiga.
+| | Antes | Depois |
+|---|---:|---:|
+| Insumos que divergem em preço | 1 | **0** de 80 |
+| Produtos só na planilha | 31 | **0** |
+| Produtos só no banco | 4 | **0** |
+| Produtos com CMV divergente | 58 | **3** — e os 3 são erro **da planilha** (§3.7) |
+| Nomes duplicados no banco | 3 | **0** |
 
-Depois de cada rodada de correção, `npm run conferir:base` responde se acabou: ele sai com código de
-erro enquanto a base estiver desalinhada, e imprime `BASE ALINHADA ✅` quando não estiver.
+O que foi feito, em ordem:
+
+1. **Adere Medical Tape** — preço corrigido de 58,07 para 30,72 e o ICMS de 18% para 12%, conforme a
+   planilha viva. Isso sozinho realinhou 55 produtos.
+2. **Trinta e um produtos cadastrados**: 26 produtos novos com suas 170 linhas de ficha, mais 5 que
+   só faltavam por causa das renomeações do item 4.
+3. **As 3 duplicatas de nome resolvidas** (§3.7).
+4. **As 4 renomeações confirmadas**: `Campo de Mesa 2,00 x 1,30` e `2,00 x 1,40` (e as versões Não
+   Estéril) são de fato os mesmos produtos que a planilha hoje chama de `1,30 x 2,00` e `1,40 x 2,00`
+   — provado pelo CMV idêntico. Foram renomeados, não recadastrados: nenhuma duplicata no catálogo.
+5. **Oito CMVs congelados foram destravados.** Os produtos `+ Tape 80cm` tinham o valor certo
+   registrado, mas a tabela de custo ainda guardava o número antigo. Corrigido.
+
+## 3.7 As 3 divergências que sobraram são erro da planilha
+
+Nos três casos o banco está certo e a planilha está errada. Vale corrigir a planilha antes da
+comparação de amanhã, senão esses três produtos vão sair com preço errado no orçamento **da
+planilha**, não no do sistema.
+
+### a) `Campo Catarata 1,40 x 1,60 GR40 Não Estéril`
+
+| | CMV |
+|---|---:|
+| Planilha | 2,692712 |
+| Sistema | 2,848086 |
+
+A planilha repete no GR40 Não Estéril exatamente o número do GR30 Não Estéril — a célula está
+apontando para a linha errada. A prova: a diferença entre GR30 e GR40 é R$ 0,155374 na versão
+estéril, e o sistema aplica essa mesma diferença na não estéril. A planilha aplica zero.
+
+### b) `Campo Com Adesivo 0,80 x 0,80` — GR30 e Não Estéril GR40 trocados
+
+A própria planilha se contradiz: a **ficha** (aba Input Preço) e a **Alocação** discordam.
+
+| Produto | Ficha da planilha | Alocação da planilha | Sistema |
+|---|---:|---:|---:|
+| GR30 | 1,564724 | **1,063161** | 1,564724 |
+| GR40 | 1,609116 | 1,609116 | 1,609116 |
+| Não Estéril GR30 | 1,018768 | 1,018768 | 1,018768 |
+| Não Estéril GR40 | 1,063161 | **1,564724** | 1,063161 |
+
+A Alocação trocou os dois valores de lugar. Quem está certo é a ficha: um produto estéril tem 7
+insumos (embalagem, esterilização, gráfica) e não pode custar menos que o não estéril equivalente,
+que tem 3. **Hoje, todo orçamento feito na planilha com esses dois produtos sai com o custo errado.**
+
+### c) `Campo de Mesa 2,00 x 2,00 Não Estéril` aparece duas vezes na Alocação
+
+Com dois valores diferentes: 4,668095 e 2,629723. O segundo é o CMV do `Campo de Mesa 1,50 x 1,50
+Não Estéril`. No sistema ficou um produto só, com 4,668095, e o 1,50 x 1,50 com o seu próprio valor.
+
+## 4. O que ainda precisa acontecer antes de liberar
+
+Os itens de **dados** estão fechados. Sobram os de **regra fiscal** e os de **planilha**:
+
+1. **Responder as duas perguntas fiscais** (Revendas §2.2 e Descpro §2.3) — sem isso, esses dois
+   canais divergem por desenho, não por erro.
+2. **Corrigir as 4 abas da planilha** que ficaram com a comissão antiga (§2.4).
+3. **Corrigir os 3 erros da planilha** apontados na §3.7 — são erros de custo que hoje afetam o
+   orçamento feito na planilha.
+4. Lembrar que o frete por conta do cliente (§2.1) diverge de propósito.
 
 ## 5. Como reproduzir esta conferência
 
