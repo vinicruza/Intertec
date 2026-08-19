@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante } from "@calc";
 import { aplicarFreteDestacadoAosItens, seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
 import { type ModoEmbalagem } from "../lib/sim/kitNoPedido";
+import { mensagemDeErro } from "../lib/erros";
 import {
   KIT_NOVO,
   kitNovoAPartirDe,
@@ -77,12 +78,6 @@ function normalizarNome(valor: string): string {
     .replace(/\p{Diacritic}/gu, "")
     .trim()
     .toLowerCase();
-}
-
-function mensagemErro(e: unknown, padrao: string): string {
-  if (e instanceof Error) return e.message;
-  if (e && typeof e === "object" && "message" in e && typeof e.message === "string") return e.message;
-  return padrao;
 }
 
 function novoFreteCotado(): FreteCotado {
@@ -382,7 +377,7 @@ export default function SimuladorPage() {
         return {
           ...cotacao,
           aprovacao: "pendente_com_pendencia" as const,
-          erroAprovacao: mensagemErro(e, "Não foi possível enviar para aprovação."),
+          erroAprovacao: mensagemDeErro(e, "Não foi possível enviar para aprovação."),
         };
       }
     },
@@ -411,7 +406,7 @@ export default function SimuladorPage() {
       queryClient.invalidateQueries({ queryKey: ["cascataVigente", r.id] });
       queryClient.invalidateQueries({ queryKey: ["versoes", r.id] });
     },
-    onError: (e: unknown) => setErroSalvar(mensagemErro(e, "Erro ao salvar.")),
+    onError: (e: unknown) => setErroSalvar(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
   if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {

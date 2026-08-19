@@ -35,3 +35,19 @@ export function traduzErro(msg: string | null | undefined): string {
   }
   return pareceFrase(msg) ? msg : GENERICO;
 }
+
+// Mensagem legível para um erro que veio de qualquer lugar.
+//
+// O Supabase rejeita RPC com um PostgrestError: um objeto simples com `message`,
+// e NÃO uma instância de Error. Quem testa só `e instanceof Error` cai no texto
+// padrão e joga fora a única frase que explicava a falha — foi o que aconteceu
+// em 19/08/2026, quando "Fechamento rejeitado: totais enviados não reconciliam
+// com os dados do pedido" virou "Erro ao gerar pedido." na tela do vendedor, e
+// a causa (uma migração pendente) só apareceu no log do banco.
+export function mensagemDeErro(e: unknown, padrao: string): string {
+  if (e instanceof Error && pareceFrase(e.message)) return e.message;
+  if (e && typeof e === "object" && "message" in e && typeof e.message === "string" && pareceFrase(e.message)) {
+    return e.message;
+  }
+  return padrao;
+}

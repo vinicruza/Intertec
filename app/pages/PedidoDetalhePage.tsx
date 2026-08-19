@@ -33,6 +33,7 @@ import {
 import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, percentual, reais } from "../lib/format";
+import { mensagemDeErro } from "../lib/erros";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
@@ -105,22 +106,22 @@ export default function PedidoDetalhePage() {
       setKitsCriados(kits);
       recarregar();
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao gerar pedido."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao gerar pedido.")),
   });
   const reabrir = useMutation({
     mutationFn: () => reabrirPedido(id!),
     onSuccess: (novoId) => navigate(`/pedidos/${novoId}`),
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao reabrir (apenas Administrador)."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao reabrir (apenas Administrador).")),
   });
   const duplicar = useMutation({
     mutationFn: () => duplicarPedido(id!),
     onSuccess: (novoId) => navigate(`/pedidos/${novoId}`),
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao duplicar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao duplicar.")),
   });
   const cancelar = useMutation({
     mutationFn: () => cancelarPedido(id!, motivoCancelamento),
     onSuccess: () => { setCancelando(false); setMotivoCancelamento(""); recarregar(); },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao cancelar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao cancelar.")),
   });
 
   // Desfecho da cotação: nem toda cotação vira pedido, e a empresa quer saber
@@ -130,23 +131,23 @@ export default function PedidoDetalhePage() {
   const perder = useMutation({
     mutationFn: () => marcarCotacaoPerdida(id!, motivoPerdaId, observacaoPerda),
     onSuccess: () => { setPerdendo(false); setMotivoPerdaId(""); setObservacaoPerda(""); recarregar(); },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao registrar a perda."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao registrar a perda.")),
   });
   const paramsQuery = useQuery({ queryKey: ["paramsAprovacao"], queryFn: obterParametrosAprovacao });
   const enviar = useMutation({
     mutationFn: () => enviarParaAprovacao(id!),
     onSuccess: recarregar,
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao enviar para aprovação."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao enviar para aprovação.")),
   });
   const decidir = useMutation({
     mutationFn: (aprovado: boolean) => decidirAprovacao(id!, aprovado, observacaoAprovacao),
     onSuccess: () => { setObservacaoAprovacao(""); recarregar(); },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao registrar a decisão."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao registrar a decisão.")),
   });
   const reabrirPerdida = useMutation({
     mutationFn: () => reabrirCotacaoPerdida(id!),
     onSuccess: recarregar,
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao reabrir a cotação."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao reabrir a cotação.")),
   });
 
   if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
@@ -767,7 +768,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
       setSalvo(true);
       queryClient.invalidateQueries({ queryKey: ["pedido", pedido.id] });
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
   const mudar = (campo: keyof DadosExpedicao) => (valor: string) => {
