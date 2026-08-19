@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "reconcile": "tsx scripts/reconcile.ts",
-    "validar:pedidos": "tsx scripts/validar-pedidos.ts"
+    "validar:pedidos": "tsx scripts/validar-pedidos.ts",
+    "conferir:base": "tsx scripts/conferir-base.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

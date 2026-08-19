@@ -5,3 +5,4 @@ export * from "./extract";
 export * from "./reconcile";
 export * from "./pedidos";
 export * from "./conferencia";
+export * from "./base";
