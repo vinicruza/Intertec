@@ -286,6 +286,30 @@ quem consome `Compressa P Medihouse` são os `Kit Catarata com 1` e `com 2` (est
 Não foram tocados: o "1" e o "2" do nome já indicam a quantidade de compressas, e não há lugar óbvio
 para o P/G — precisa ela dizer como quer chamar.
 
+### c) A costureira do GG está cadastrada, mas nenhum produto a usa
+
+Achado ao fechar a conferência dos aventais. Existem duas costureiras de avental:
+
+| Insumo | Preço sem imposto | Produtos que usam |
+|---|---:|---:|
+| `Custo costureira avental M G` | 0,8350 | **todos** os aventais |
+| `Custo costureira avental GG` | 0,9350 | **nenhum** |
+
+Todo avental — inclusive GG e EGG — usa a costureira "M G". A diferença de tamanho aparece só no
+tecido: a bobina vai de 2,3050 (M) para 2,5564 (G), 3,1000 (GG) e 4,0533 (EGG).
+
+A planilha faz igual, então **o sistema está fiel e isto não é defeito de carga**. Mas se costurar um
+GG custa mesmo mais caro que um M, os 8 produtos GG e os 8 EGG estão subcusteados em R$ 0,10 cada.
+Pergunta para a Patrícia: a costureira cobra o mesmo para todos os tamanhos, ou o insumo GG deixou de
+ser ligado por engano?
+
+### d) O tamanho M tem dois nomes
+
+Não existe produto `Avental M` simples. O tamanho M aparece como `Avental` (sem letra) nas versões
+com compressa, e como `Avental M` nas versões com Tag — mesma costureira e mesmo tecido (2,3050), é o
+mesmo tamanho escrito de duas formas. Confunde na hora de cotar. É assim na planilha também;
+padronizar é só renomear, sem efeito nenhum no custo.
+
 ## 4. O que ainda precisa acontecer antes de liberar
 
 Os itens de **dados** estão fechados. Sobram os de **regra fiscal** e os de **planilha**:
