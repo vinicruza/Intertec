@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { Decimal } from "../../lib/calculations/decimal";
@@ -313,5 +314,18 @@ describe("leitura de célula do exceljs", () => {
     ws.getCell("N7").value = { formula: "A1*B1" } as ExcelJS.CellFormulaValue;
 
     expect(planilhaDeWorkbook(wb).valor("Edmilson", 7, 14)).toBeNull();
+  });
+});
+
+// O conferidor precisa chamar o motor do MESMO jeito que a tela chama. Até
+// 19/08/2026 ele passava só `fretePorContaCliente` e esquecia
+// `tributarFreteInformado`, introduzido na mudança de frete destacado de
+// 12/08: o resultado é que ele zerava o imposto sobre frete em toda aba com a
+// caixa "Frete Cliente" marcada e reportava uma divergência que a aplicação
+// não tem. Seis das doze abas apareciam erradas no relatório do cliente.
+describe("conferidor espelha o motor da tela", () => {
+  it("frete marcado como do cliente continua TRIBUTADO, como em simular()", () => {
+    const fonte = readFileSync("lib/import/conferencia.ts", "utf8");
+    expect(fonte).toMatch(/tributarFreteInformado:\s*pedido\.deducoes\.freteCliente/);
   });
 });

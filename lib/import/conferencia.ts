@@ -149,6 +149,13 @@ export function conferirPedido(
       itens: itensDoMotor(pedido),
       frete,
       fretePorContaCliente: pedido.deducoes.freteCliente,
+      // Faltava esta linha. A flag "Frete Cliente" faz duas coisas: zera a
+      // DEDUÇÃO do frete e mantém o frete informado como base do IMPOSTO sobre
+      // frete (mudança de 12/08/2026, que a tela já passa em `simular()`). Sem
+      // ela o conferidor zerava o imposto sobre frete em toda aba com a caixa
+      // marcada e acusava uma divergência que a aplicação não tem — seis das
+      // doze abas saíam erradas no relatório do cliente.
+      tributarFreteInformado: pedido.deducoes.freteCliente,
       aliquotaImposto: icsm,
       aliquotaDifal: canal.aplicaDifal ? aliquotaDifal(tabelas, ufNormalizada) : new Decimal(0),
       aliquotaComissao: canal.aliquotaComissao,
