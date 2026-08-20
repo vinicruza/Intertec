@@ -35,7 +35,19 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
   // dia: a base da COMISSÃO (T16) e a do DIFAL (T17) passaram a incluir o
   // frete. Histórico: comissão 420,00 / DIFAL 2.268,00 / RL 11.382,00 / margem
   // 45,96%  →  comissão 445,00 / DIFAL 2.403,00 / RL 11.222,00 / margem 45,19%.
-  it("reproduz a cascata com frete desmarcado: RL 11.222,00 e margem 45,19% (status Boa)", () => {
+  //
+  // ⚠️ Revisados DE NOVO em 21/08/2026, na decisão de seguir a planilha: com a
+  // caixa "Frete destacado" EM BRANCO quem paga o transporte é a Intertec, e o
+  // frete sai do resultado como qualquer custo — na planilha é o `N12 = 0` que
+  // deixa o `N14 = F24 - SOMA(N6:N12)` descontar o frete inteiro. Antes disto o
+  // simulador mandava `fretePorContaCliente: true` fixo, e o frete NUNCA saía.
+  //
+  //   RL 11.222,00 / margem 45,19%  →  RL 10.059,50 / margem 38,86%.
+  //
+  // Repare que o resultado passou a ser exatamente o do golden test T6, que é a
+  // mesma situação (frete de R$ 1.000 pago pela Intertec) escrita direto no
+  // motor: 162,50 de imposto sobre frete, RL 10.059,50, margem 38,86%.
+  it("reproduz a cascata com frete desmarcado: RL 10.059,50 e margem 38,86% (igual ao T6)", () => {
     const s = simular(entrada);
     expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
     expect(toMoney(s.resultado.imposto)).toBe("2730.00");
@@ -43,14 +55,17 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(toMoney(s.resultado.difal)).toBe("2403.00");
     expect(toMoney(s.resultado.baseComissao)).toBe("17800.00");
     expect(toMoney(s.resultado.comissao)).toBe("445.00");
-    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11222.00");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("45.19");
-    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("17.43");
+    // O frete sai do resultado E é tributado — os dois, como na planilha.
+    expect(toMoney(s.resultado.frete)).toBe("1000.00");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10059.50");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("38.86");
+    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("7.89");
     expect(s.avisos).toHaveLength(0);
 
-    // Com o frete desmarcado, a margem segue a leitura da rentabilidade antiga.
-    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS)?.label).toBe("Boa");
+    // Consequência prática da mudança: este pedido saiu da faixa "Boa" e caiu
+    // para "Atenção". Não é a régua que mudou — é a margem que era otimista.
+    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS)?.label).toBe("Atenção");
   });
 
   it("frete destacado ligado mantém a base da venda e deduz frete/imposto frete em linhas próprias", () => {
@@ -65,7 +80,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
   it("canal Revendas (sem DIFAL): margem sobe e o DIFAL zera", () => {
     const s = simular({ ...entrada, canal: { ...entrada.canal, aplicaDifal: false } });
     expect(toMoney(s.difalAplicado)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("13625.00"); // 11.222,00 + 2.403
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("12462.50"); // 10.059,50 + 2.403
   });
 
   it("canal Marketplace: frete vira % da receita por UF (BA 17%)", () => {
@@ -94,7 +109,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(s.aplicaDifalUsado).toBe(false);
     expect(toMoney(s.difalAplicado)).toBe("0.00"); // alíquota usada, zerada
     expect(toMoney(s.resultado.difal)).toBe("0.00"); // valor em R$
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("13625.00"); // igual ao canal Revendas
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("12462.50"); // igual ao canal Revendas
   });
 
   it("override liga o DIFAL mesmo com o canal não aplicando por padrão", () => {
@@ -106,7 +121,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     expect(s.aplicaDifalUsado).toBe(true);
     expect(s.difalAplicado.toString()).toBe("0.135"); // alíquota usada
     expect(toMoney(s.resultado.difal)).toBe("2403.00"); // valor em R$
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("11222.00"); // igual ao padrão
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10059.50"); // igual ao padrão
   });
 
   it("sem override (null/undefined), usa o padrão do canal — comportamento antigo preservado", () => {

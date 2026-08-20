@@ -433,7 +433,7 @@ tirar: o jogo é fixo. No sistema a vendedora desmarca a esterilização, e aí:
 vendedora montar a embalagem que o kit realmente usa em vez de pagar por uma esterilização que não
 aconteceu.
 
-## 3.11b A regra do frete destacado do Bryan — CONFERIDA, o sistema já faz certo
+## 3.11b A regra do frete destacado do Bryan — CONFERIDA (ver §3.12 para a decisão final)
 
 Áudio do Bryan de 19/08/2026:
 
@@ -475,76 +475,99 @@ e é por isso que só elas batem com o sistema.
 "Imposto" — e aí o par de linhas passa a implementar a regra do Bryan sozinho, porque a linha
 "Imposto Frete" só é preenchida quando o frete está destacado.
 
-### O que o áudio NÃO responde
+### ⚠️ Atualização de 21/08/2026
 
-O áudio trata da **base do imposto**. Ele não diz se o frete **sai do resultado** quando quem paga é
-a Intertec — que é outra linha da cascata e é a pendência da §3.12. As duas coisas são independentes:
-dá para acertar o imposto (já está) e ainda assim mostrar margem melhor do que a real.
+A conferência acima foi feita ANTES da decisão de seguir a planilha (§3.12). Depois dela, o sistema
+passou a cobrar o imposto sobre o frete **também** quando a caixa está em branco — como a planilha
+faz. A regra do Bryan continua valendo para o caso **destacado**, e ficou pendente para o caso **não
+destacado**. Os números da tabela acima seguem corretos para a coluna "destacado"; para "não
+destacado", ver a §3.12.
 
-## 3.12 O simulador não tem "frete por conta da Intertec" — PRECISA DE DECISÃO
+## 3.12 Frete não destacado passa a sair do resultado — RESOLVIDO em 21/08
 
 Achado em 20/08 varrendo o caminho de fechamento com o login de cada vendedora.
+**Decisão do cliente em 21/08/2026: seguir a planilha.** Implementado no mesmo dia, nos dois lados.
+
+### O defeito
 
 Na planilha, a linha **"Frete Cliente"** tem dois estados:
 
 - **com "X"** — o frete não reduz a margem (o `N12 = −N6` cancela o `+N6`). O cliente paga.
-- **em branco** — o frete **reduz a margem**. Quem paga é a Intertec.
+- **em branco** — o frete **reduz a margem** (`N12 = 0`, e o `N14 = F24 − SOMA(N6:N12)` desconta o
+  frete inteiro). Quem paga o transporte é a Intertec.
 
-No sistema existe só a caixa **"Frete destacado"**, e ela decide outra coisa: se o frete é
-**tributado** ou não. O frete em si **nunca** sai do resultado, marcada ou desmarcada:
+No sistema o segundo caso não existia. `simular()` mandava `fretePorContaCliente: true` **fixo**, e
+o `close_order_with_snapshots` nunca subtraía `p_freight` do `v_net`. Os dois erravam igual — por
+isso o fechamento reconciliava e ninguém percebeu.
 
-```ts
-// app/lib/sim/params.ts — simular()
-fretePorContaCliente: true,              // fixo, a tela não muda
-tributarFreteInformado: freteDestacado,  // isto é o que a caixa controla
-```
+### O que mudou
 
-```ts
-// lib/calculations/order.ts
-const frete = p.fretePorContaCliente ? zero : freteInformado;   // sempre zero vindo da tela
-```
+| | Frete sai do resultado? | Imposto sobre o frete? |
+|---|---|---|
+| Caixa **marcada** (destacado, o cliente paga) | não | sim |
+| Caixa **em branco** (a Intertec paga) | **sim** ← mudou | sim |
 
-O motor `calcularPedido` sabe deduzir o frete (`fretePorContaCliente: false`, coberto pelos golden
-tests), mas **a tela não tem como chegar lá**. O banco faz igual, então o fechamento não reclama:
+O imposto sobre o frete continua nos dois casos, porque na planilha a linha `N7 = alíquota × N6` não
+olha o "X". É o mesmo modelo do `Calculations.md` §6 e do **golden test T6** — frete de R$ 1.000,00
+pago pela Intertec: deduz 1.000 E cobra 162,50 de imposto.
 
-```sql
--- close_order_with_snapshots
-v_freight_tax := case when v_order.freight_paid_by_customer then v_tax_rate*p_freight else 0 end;
-v_net := v_gross - v_freight_tax - v_tax - v_difal - v_commission;   -- o frete não entra
-```
+Alterado em `app/lib/sim/params.ts` e na migração
+`20260821120000_frete_nao_destacado_sai_do_resultado.sql`, na mesma entrega. Os dois TÊM de andar
+casados: o fechamento recusa o pedido quando os totais da tela não reconciliam com os do banco.
 
-TS e SQL concordam entre si. Quem discorda é a planilha — e, no caso do frete pago pela Intertec, a
-planilha é que está certa: o dinheiro saiu.
+Sete testes que travavam o comportamento antigo foram reescritos (`fixture-patricia`, `snapshot`,
+`fluxo-do-vendedor`). Nenhum golden test precisou mudar — o T6 já dizia o certo desde sempre.
 
-### Quanto isso vale hoje
+### O ORC-2026-0041 agora fecha igual à planilha
 
-Há **16 orçamentos** com frete > 0 e "Frete destacado" desmarcado. Nos **11 já fechados**:
+O orçamento do Oclusor (700 un a R$ 3,60, BA, frete R$ 82,00 em branco) passa a dar
+**41,4601786%** — o `0,4146017863` da célula N16 da aba `Patricia`, na oitava casa decimal. Travado
+em teste (`tests/calc/frete-destacado.test.ts`).
 
-| Orçamento | Vendedora | UF | Frete | Margem gravada | Margem se o frete saísse | Diferença |
+### Os 11 pedidos já fechados com margem otimista
+
+Snapshot é imutável (Decisão D7), então nada mudou retroativamente. Mas ficam registrados:
+
+| Pedido | Cliente | UF | Frete | Margem gravada | Pela regra nova | Diferença |
 |---|---|---|---|---|---|---|
-| ORC-2026-0010 | Camila | MA | 380,00 | 67,25% | 51,37% | **15,88 pts** |
-| ORC-2026-0008 | Isabela | SP | 140,00 | 61,54% | 51,18% | 10,36 pts |
-| ORC-2026-0016 | Isabela | SP | 80,00 | 60,83% | 51,29% | 9,54 pts |
-| ORC-2026-0013 | Isabela | SP | 60,00 | 70,20% | 62,44% | 7,76 pts |
-| ORC-2026-0020 | Isabela | RJ | 37,00 | 56,16% | **48,60%** | 7,56 pts |
-| ORC-2026-0043 | Isabela | SP | 153,00 | 52,85% | **47,92%** | 4,93 pts |
-| ORC-2026-0006 | Isabela | ES | 35,00 | 44,11% | 41,11% | 3,00 pts |
-| ORC-2026-0011 | Isabela | RJ | 195,00 | 57,81% | 55,01% | 2,80 pts |
-| ORC-2026-0021 | Camila | SP | 70,00 | 54,47% | 51,70% | 2,78 pts |
-| ORC-2026-0014 | Isabela | SP | 200,00 | 46,02% | 43,94% | 2,07 pts |
-| ORC-2026-0022 | Camila | SP | 70,00 | 54,47% | 54,13% | 0,34 pts |
+| ORC-2026-0010 | INSTITUTO DR JOSE CARLOS PORTELA | MA | 380,00 | 67,25% | 51,37% | **15,88 pts** |
+| ORC-2026-0008 | C & J CLINICA MEDICA | SP | 140,00 | 61,54% | 51,18% | 10,36 pts |
+| ORC-2026-0016 | JEFFERSON FREIRE CARDOSO | SP | 80,00 | 60,83% | 51,29% | 9,54 pts |
+| ORC-2026-0013 | LUIZ FERNANDO NERY | SP | 60,00 | 70,20% | 62,44% | 7,76 pts |
+| ORC-2026-0020 | NUCLEO DE MICROCIRURGIA OCULAR RJ | RJ | 37,00 | 56,16% | 48,60% | 7,56 pts |
+| ORC-2026-0043 | INSTITUTO DA VISAO LAGEANO | SP | 153,00 | 52,85% | 47,92% | 4,93 pts |
+| ORC-2026-0006 | HOSPITAL MATA DA PRAIA | ES | 35,00 | 44,11% | 41,11% | 3,00 pts |
+| ORC-2026-0011 | HOSP. OFTALMOLOGICO SANTA BEATRIZ | RJ | 195,00 | 57,81% | 55,01% | 2,80 pts |
+| ORC-2026-0021 | VEROS HOSPITAL VETERINARIO | SP | 70,00 | 54,47% | 51,70% | 2,78 pts |
+| ORC-2026-0014 | REDEMO SERVICOS MEDICOS | SP | 200,00 | 46,02% | 43,94% | 2,07 pts |
+| ORC-2026-0022 | VEROS HOSPITAL VETERINARIO | SP | 70,00 | 54,47% | 54,13% | 0,34 pts |
 
-**ORC-2026-0020 e ORC-2026-0043 sairiam do verde** e teriam ido para aprovação.
+Quatro deles (0008, 0016, 0043, 0020) estavam acima de 50% e passariam a ficar abaixo — ou seja,
+teriam ido para aprovação em vez de fechar direto. Vale reabrir e refechar se a empresa quiser o
+histórico correto; é decisão dela, e são 11 pedidos.
 
-### A pergunta para o cliente
+### O que continua em aberto: o áudio do Bryan
 
-> Quando a Intertec paga o frete (o "X" da planilha fica em branco), esse frete deve **derrubar a
-> margem do pedido**, como a planilha faz?
+O áudio de 19/08/2026 pede outra coisa para o imposto:
 
-Se a resposta for sim — e a leitura financeira diz que sim, o dinheiro saiu — a correção é trocar a
-caixa única por **duas opções de quem paga o frete**, e mexer nos dois lados (TypeScript e SQL) na
-mesma entrega, porque o fechamento reconcilia os dois. **Não fiz a mudança**: ela altera a margem de
-todo orçamento com frete e é assunto de `Calculations.md`, que só muda com o cliente confirmando.
+> "Se o frete não estiver destacado na nota, ou seja, se ele não aparecer na nota fiscal, o imposto
+> deve ser calculado **somente sobre o valor do pedido**."
+
+Pela regra dele, a linha "Imposto sobre o frete" deveria ser **zero** quando a caixa está em branco.
+A planilha não faz isso, e no mesmo áudio ele diz: *"na planilha eu não consegui configurar qual é a
+forma correta"*. Como a decisão de 21/08 foi seguir a planilha, o sistema segue a planilha.
+
+**Enquanto isso, a diferença é exatamente `alíquota × frete` em pedido com a caixa em branco.**
+Nos três orçamentos conferidos: SP 14,99 · BA 13,33 · PR 40,38.
+
+Se a empresa fechar pela regra do Bryan, a correção é de uma linha em cada lado:
+
+- planilha: `N7 = SE(N11="X"; alíquota × N6; 0)`
+- sistema: `tributarFreteInformado: freteDestacado` em `params.ts` **e**
+  `v_freight_tax := case when v_order.freight_paid_by_customer then v_tax_rate*p_freight else 0 end`
+  na função de fechamento — as duas na mesma entrega.
+
+Os testes que mudariam estão marcados com `REGRA DO BRYAN` em `tests/calc/frete-destacado.test.ts`.
 
 ## 3.13 Os 4 kits do catálogo estão sem embalagem nenhuma
 

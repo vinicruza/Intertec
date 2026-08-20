@@ -80,14 +80,34 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
   // linha própria, com imposto sobre frete, mas NÃO infla a receita dos itens
   // nem a base de comissão/impostos da venda. O "final com frete" é só leitura
   // comercial para o vendedor, não a base da rentabilidade.
+  //
+  // A caixa "Frete destacado" da tela é a coluna "Frete Cliente" da planilha:
+  //
+  //   MARCADA   (destacado na nota, o cliente paga)  → o frete NÃO sai do
+  //             resultado. Na planilha é o "X", que faz `N12 = -N6` anular a
+  //             linha do frete.
+  //   EM BRANCO (a Intertec paga o transporte)       → o frete SAI do
+  //             resultado, como qualquer outro custo. Na planilha é `N12 = 0`,
+  //             e o `N14 = F24 - SOMA(N6:N12)` desconta o frete inteiro.
+  //
+  // O imposto sobre o frete é cobrado nos DOIS casos, porque na planilha a
+  // linha `N7 = alíquota × N6` não olha o "X". É o mesmo que o Calculations.md
+  // §6 descreve e o golden test T6 trava (frete de R$ 1.000 pago pela Intertec:
+  // deduz 1.000 E cobra 162,50 de imposto).
+  //
+  // Até 21/08/2026 esta linha mandava `fretePorContaCliente: true` fixo, e por
+  // isso o frete NUNCA saía do resultado — a margem do simulador ficava melhor
+  // que a da planilha em todo pedido em que a Intertec paga o transporte.
   const freteDestacado = entrada.fretePorContaCliente;
   const itensCalculados = entrada.itens;
 
   const resultado = calcularPedido({
     itens: itensCalculados,
     frete: freteUsado,
-    fretePorContaCliente: true,
-    tributarFreteInformado: freteDestacado,
+    fretePorContaCliente: freteDestacado,
+    // Sempre: quem decide se o frete é tributado é a planilha, e ela tributa
+    // nos dois casos. Ver o bloco acima.
+    tributarFreteInformado: true,
     aliquotaImposto: entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,
