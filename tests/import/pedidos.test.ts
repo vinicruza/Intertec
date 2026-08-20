@@ -317,15 +317,19 @@ describe("leitura de célula do exceljs", () => {
   });
 });
 
-// O conferidor precisa chamar o motor do MESMO jeito que a tela chama. Até
-// 19/08/2026 ele passava só `fretePorContaCliente` e esquecia
-// `tributarFreteInformado`, introduzido na mudança de frete destacado de
-// 12/08: o resultado é que ele zerava o imposto sobre frete em toda aba com a
-// caixa "Frete Cliente" marcada e reportava uma divergência que a aplicação
-// não tem. Seis das doze abas apareciam erradas no relatório do cliente.
-describe("conferidor espelha o motor da tela", () => {
-  it("frete marcado como do cliente continua TRIBUTADO, como em simular()", () => {
+// O conferidor reproduz a PLANILHA — não a aplicação. Desde 21/08/2026 os dois
+// deixaram de ser a mesma conta: a planilha cobra o imposto sobre o frete com
+// ou sem o "X" (a linha `N7 = alíquota × N6` não olha a caixa), e a aplicação
+// segue a regra do Bryan e não cobra quando o frete não está destacado.
+//
+// Por isso `tributarFreteInformado` é fixo em `true` aqui: se ele acompanhasse
+// a caixa, o conferidor zeraria o imposto sobre frete das abas SEM "X" e
+// acusaria divergência onde a planilha está internamente coerente. O papel dele
+// é dizer o que a planilha calcula; a diferença para a aplicação é conhecida e
+// vale `alíquota × frete` nos pedidos não destacados.
+describe("conferidor espelha a planilha", () => {
+  it("o imposto sobre o frete é cobrado com ou sem a caixa Frete Cliente", () => {
     const fonte = readFileSync("lib/import/conferencia.ts", "utf8");
-    expect(fonte).toMatch(/tributarFreteInformado:\s*pedido\.deducoes\.freteCliente/);
+    expect(fonte).toMatch(/tributarFreteInformado:\s*true/);
   });
 });

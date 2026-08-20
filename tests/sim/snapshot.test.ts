@@ -33,12 +33,12 @@ describe("snapshot de fechamento — fixture Patricia", () => {
   ]);
 
   // Valores de 21/08/2026: com o frete desmarcado, os R$ 1.000 do transporte
-  // saem do resultado e são tributados em 162,50 — a conta da planilha. Antes
-  // eram 11.222,00 de receita líquida e 5.071,58 de margem.
+  // saem do resultado e NÃO são tributados — a regra do Bryan (golden T14c).
+  // Antes eram 11.222,00 de receita líquida e 5.071,58 de margem.
   it("congela os totais em precisão total e o display a 2 casas", () => {
-    expect(snap.pedido.net_revenue_snapshot).toBe("10059.5");
-    expect(snap.pedido.totals_display.receita_liquida).toBe("10059.50");
-    expect(snap.pedido.totals_display.margem_contribuicao).toBe("3909.08");
+    expect(snap.pedido.net_revenue_snapshot).toBe("10222");
+    expect(snap.pedido.totals_display.receita_liquida).toBe("10222.00");
+    expect(snap.pedido.totals_display.margem_contribuicao).toBe("4071.58");
     expect(snap.pedido.totals_display.cmv).toBe("6150.42");
     expect(snap.pedido.totals_display.difal).toBe("2403.00");
   });

@@ -1,43 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { dec, toPercent } from "@calc";
+import { dec, toMoney, toPercent } from "@calc";
 import { simular } from "../../app/lib/sim/params";
 
 // ============================================================
-// A caixa "Frete destacado" — o sistema segue a PLANILHA (decisão de 21/08/2026)
+// A caixa "Frete destacado" — regra do Bryan (áudio de 19/08/2026)
 // ============================================================
 //
-// A caixa da tela é a coluna "Frete Cliente" da planilha, e manda em duas
-// coisas de uma vez:
+// Nas palavras dele:
+//
+//   "Se o frete estiver destacado na nota, o imposto deve ser calculado sobre o
+//    valor do pedido MAIS o frete. Se o frete não estiver destacado na nota, ou
+//    seja, se ele não aparecer na nota fiscal, o imposto deve ser calculado
+//    SOMENTE sobre o valor do pedido, que será o valor total da nota fiscal."
+//
+// É o posicionamento da empresa, e vale sobre a planilha. A caixa da tela manda
+// nas DUAS pontas da cascata:
 //
 //   MARCADA   (destacado na nota, o cliente paga o transporte)
-//       frete NÃO sai do resultado   — na planilha, `N12 = -N6` anula a linha
-//       imposto sobre o frete        — SIM
+//       frete NÃO sai do resultado  — na planilha, `N12 = -N6` anula a linha
+//       imposto sobre o frete       — SIM (ele está na nota)
 //
 //   EM BRANCO (a Intertec paga o transporte)
-//       frete SAI do resultado       — na planilha, `N12 = 0`, e o
-//                                      `N14 = F24 - SOMA(N6:N12)` desconta tudo
-//       imposto sobre o frete        — SIM (a linha `N7 = alíquota × N6` da
-//                                      planilha não olha o "X")
-//
-// É o mesmo modelo do Calculations.md §6 e do golden test T6, que trava um
-// frete de R$ 1.000 pago pela Intertec deduzindo 1.000 E cobrando 162,50.
+//       frete SAI do resultado      — na planilha, `N12 = 0`, e o
+//                                     `N14 = F24 - SOMA(N6:N12)` desconta tudo
+//       imposto sobre o frete       — NÃO (ele não está na nota)
 //
 // ------------------------------------------------------------
-// PENDÊNCIA REGISTRADA: o áudio do Bryan (19/08/2026) pede outra coisa
+// Onde a planilha ainda diverge — e é a planilha que está atrasada
 // ------------------------------------------------------------
 //
-//   "Se o frete não estiver destacado na nota, ou seja, se ele não aparecer na
-//    nota fiscal, o imposto deve ser calculado SOMENTE sobre o valor do pedido."
+// A linha `N7 = alíquota × N6` da planilha cobra o imposto sobre o frete nos
+// dois estados da caixa, e o próprio Bryan disse no mesmo áudio: "na planilha
+// eu não consegui configurar qual é a forma correta". A correção lá é
+// `N7 = SE(N11="X"; alíquota × N6; 0)`.
 //
-// Pela regra dele, a linha "Imposto sobre o frete" deveria ser ZERO quando a
-// caixa está em branco — e o próprio Bryan disse, no mesmo áudio, que "na
-// planilha eu não consegui configurar qual é a forma correta". A planilha, o
-// Calculations.md §6 e o T6 dizem o contrário, e a decisão de 21/08/2026 foi
-// seguir a planilha até a empresa fechar a regra.
+// Enquanto isso, em pedido NÃO destacado a planilha cobra `alíquota × frete` a
+// mais que o sistema. Nos orçamentos conferidos: SP 14,99 · BA 13,33 · PR 40,38.
 //
-// Enquanto isso, a diferença é exatamente `alíquota × frete` em pedido com a
-// caixa EM BRANCO. Os testes marcados "REGRA DO BRYAN" abaixo descrevem o que
-// mudaria; quando a decisão vier, é neles que se mexe.
+// O golden test T6 continua descrevendo a cascata da PLANILHA (deduz E tributa)
+// e o T14c descreve a da EMPRESA (deduz e não tributa) — os dois no mesmo
+// pedido-fixture, e a diferença entre eles é exatamente os 162,50.
 //
 // O banco faz a mesma conta em `close_order_with_snapshots`. Se esta regra
 // mudar, muda nos DOIS lados na mesma entrega — senão o fechamento recusa o
@@ -87,36 +89,43 @@ function rodar(caso: (typeof CASOS)[number], destacado: boolean) {
   }).resultado;
 }
 
-describe("caixa Frete destacado — o frete sai ou não do resultado", () => {
+describe("caixa Frete destacado — manda no resultado E no imposto", () => {
   for (const caso of CASOS) {
-    it(`${caso.nome}: MARCADA → o frete não reduz o resultado`, () => {
+    it(`${caso.nome}: MARCADA → não reduz o resultado, mas é tributado`, () => {
       const r = rodar(caso, true);
       expect(r.frete.toString()).toBe("0");
       expect(r.freteInformado.toString()).toBe(caso.frete); // fica registrado para auditoria
+      expect(r.impostoFrete.toString()).toBe(dec(caso.aliquota).times(caso.frete).toString());
     });
 
-    it(`${caso.nome}: EM BRANCO → o frete inteiro sai do resultado`, () => {
+    it(`${caso.nome}: EM BRANCO → sai inteiro do resultado e NÃO é tributado`, () => {
       const r = rodar(caso, false);
       expect(r.frete.toString()).toBe(caso.frete);
+      expect(r.impostoFrete.toString()).toBe("0");
     });
 
-    it(`${caso.nome}: a diferença de receita líquida entre os dois é o frete cheio`, () => {
+    // A regra do Bryan escrita como ele a enunciou: sobre o TOTAL das duas
+    // linhas de imposto, que é o que a nota fiscal enxerga.
+    it(`${caso.nome}: o imposto total é a regra do Bryan, nos dois estados`, () => {
+      const comDestaque = rodar(caso, true);
+      const semDestaque = rodar(caso, false);
+      expect(comDestaque.imposto.plus(comDestaque.impostoFrete).toString()).toBe(
+        dec(caso.aliquota).times(dec(caso.receita).plus(caso.frete)).toString()
+      );
+      expect(semDestaque.imposto.plus(semDestaque.impostoFrete).toString()).toBe(
+        dec(caso.aliquota).times(caso.receita).toString()
+      );
+    });
+
+    // Marcar a caixa devolve o frete ao resultado, mas cobra o imposto dele.
+    it(`${caso.nome}: marcar a caixa vale frete × (1 − alíquota)`, () => {
       const diferenca = rodar(caso, true).receitaLiquida.minus(rodar(caso, false).receitaLiquida);
-      expect(diferenca.toString()).toBe(caso.frete);
-    });
-
-    // A planilha cobra o imposto sobre o frete nos dois estados da caixa.
-    // REGRA DO BRYAN: aqui é onde ela mudaria — com a caixa em branco, o
-    // esperado passaria a ser "0".
-    it(`${caso.nome}: imposto sobre o frete é cobrado nos dois casos (planilha)`, () => {
-      const esperado = dec(caso.aliquota).times(caso.frete).toString();
-      expect(rodar(caso, true).impostoFrete.toString()).toBe(esperado);
-      expect(rodar(caso, false).impostoFrete.toString()).toBe(esperado);
+      expect(diferenca.toString()).toBe(dec(caso.frete).times(dec("1").minus(caso.aliquota)).toString());
     });
 
     // DIFAL e comissão seguem `receita + frete informado` nos dois estados
-    // (decisões de 18/08/2026). Sem isto, um erro no par de flags passaria
-    // despercebido: são as duas linhas que NÃO mudam com a caixa.
+    // (decisões de 18/08/2026). São as duas linhas que NÃO mudam com a caixa —
+    // sem isto, um erro no par de flags passaria despercebido.
     it(`${caso.nome}: DIFAL e comissão não mudam com a caixa`, () => {
       const marcada = rodar(caso, true);
       const branco = rodar(caso, false);
@@ -125,6 +134,15 @@ describe("caixa Frete destacado — o frete sai ou não do resultado", () => {
       expect(marcada.comissao.toString()).toBe(branco.comissao.toString());
       expect(marcada.baseDifal.toString()).toBe(base.toString());
       expect(marcada.baseComissao.toString()).toBe(base.toString());
+    });
+
+    // O tamanho exato da divergência que sobra contra a planilha, para quando
+    // o Bryan ajustar a célula N7 e a conferência voltar a fechar em tudo.
+    it(`${caso.nome}: a planilha cobra alíquota × frete a mais quando não destacado`, () => {
+      const naPlanilha = dec(caso.aliquota).times(caso.frete);
+      const noSistema = rodar(caso, false).impostoFrete;
+      expect(noSistema.toString()).toBe("0");
+      expect(naPlanilha.minus(noSistema).toString()).toBe(naPlanilha.toString());
     });
   }
 
@@ -137,21 +155,31 @@ describe("caixa Frete destacado — o frete sai ou não do resultado", () => {
   });
 });
 
-// O orçamento da aba `Patricia` de 20/08/2026, reproduzido inteiro: é o caso em
-// que o cliente pegou a divergência, e o que fecha a conferência da §3.10/§3.12.
-describe("ORC-2026-0041 reproduz a aba Patricia com o frete em branco", () => {
+// O ORC-2026-0041 (aba `Patricia`, 20/08/2026) é o pedido em que o cliente
+// pegou a divergência. Aqui ele fica inteiro, com a diferença para a planilha
+// isolada numa linha só.
+describe("ORC-2026-0041 — Oclusor 700 un a R$ 3,60, BA, frete R$ 82,00 em branco", () => {
   const caso = CASOS[1];
 
-  it("receita líquida 1.598,855 e margem 41,4601786% — os números da planilha", () => {
+  it("bate com a planilha em tudo, menos no imposto sobre o frete", () => {
     const r = rodar(caso, false);
-    expect(r.frete.toString()).toBe("82");
-    expect(r.impostoFrete.toString()).toBe("13.325");
-    expect(r.imposto.toString()).toBe("409.5");
-    expect(r.difal.toString()).toBe("351.27");
-    expect(r.comissao.toString()).toBe("65.05");
-    expect(r.receitaLiquida.toString()).toBe("1598.855");
-    // A planilha mostra 0,4146017863 na célula N16.
-    expect(toPercent(r.margemContribuicaoPct)).toBe("41.46");
-    expect(r.margemContribuicaoPct.toFixed(10)).toBe("0.4146017863");
+    expect(toMoney(r.receitaBruta)).toBe("2520.00"); // planilha F24
+    expect(toMoney(r.frete)).toBe("82.00"); // planilha N6, descontado por N12 = 0
+    expect(toMoney(r.imposto)).toBe("409.50"); // planilha N8
+    expect(toMoney(r.difal)).toBe("351.27"); // planilha N9
+    expect(toMoney(r.comissao)).toBe("65.05"); // planilha N10
+    // Planilha N7 = 13,325. Aqui é zero, pela regra do Bryan: o frete não está
+    // na nota. É a única linha em que os dois discordam.
+    expect(toMoney(r.impostoFrete)).toBe("0.00");
+    expect(toMoney(r.receitaLiquida)).toBe("1612.18"); // planilha N14 = 1.598,855
+    expect(toPercent(r.margemContribuicaoPct)).toBe("41.94"); // planilha N16 = 41,46%
+  });
+
+  it("a diferença para a planilha é exatamente 16,25% × 82,00", () => {
+    const r = rodar(caso, false);
+    const receitaLiquidaDaPlanilha = dec("1598.855");
+    expect(r.receitaLiquida.minus(receitaLiquidaDaPlanilha).toString()).toBe(
+      dec("0.1625").times("82").toString()
+    );
   });
 });

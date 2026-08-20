@@ -119,10 +119,17 @@ describe("Camada 4 — pedido completo", () => {
   // exemplo. Histórico: comissão 420,00 / DIFAL 2.268,00 / RL 10.219,50 /
   // margem 39,82%  →  comissão 445,00 / DIFAL 2.403,00 / RL 10.059,50 /
   // margem 38,86%.
+  // ⚠️ 21/08/2026: `tributarFreteInformado: true` passou a ser EXPLÍCITO aqui.
+  // Nenhum número mudou — este golden test descreve a cascata da PLANILHA
+  // (Calculations.md §6), onde o frete pago pela Intertec é deduzido E
+  // tributado. Antes o motor tributava por omissão; agora a flag é quem manda,
+  // porque a regra do Bryan (áudio de 19/08/2026) exige o caso "deduz e NÃO
+  // tributa" para o frete não destacado, que a aplicação usa. Ver `params.ts`.
   it("T6 — pedido UF BA: receita líquida 10.059,50 e margem 38,86%", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
+      tributarFreteInformado: true, // cascata da planilha: deduz E tributa
       aliquotaImposto: "0.1625", // ICSM BA = 16,25%
       aliquotaDifal: "0.135",    // DIFAL BA = 13,5%
       aliquotaComissao: "0.025",
@@ -147,6 +154,7 @@ describe("Camada 4 — pedido completo", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
+      tributarFreteInformado: true, // cascata da planilha, igual ao T6
       aliquotaImposto: "0.2725", // ICSM SP = 27,25% (venda interna)
       aliquotaDifal: "0",        // SP não tem DIFAL
       aliquotaComissao: "0.025",
@@ -518,12 +526,34 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       itens: [itemAvental],
       frete: "1000",
       fretePorContaCliente: false,
+      tributarFreteInformado: true, // igual ao T6: cascata da planilha
       aliquotaImposto: "0.1625",
       aliquotaDifal: "0.135",
       aliquotaComissao: "0.025",
     });
     esperarProximo(r.receitaLiquida, "10059.50");
     expect(toPercent(r.margemContribuicaoPct)).toBe("38.86");
+  });
+
+  // T14c — a combinação que a APLICAÇÃO usa desde 21/08/2026 para o frete não
+  // destacado, pela regra do Bryan: o frete sai do resultado e NÃO é tributado,
+  // porque não aparece na nota fiscal. É o T6 sem os 162,50 de imposto sobre
+  // frete — a diferença exata entre a regra da empresa e a da planilha.
+  it("T14c — frete não destacado: deduz o frete e NÃO tributa (regra do Bryan)", () => {
+    const r = calcularPedido({
+      itens: [itemAvental],
+      frete: "1000",
+      fretePorContaCliente: false,
+      tributarFreteInformado: false,
+      aliquotaImposto: "0.1625",
+      aliquotaDifal: "0.135",
+      aliquotaComissao: "0.025",
+    });
+    esperarProximo(r.frete, "1000");
+    esperarProximo(r.impostoFrete, "0");
+    // 10.059,50 do T6 + os 162,50 que a planilha cobra a mais.
+    esperarProximo(r.receitaLiquida, "10222");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.83");
   });
 
   // ============================================================

@@ -109,7 +109,18 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   // entre parênteses que o cliente devolve o frete. Corrigido em 04/08/2026.
   const freteInformado = dec(p.frete);
   const frete = p.fretePorContaCliente ? zero : freteInformado;
-  const baseImpostoFrete = p.tributarFreteInformado ? freteInformado : frete;
+  // Duas perguntas independentes, e cada flag responde uma:
+  //
+  //   fretePorContaCliente  → o frete SAI do resultado?
+  //   tributarFreteInformado → o frete é TRIBUTADO?
+  //
+  // Antes de 21/08/2026 a segunda linha era `tributar ? freteInformado : frete`,
+  // e com isso um frete deduzido era tributado de qualquer jeito — não havia
+  // como pedir "deduz e NÃO tributa", que é a regra ditada pelo Bryan em áudio
+  // (19/08/2026) para o frete não destacado: se ele não aparece na nota, não há
+  // o que tributar. Quem quiser o comportamento da planilha (deduz E tributa)
+  // pede as duas coisas explicitamente — é o que o golden test T6 faz.
+  const baseImpostoFrete = p.tributarFreteInformado ? freteInformado : zero;
 
   const aliquotaImposto = dec(p.aliquotaImposto);
   const impostoFrete = aliquotaImposto.times(baseImpostoFrete);

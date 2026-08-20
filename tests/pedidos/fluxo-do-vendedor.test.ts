@@ -168,16 +168,16 @@ describe("pedido só com produtos individuais", () => {
     expect(toMoney(s.resultado.imposto)).toBe("2851.88"); // 16,25%
     expect(toMoney(s.resultado.difal)).toBe("2504.25"); // 13,5% × (17.550 + 1.000 de frete)
     expect(toMoney(s.resultado.comissao)).toBe("463.75"); // 2,5% × (17.550 + 1.000 de frete)
-    // Frete desmarcado = a Intertec paga o transporte: sai do resultado E é
-    // tributado, como na planilha (decisão de 21/08/2026, docs/16 §3.12).
+    // Frete desmarcado = a Intertec paga o transporte: sai do resultado e não
+    // é tributado (regra do Bryan, 19/08/2026 — golden T14c).
     expect(toMoney(s.resultado.frete)).toBe("1000.00");
-    expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10567.63");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10730.13");
     // CMV: 4000 × 1,537605 + 500 × 0,412
     expect(toMoney(s.resultado.cmvTotal)).toBe("6356.42");
-    expect(toMoney(s.resultado.margemContribuicao)).toBe("4211.21");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("39.85");
-    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS_MARGEM)?.label).toBe("Atenção");
+    expect(toMoney(s.resultado.margemContribuicao)).toBe("4373.71");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("40.76");
+    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS_MARGEM)?.label).toBe("Boa");
   });
 
   it("grava um item por linha, com o id do produto", () => {
@@ -477,14 +477,16 @@ describe("escolhas do vendedor que mudam a conta", () => {
   // mandava `fretePorContaCliente: true` fixo, então o frete nunca saía do
   // resultado — nem quando quem pagava o transporte era a Intertec. A planilha
   // sempre desceu o frete nesse caso (`N12 = 0`), e é ela que manda.
-  it("frete desmarcado é custo da Intertec: sai do resultado e é tributado", () => {
+  it("frete desmarcado é custo da Intertec: sai do resultado e não é tributado", () => {
     const s = montarPedido(base).simulacao!;
     expect(toMoney(s.freteUsado)).toBe("1000.00");
     expect(toMoney(s.resultado.frete)).toBe("1000.00");
-    expect(toMoney(s.resultado.impostoFrete)).toBe("162.50");
-    // Marcar a caixa devolve os R$ 1.000 ao resultado — e só eles.
+    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
+    // Marcar a caixa devolve os R$ 1.000 ao resultado, mas cobra os 162,50 de
+    // imposto sobre o frete que passa a aparecer na nota: sobram 837,50.
     const destacado = montarPedido({ ...base, fretePorContaCliente: true }).simulacao!;
-    expect(destacado.resultado.receitaLiquida.minus(s.resultado.receitaLiquida).toString()).toBe("1000");
+    expect(toMoney(destacado.resultado.impostoFrete)).toBe("162.50");
+    expect(destacado.resultado.receitaLiquida.minus(s.resultado.receitaLiquida).toString()).toBe("837.5");
   });
 
   it("DIFAL desmarcado no pedido vale mais que o padrão do canal", () => {

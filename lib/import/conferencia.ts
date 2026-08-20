@@ -155,7 +155,12 @@ export function conferirPedido(
       // ela o conferidor zerava o imposto sobre frete em toda aba com a caixa
       // marcada e acusava uma divergência que a aplicação não tem — seis das
       // doze abas saíam erradas no relatório do cliente.
-      tributarFreteInformado: pedido.deducoes.freteCliente,
+      // SEMPRE true: este conferidor reproduz a PLANILHA, e lá a linha
+      // `N7 = alíquota × N6` cobra o imposto sobre o frete com ou sem o "X".
+      // O sistema segue a regra do Bryan e não cobra no caso não destacado
+      // (ver `params.ts`) — é uma divergência conhecida, de `alíquota × frete`,
+      // e quem a aponta é o relatório de conferência, não este cálculo.
+      tributarFreteInformado: true,
       aliquotaImposto: icsm,
       aliquotaDifal: canal.aplicaDifal ? aliquotaDifal(tabelas, ufNormalizada) : new Decimal(0),
       aliquotaComissao: canal.aliquotaComissao,

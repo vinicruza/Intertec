@@ -475,18 +475,19 @@ e é por isso que só elas batem com o sistema.
 "Imposto" — e aí o par de linhas passa a implementar a regra do Bryan sozinho, porque a linha
 "Imposto Frete" só é preenchida quando o frete está destacado.
 
-### ⚠️ Atualização de 21/08/2026
+### O que o áudio NÃO responde
 
-A conferência acima foi feita ANTES da decisão de seguir a planilha (§3.12). Depois dela, o sistema
-passou a cobrar o imposto sobre o frete **também** quando a caixa está em branco — como a planilha
-faz. A regra do Bryan continua valendo para o caso **destacado**, e ficou pendente para o caso **não
-destacado**. Os números da tabela acima seguem corretos para a coluna "destacado"; para "não
-destacado", ver a §3.12.
+O áudio trata da **base do imposto**. Ele não diz se o frete **sai do resultado** quando quem paga é
+a Intertec — outra linha da cascata, resolvida na §3.12 em 21/08/2026. As duas coisas são
+independentes, e hoje as duas estão implementadas: o imposto pela regra do Bryan, a dedução pela
+planilha.
 
-## 3.12 Frete não destacado passa a sair do resultado — RESOLVIDO em 21/08
+## 3.12 A caixa "Frete destacado" manda no resultado E no imposto — RESOLVIDO em 21/08
 
 Achado em 20/08 varrendo o caminho de fechamento com o login de cada vendedora.
-**Decisão do cliente em 21/08/2026: seguir a planilha.** Implementado no mesmo dia, nos dois lados.
+**Decisão de 21/08/2026:** onde há posicionamento claro da empresa, ele vale; a planilha vale no
+resto. Para o frete há posicionamento — o áudio do Bryan de 19/08 (§3.11b). Implementado no mesmo
+dia, nos dois lados.
 
 ### O defeito
 
@@ -502,14 +503,29 @@ isso o fechamento reconciliava e ninguém percebeu.
 
 ### O que mudou
 
+A mesma caixa passa a mandar nas duas pontas:
+
 | | Frete sai do resultado? | Imposto sobre o frete? |
 |---|---|---|
-| Caixa **marcada** (destacado, o cliente paga) | não | sim |
-| Caixa **em branco** (a Intertec paga) | **sim** ← mudou | sim |
+| Caixa **marcada** (destacado, está na nota) | não | **sim** |
+| Caixa **em branco** (não aparece na nota) | **sim** ← mudou | **não** ← regra do Bryan |
 
-O imposto sobre o frete continua nos dois casos, porque na planilha a linha `N7 = alíquota × N6` não
-olha o "X". É o mesmo modelo do `Calculations.md` §6 e do **golden test T6** — frete de R$ 1.000,00
-pago pela Intertec: deduz 1.000 E cobra 162,50 de imposto.
+A dedução do frete vem da planilha; o imposto vem do áudio do Bryan. **A planilha ainda cobra o
+imposto sobre o frete nos dois casos** — a linha `N7 = alíquota × N6` não olha o "X", e ele mesmo
+disse no áudio que *"na planilha eu não consegui configurar qual é a forma correta"*. Correção lá:
+
+```
+N7 = SE(N11="X"; alíquota × N6; 0)
+```
+
+Enquanto isso, a planilha cobra `alíquota × frete` a mais em pedido não destacado — SP 14,99 ·
+BA 13,33 · PR 40,38 nos orçamentos conferidos.
+
+Os golden tests passaram a descrever as duas cascatas, no mesmo pedido-fixture:
+
+- **T6** — a da planilha: frete de R$ 1.000,00 deduzido **e** tributado em 162,50. Inalterado; só
+  ganhou `tributarFreteInformado: true` explícito na entrada.
+- **T14c** (novo) — a da empresa: o mesmo frete deduzido e **não** tributado. RL 10.222,00.
 
 Alterado em `app/lib/sim/params.ts` e na migração
 `20260821120000_frete_nao_destacado_sai_do_resultado.sql`, na mesma entrega. Os dois TÊM de andar
@@ -518,17 +534,18 @@ casados: o fechamento recusa o pedido quando os totais da tela não reconciliam 
 Sete testes que travavam o comportamento antigo foram reescritos (`fixture-patricia`, `snapshot`,
 `fluxo-do-vendedor`). Nenhum golden test precisou mudar — o T6 já dizia o certo desde sempre.
 
-### O ORC-2026-0041 agora fecha igual à planilha
+### O ORC-2026-0041 depois da mudança
 
-O orçamento do Oclusor (700 un a R$ 3,60, BA, frete R$ 82,00 em branco) passa a dar
-**41,4601786%** — o `0,4146017863` da célula N16 da aba `Patricia`, na oitava casa decimal. Travado
-em teste (`tests/calc/frete-destacado.test.ts`).
+O orçamento do Oclusor (700 un a R$ 3,60, BA, frete R$ 82,00 em branco) passa a dar **41,94%**
+contra os 41,46% da planilha. Bate linha a linha em receita, imposto, DIFAL e comissão; a única
+diferença é o imposto sobre o frete — 13,325 na planilha, zero aqui, pela regra do Bryan. Travado em
+teste (`tests/calc/frete-destacado.test.ts`).
 
 ### Os 11 pedidos já fechados com margem otimista
 
 Snapshot é imutável (Decisão D7), então nada mudou retroativamente. Mas ficam registrados:
 
-| Pedido | Cliente | UF | Frete | Margem gravada | Pela regra nova | Diferença |
+| Pedido | Cliente | UF | Frete | Margem gravada | Só descontando o frete | Diferença |
 |---|---|---|---|---|---|---|
 | ORC-2026-0010 | INSTITUTO DR JOSE CARLOS PORTELA | MA | 380,00 | 67,25% | 51,37% | **15,88 pts** |
 | ORC-2026-0008 | C & J CLINICA MEDICA | SP | 140,00 | 61,54% | 51,18% | 10,36 pts |
@@ -546,28 +563,22 @@ Quatro deles (0008, 0016, 0043, 0020) estavam acima de 50% e passariam a ficar a
 teriam ido para aprovação em vez de fechar direto. Vale reabrir e refechar se a empresa quiser o
 histórico correto; é decisão dela, e são 11 pedidos.
 
-### O que continua em aberto: o áudio do Bryan
+(A coluna do meio isola só o efeito da dedução do frete; o imposto sobre o frete já era cobrado
+antes e continua sendo nesses pedidos, todos com a caixa em branco — ali a mudança do imposto joga a
+favor e devolve `alíquota × frete`.)
 
-O áudio de 19/08/2026 pede outra coisa para o imposto:
+### Onde mora a regra, para quando ela mudar
 
-> "Se o frete não estiver destacado na nota, ou seja, se ele não aparecer na nota fiscal, o imposto
-> deve ser calculado **somente sobre o valor do pedido**."
+| | arquivo | linha |
+|---|---|---|
+| motor | `lib/calculations/order.ts` | `baseImpostoFrete = tributar ? freteInformado : zero` |
+| tela | `app/lib/sim/params.ts` | `fretePorContaCliente` e `tributarFreteInformado`, os dois = caixa |
+| banco | `close_order_with_snapshots` | `v_freight_out` e `v_freight_tax` |
+| conferidor da planilha | `lib/import/conferencia.ts` | `tributarFreteInformado: true` (fixo — reproduz a planilha) |
 
-Pela regra dele, a linha "Imposto sobre o frete" deveria ser **zero** quando a caixa está em branco.
-A planilha não faz isso, e no mesmo áudio ele diz: *"na planilha eu não consegui configurar qual é a
-forma correta"*. Como a decisão de 21/08 foi seguir a planilha, o sistema segue a planilha.
-
-**Enquanto isso, a diferença é exatamente `alíquota × frete` em pedido com a caixa em branco.**
-Nos três orçamentos conferidos: SP 14,99 · BA 13,33 · PR 40,38.
-
-Se a empresa fechar pela regra do Bryan, a correção é de uma linha em cada lado:
-
-- planilha: `N7 = SE(N11="X"; alíquota × N6; 0)`
-- sistema: `tributarFreteInformado: freteDestacado` em `params.ts` **e**
-  `v_freight_tax := case when v_order.freight_paid_by_customer then v_tax_rate*p_freight else 0 end`
-  na função de fechamento — as duas na mesma entrega.
-
-Os testes que mudariam estão marcados com `REGRA DO BRYAN` em `tests/calc/frete-destacado.test.ts`.
+As três primeiras mudam **na mesma entrega**: o fechamento recusa o pedido quando os totais da tela
+não reconciliam com os do banco. A quarta é o conferidor, que existe para apontar a diferença — ele
+segue a planilha de propósito.
 
 ## 3.13 Os 4 kits do catálogo estão sem embalagem nenhuma
 
@@ -622,6 +633,63 @@ O custo da embalagem vem certo do servidor para o perfil Comercial (era o proble
 para aprovação não fecha mais sozinho — a auto-aprovação por margem exige `approval_status =
 'rascunho'`. Na tela isso não acontece, porque só pedido vermelho ou amarelo é enviado. Fica anotado
 caso a régua de aprovação mude.
+
+## 3.13 A planilha mudou 12 preços de insumo em 20/08 — o banco não recebeu
+
+Achado em 21/08 conferindo o orçamento **CENTRO DA VISAO / DF / Camila**.
+
+Comparando a planilha de hoje com a de ontem, **202 dos 358 produtos mudaram de CMV**, todos para
+baixo. A causa está em 12 insumos:
+
+| Insumo | Sistema | Planilha hoje | Diferença | Data na planilha |
+|---|---|---|---|---|
+| Bobina Laminado m² | 1,464300 | 1,298250 | −0,166050 | 04/05/2026 |
+| Bobina SMS 30 gr m² | 0,784800 | 0,654000 | −0,130800 | 04/05/2026 |
+| Bobina TNT Branco 40gr m² | 0,895600 | 0,756400 | −0,139200 | 04/05/2026 |
+| Bobina TNT Branco 30gr m² | 0,671700 | 0,567300 | −0,104400 | 04/05/2026 |
+| Bobina TNT Azul 40gr m² | 0,940000 | 0,854400 | −0,085600 | 04/05/2026 |
+| Bobina TNT Azul 30gr m² | 0,705000 | 0,640800 | −0,064200 | 04/05/2026 |
+| **Linha** | 57,610000 | **61,280500** | **+3,670500** | **20/08/2026** |
+| Campo com Fenestra TNT GR 40 1,40 x 2,00 | 1,994745 | 1,684709 | −0,310036 | 10/03/2026 |
+| Campo com Fenestra TNT GR 30 1,40 x 2,00 | 1,496059 | 1,263532 | −0,232527 | 10/03/2026 |
+| Campo com Fenestra TNT GR 40 1,40 x 0,60 | 0,598424 | 0,505413 | −0,093011 | 10/03/2026 |
+| Campo com Fenestra TNT GR 30 1,40 x 0,60 | 0,448818 | 0,379060 | −0,069758 | 10/03/2026 |
+| Perneira | 2,697786 | 2,425796 | −0,271990 | 10/03/2026 |
+
+Os quatro "Campo com Fenestra" e a Perneira são intermediários que derivam das bobinas — caíram por
+consequência. **A mudança de raiz são as 6 bobinas e a Linha.**
+
+⚠️ **Só a Linha teve a "Data atualização" mexida** (20/08/2026). As seis bobinas continuam marcadas
+com 04/05/2026 e os intermediários com 10/03/2026, embora os valores tenham mudado. Ou a data não
+foi atualizada junto, ou a edição ainda está em andamento — **precisa de confirmação antes de
+espelhar no banco.**
+
+### O efeito no orçamento CENTRO DA VISAO (DF, frete R$ 300,00 destacado)
+
+| | Sistema | Planilha |
+|---|---|---|
+| Receita (600 × 7,40) | 4.440,00 | 4.440,00 |
+| (−) Imposto sobre o frete (16,25% × 300) | 48,75 | 48,75 |
+| (−) Imposto sobre a venda (16,25% × 4.440) | 721,50 | 721,50 |
+| (−) DIFAL DF (13% × 4.740) | 616,20 | 616,20 |
+| (−) Comissão (2,5% × 4.740) | 118,50 | 118,50 |
+| **Receita líquida** | **2.935,05** | **2.935,05** |
+| CMV unitário | **2,448351394** | **2,263432076** |
+| (−) CMV total | **1.469,01** | **1.358,06** |
+| **Margem** | **49,95%** 🟡 | **53,73%** 🟢 |
+
+**A cascata bate à perfeição — as cinco linhas de dedução são idênticas, incluindo o imposto sobre o
+frete (a aba `Camila` já foi corrigida para `alíquota × F24`).** A única diferença é o CMV:
+R$ 110,95, que é `0,184919 × 600`.
+
+É esta a explicação de "no simulador a margem está dando menor que na planilha": não é fórmula, é
+**base de custo desatualizada**. E o efeito é grande — 3,78 pontos neste pedido, o bastante para
+trocar o selo de Verde para Amarelo e mandar o pedido para aprovação.
+
+### O que precisa ser feito
+
+Espelhar os 12 preços em `inputs`. Não foi feito ainda porque muda o CMV de 202 produtos em produção
+de uma vez, e as datas não confirmam a edição. Depende da resposta do Bryan.
 
 ## 4. O que ainda precisa acontecer antes de liberar
 

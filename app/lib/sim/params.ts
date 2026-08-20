@@ -90,10 +90,23 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
   //             resultado, como qualquer outro custo. Na planilha é `N12 = 0`,
   //             e o `N14 = F24 - SOMA(N6:N12)` desconta o frete inteiro.
   //
-  // O imposto sobre o frete é cobrado nos DOIS casos, porque na planilha a
-  // linha `N7 = alíquota × N6` não olha o "X". É o mesmo que o Calculations.md
-  // §6 descreve e o golden test T6 trava (frete de R$ 1.000 pago pela Intertec:
-  // deduz 1.000 E cobra 162,50 de imposto).
+  // O IMPOSTO sobre o frete segue a regra ditada pelo Bryan em áudio
+  // (19/08/2026), que é o posicionamento da empresa:
+  //
+  //   "Se o frete estiver destacado na nota, o imposto deve ser calculado sobre
+  //    o valor do pedido MAIS o frete. Se o frete não estiver destacado, ou
+  //    seja, se ele não aparecer na nota fiscal, o imposto deve ser calculado
+  //    SOMENTE sobre o valor do pedido."
+  //
+  // Ou seja: a mesma caixa manda nas duas coisas. Marcada → não deduz e
+  // tributa; em branco → deduz e não tributa.
+  //
+  // A planilha ainda cobra o imposto sobre o frete nos dois casos (a linha
+  // `N7 = alíquota × N6` não olha o "X"), e o próprio Bryan disse no áudio que
+  // "na planilha eu não consegui configurar qual é a forma correta". Onde há
+  // posicionamento claro da empresa, ele vale; a planilha vale no resto.
+  // Enquanto a planilha não for ajustada, ela cobra `alíquota × frete` a mais
+  // em pedido não destacado. Correção lá: `N7 = SE(N11="X"; alíquota × N6; 0)`.
   //
   // Até 21/08/2026 esta linha mandava `fretePorContaCliente: true` fixo, e por
   // isso o frete NUNCA saía do resultado — a margem do simulador ficava melhor
@@ -105,9 +118,7 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     itens: itensCalculados,
     frete: freteUsado,
     fretePorContaCliente: freteDestacado,
-    // Sempre: quem decide se o frete é tributado é a planilha, e ela tributa
-    // nos dois casos. Ver o bloco acima.
-    tributarFreteInformado: true,
+    tributarFreteInformado: freteDestacado,
     aliquotaImposto: entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,

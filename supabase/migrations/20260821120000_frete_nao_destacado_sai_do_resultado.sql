@@ -1,14 +1,13 @@
 -- ============================================================
--- Frete destacado define se o frete SAI do resultado — igual à planilha
--- Decisão do cliente em 21/08/2026. Registro: docs/16 §3.12.
+-- Frete destacado: a mesma caixa manda no RESULTADO e no IMPOSTO
+-- Regra ditada pelo Bryan em áudio (19/08/2026). Registro: docs/16 §3.12.
 -- ============================================================
 --
 -- A caixa "Frete destacado" da tela é a coluna "Frete Cliente" da planilha:
 --
---   MARCADA   → o cliente paga o transporte. O frete não reduz o resultado,
---               mas continua sendo tributado.
---   EM BRANCO → a Intertec paga o transporte. O frete reduz o resultado E
---               continua sendo tributado.
+--   MARCADA   → o frete está NA NOTA. Não reduz o resultado, e é tributado.
+--   EM BRANCO → o frete NÃO aparece na nota. Reduz o resultado como qualquer
+--               custo, e não há o que tributar.
 --
 -- O defeito corrigido: `v_net` nunca subtraía `p_freight`. A margem de todo
 -- pedido em que a Intertec paga o frete saía melhor do que a real — no
@@ -18,12 +17,9 @@
 -- casadas: este fechamento recusa o pedido quando os totais enviados pela tela
 -- não reconciliam com os que ele recalcula.
 --
--- PENDÊNCIA: o áudio do Bryan de 19/08/2026 pede que, com o frete NÃO
--- destacado, o imposto saia só sobre o pedido — o que zeraria `v_freight_tax`
--- neste caso. A planilha não faz isso (a linha N7 não olha o "X") e o próprio
--- Bryan disse no áudio que "na planilha eu não consegui configurar qual é a
--- forma correta". Fica como está até a empresa fechar a regra; quando fechar,
--- muda aqui e em `params.ts` na mesma entrega.
+-- Onde há posicionamento claro da empresa, ele vale; a planilha vale no resto.
+-- Aqui há: o áudio do Bryan de 19/08/2026. A planilha é que está atrasada nesta
+-- linha, e a diferença é `alíquota × frete` em pedido não destacado.
 
 create or replace function public.close_order_with_snapshots(
   p_order_id uuid,
@@ -140,14 +136,16 @@ begin
   --       qualquer outro custo. Na planilha é `N12 = 0`, e o
   --       `N14 = F24 - SOMA(N6:N12)` desconta o frete inteiro.
   --
-  -- O imposto sobre o frete é cobrado NOS DOIS casos, porque a linha
-  -- `N7 = alíquota × N6` da planilha não olha o "X". Mesmo modelo do
-  -- Calculations.md §6 e do golden test T6.
-  --
   -- Antes de 21/08/2026 o frete nunca saía do resultado aqui — o mesmo defeito
   -- que a tela tinha, e por isso os dois reconciliavam no fechamento.
+  --
+  -- A planilha ainda cobra o imposto sobre o frete nos dois casos (a linha
+  -- `N7 = alíquota × N6` não olha o "X"); o próprio Bryan disse no áudio que
+  -- "na planilha eu não consegui configurar qual é a forma correta". Correção
+  -- lá: `N7 = SE(N11="X"; alíquota × N6; 0)`. Golden tests: T6 descreve a
+  -- cascata da planilha, T14c a da empresa.
   v_freight_out := case when v_order.freight_paid_by_customer then 0 else p_freight end;
-  v_freight_tax := v_tax_rate*p_freight;
+  v_freight_tax := case when v_order.freight_paid_by_customer then v_tax_rate*p_freight else 0 end;
 
   -- Base de venda + frete informado: vale para o DIFAL (§6.3) e para a comissão
   -- (§6.2). Antes de 18/08/2026 as duas saíam só sobre v_gross.
