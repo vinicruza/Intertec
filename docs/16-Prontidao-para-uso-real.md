@@ -350,13 +350,78 @@ Abas ainda com o imposto em dobro em 20/08 (reconferido na versão de hoje da pl
 `Isabela`, `Suellen`, `Priscilene`, `Nathalia`, `Mari`, `Externos`, `Revendas`, `Edmilson` e
 `Descpro` — esta última com a alíquota própria de 6,5% (`=$N$37*(F24+N6)`) e sem linha de DIFAL.
 
-### O único caso em que o sistema dá margem MENOR que a planilha
+### O caso do kit montado
 
-É o **kit montado**. Na planilha a vendedora escolhe `Kit Aleatório`, que carrega um CMV médio fixo
-(2,026695). O sistema soma o custo real dos itens que ela colocou no kit. Quando o kit real é mais
-caro que a média, o sistema mostra a margem verdadeira — menor — e a planilha mostra a aproximação.
-É o comportamento esperado, e é a razão de o sistema existir. Exemplos vivos em 20/08: aba `Suellen`
-marca 82,11% e a aba `Priscilene` marca 51,34%, ambas com `Kit Aleatório`.
+Na planilha a vendedora escolhe `Kit Aleatório` (2,026695) além de listar os componentes. O que esse
+número é de verdade está detalhado na §3.11 — não é uma média, é um jogo FIXO de embalagem.
+
+## 3.11 O que é o "Kit Aleatório" da planilha — e o teste do pedido INOVE (PR)
+
+**Descoberta de 20/08: `Kit Aleatório` não é uma média nem uma aproximação. É um jogo FIXO de
+embalagem, e o sistema reproduz o número dele exatamente.**
+
+Na planilha, `Alocação Despesa!B329` puxa o CMV de `Kit Aleatório` da coluna `Input Preço!$AEA`.
+Abrindo essa coluna, a composição é:
+
+| Insumo | Quantidade | Custo |
+|---|---|---|
+| Envelope 30x40 | 1 por kit | 0,82836 |
+| Caixa 6 | 1 ÷ 30 | 0,33271 |
+| Esterilização Horizont | 1 ÷ 30 | 0,7906667 |
+| Etiquetinha | 1 por kit | 0,0089583 |
+| Gráfica | 1 por kit | 0,0660000 |
+| **Total** | | **2,026695** |
+
+É exatamente o modelo que o sistema passou a usar em 19/08 (envelope unitário, caixa e esterilização
+rateadas por envelopes-por-caixa, etiquetinha e gráfica automáticas). Rodando `custoKitCompleto` com
+essas cinco linhas, o sistema devolve **2,02669500** — bate na sexta casa.
+
+Ou seja: os dois lados calculam a embalagem do kit da MESMA forma. A diferença é que na planilha esse
+jogo é fixo para todo kit montado, e no sistema a vendedora escolhe o envelope, a caixa e quantos
+envelopes cabem nela.
+
+### O teste: INOVE / PR / Isabela
+
+Kit de 100 unidades a R$ 33,75 (receita R$ 3.375,00), frete R$ 190,00 destacado, PR (ICSM 21,25%,
+DIFAL 7,5%). Composição por kit: 2 Compressa Wiper Não Estéril, 2 Avental Não Estéril, 1 Campo de
+Mesa 1,30 x 1,70 Não Estéril, 1 Campo Simples 1,00 x 1,20 Não Estéril GR30.
+
+| | Sistema (mesma embalagem da planilha) | Planilha |
+|---|---|---|
+| Receita | 3.375,00 | 3.375,00 |
+| (−) Imposto sobre o frete (21,25% × 190) | 40,38 | 40,38 |
+| (−) Imposto sobre a venda | **717,19** = 21,25% × **3.375** | **757,56** = 21,25% × **3.565** |
+| (−) DIFAL (7,5% × 3.565) | 267,38 | 267,38 |
+| (−) Comissão (2,5% × 3.565) | 89,13 | 89,13 |
+| **Receita líquida** | **2.260,94** | **2.220,56** |
+| (−) CMV | 1.145,29 | 1.146,47 |
+| **Margem** | **49,34% 🟡** | **48,37%** |
+
+Sobram duas diferenças, as duas explicadas:
+
+1. **R$ 40,38 no imposto** — é `21,25% × 190`, o imposto sobre o frete cobrado duas vezes (§2.5). A
+   aba `Isabela` é uma das 10 que ainda não foram corrigidas. Terceiro pedido seguido em que a
+   diferença é exatamente esse valor.
+2. **R$ 1,19 no CMV** — o `Avental Não Estéril` está 0,005934 mais caro na planilha (2,817356975)
+   que no banco (2,811423). É **menos de um centavo por unidade**, abaixo da tolerância de R$ 0,01
+   do `conferir:base`, por isso nunca apareceu na conferência. A diferença é constante em toda a
+   família Avental, então é um insumo compartilhado com preço levemente diferente — vale investigar,
+   mas não muda decisão nenhuma (0,035% do pedido).
+
+### O achado que importa neste pedido: esterilização num kit Não Estéril
+
+Os quatro componentes deste kit são **Não Estéril**, mas o `Kit Aleatório` carrega
+`Esterilização Horizont` embutida — R$ 0,79 por kit, **R$ 79,07 no pedido**. A planilha não tem como
+tirar: o jogo é fixo. No sistema a vendedora desmarca a esterilização, e aí:
+
+| | CMV do pedido | Margem | Selo |
+|---|---|---|---|
+| Com esterilização (igual à planilha) | 1.145,29 | 49,34% | 🟡 Amarela |
+| Sem esterilização (correto para Não Estéril) | 1.066,22 | **52,84%** | 🟢 Verde |
+
+**É essa a razão de o sistema existir para kits montados**: não é dar um número diferente, é deixar a
+vendedora montar a embalagem que o kit realmente usa em vez de pagar por uma esterilização que não
+aconteceu.
 
 ## 4. O que ainda precisa acontecer antes de liberar
 
