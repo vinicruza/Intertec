@@ -310,6 +310,54 @@ com compressa, e como `Avental M` nas versões com Tag — mesma costureira e me
 mesmo tamanho escrito de duas formas. Confunde na hora de cotar. É assim na planilha também;
 padronizar é só renomear, sem efeito nenhum no custo.
 
+## 3.10 ORC-2026-0041 (Oclusor / BA) — o selo amarelo de 20/08
+
+**Conclusão: a conta do sistema e a da planilha são a mesma. O que mudou foi o frete digitado.**
+
+O pedido do dia 20/08 às 11h (700 Oclusor a R$ 3,60 = R$ 2.520,00, destino BA) foi gravado no
+sistema **sem frete** (R$ 0,00). A aba `Patricia` da planilha tem o mesmo orçamento **com frete de
+R$ 82,00 por conta da Intertec** (a marca "X" de Frete Cliente está vazia).
+
+| | Sistema (frete R$ 0,00) | Planilha (frete R$ 82,00) |
+|---|---|---|
+| Receita | 2.520,00 | 2.520,00 |
+| (−) Frete | 0,00 | 82,00 |
+| (−) Imposto sobre o frete | 0,00 | 13,325 |
+| (−) Imposto sobre a venda (16,25%) | 409,50 | 409,50 |
+| (−) DIFAL BA (13,5%) | 340,20 | 351,27 |
+| (−) Comissão (2,5%) | 63,00 | 65,05 |
+| **Receita líquida** | **1.707,30** | **1.598,855** |
+| (−) CMV (700 × 1,337095516) | 935,966861 | 935,966861 |
+| **Margem de contribuição** | **45,178536%** | **41,460179%** |
+
+Digitando o frete de R$ 82,00 no sistema **do mesmo jeito** (frete da Intertec, sem marcar
+"Frete destacado"), o motor devolve **41,460179%** — bate com o `0,4146017863` da planilha até a
+oitava casa decimal. Não há divergência de fórmula neste pedido: há um campo que ficou em branco.
+
+Ou seja: neste orçamento **a planilha é que dá a margem menor**, não o sistema. Com o frete lançado
+no sistema, os dois ficam em 41,46% — continua no selo **Amarelo** (faixa de 40% a 50%), só que
+3,7 pontos pior do que ficou gravado.
+
+### Por que esta aba se comporta diferente das outras três conferências
+
+A aba `Patricia` (e a `Temporaria Patricia`) **já foram corrigidas**: o imposto agora é
+`alíquota × F24`, sem somar o frete. As outras **10 abas continuam com o erro** da §2.5
+(`alíquota × (F24 + N6)`), e é por isso que nas conferências anteriores (Revendas/Seguemed,
+HOFTALMO, OLHO CLINICA) a planilha sempre dava margem **menor** que o sistema, na proporção exata de
+`alíquota × frete`.
+
+Abas ainda com o imposto em dobro em 20/08 (reconferido na versão de hoje da planilha): `Camila`,
+`Isabela`, `Suellen`, `Priscilene`, `Nathalia`, `Mari`, `Externos`, `Revendas`, `Edmilson` e
+`Descpro` — esta última com a alíquota própria de 6,5% (`=$N$37*(F24+N6)`) e sem linha de DIFAL.
+
+### O único caso em que o sistema dá margem MENOR que a planilha
+
+É o **kit montado**. Na planilha a vendedora escolhe `Kit Aleatório`, que carrega um CMV médio fixo
+(2,026695). O sistema soma o custo real dos itens que ela colocou no kit. Quando o kit real é mais
+caro que a média, o sistema mostra a margem verdadeira — menor — e a planilha mostra a aproximação.
+É o comportamento esperado, e é a razão de o sistema existir. Exemplos vivos em 20/08: aba `Suellen`
+marca 82,11% e a aba `Priscilene` marca 51,34%, ambas com `Kit Aleatório`.
+
 ## 4. O que ainda precisa acontecer antes de liberar
 
 Os itens de **dados** estão fechados. Sobram os de **regra fiscal** e os de **planilha**:
