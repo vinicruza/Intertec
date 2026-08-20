@@ -1250,10 +1250,6 @@ function MontadorKit({
       grafica: auto.find((i) => /gr[áa]fica/i.test(i.nome))?.id,
     };
   }, [ctx.insumosEmbalagem]);
-  const automaticosDoKit = ctx.insumosEmbalagem
-    .filter((i) => i.papel === "automatico")
-    .map((i) => i.nome);
-
   // A escolha é DERIVADA das linhas gravadas: `kit.embalagem` segue sendo a
   // única fonte de verdade, então não há estado paralelo para dessincronizar
   // ao reabrir uma cotação salva.
@@ -1530,15 +1526,6 @@ function MontadorKit({
             </select>
           </div>
         </div>
-
-        {/* As automáticas aparecem, mas não se mexe nelas. Custo escondido foi
-            a origem de metade dos problemas desta semana: a vendedora precisa
-            ver que o kit leva etiqueta e gráfica, mesmo sem poder alterar. */}
-        {automaticosDoKit.length > 0 && (
-          <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-xs text-[var(--cor-texto-suave)]">
-            Entram sozinhas, 1 por kit: <strong>{automaticosDoKit.join(" e ")}</strong>.
-          </p>
-        )}
 
         {escolhaEmbalagem.envelopesPorCaixa.trim() === "" &&
           (escolhaEmbalagem.caixaId || escolhaEmbalagem.esterilizacaoId) && (
