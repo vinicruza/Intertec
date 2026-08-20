@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { resolverKitDoPedido, type CatalogoParaKit, linhasDaEmbalagem, EMBALAGEM_VAZIA } from "@app/lib/sim/kitNoPedido";
+import {
+  resolverKitDoPedido,
+  type CatalogoParaKit,
+  linhasDaEmbalagem,
+  escolhaDasLinhas,
+  EMBALAGEM_VAZIA,
+  type PapelNoKit,
+} from "@app/lib/sim/kitNoPedido";
 import { assinaturaKitCompleta, type CustoProdutoKit } from "@calc";
 
 // Kit montado dentro do pedido (reunião Intertech 16/07/2026).
@@ -233,10 +240,45 @@ describe("embalagem escolhida pela vendedora", () => {
     expect(new Set(rateadas.map((x) => x.quantidade)).size).toBe(1);
   });
 
-  it("sem o número de envelopes por caixa, caixa e esterilização NÃO entram", () => {
-    // Entrar sem rateio cobraria uma caixa inteira em cada kit.
+  // Este teste mudou em 20/08/2026. Antes ele exigia que a caixa e a
+  // esterilização NÃO virassem linha sem o número — e era isso que travava o
+  // formulário da vendedora: a escolha dela é lida de volta das linhas, então a
+  // caixa voltava sozinha para "Selecione…" e o número se apagava ao ser
+  // digitado. A garantia que importa nunca foi "não virar linha", e sim "não
+  // entrar no custo sem rateio". É essa que o teste passa a cobrar.
+  it("caixa escolhida sem o número vira linha (para a tela lembrar), com quantidade vazia", () => {
     const l = linhasDaEmbalagem({ ...escolha, envelopesPorCaixa: "" }, AUTO);
-    expect(l.some((x) => x.modo === "itensPorCaixa")).toBe(false);
+    const rateadas = l.filter((x) => x.modo === "itensPorCaixa");
+    expect(rateadas.map((x) => x.insumoId)).toEqual(["caixa6", "horizont"]);
+    expect(rateadas.every((x) => x.quantidade === "")).toBe(true);
+  });
+
+  it("a escolha volta inteira das linhas mesmo pela metade — o formulário não se apaga", () => {
+    const papeis = new Map<string, PapelNoKit | null>([
+      ["env30x40", "envelope"],
+      ["caixa6", "caixa"],
+      ["horizont", "esterilizacao"],
+      ["etiq", "automatico"],
+      ["graf", "automatico"],
+    ]);
+    // Caixa escolhida, número ainda em branco: era exatamente aqui que a tela
+    // devolvia caixaId vazio e a vendedora não conseguia sair do lugar.
+    const meio = { ...escolha, esterilizacaoId: "", envelopesPorCaixa: "" };
+    expect(escolhaDasLinhas(linhasDaEmbalagem(meio, AUTO), papeis)).toEqual(meio);
+    // E com o número preenchido depois, continua batendo.
+    const cheio = { ...escolha, envelopesPorCaixa: "30" };
+    expect(escolhaDasLinhas(linhasDaEmbalagem(cheio, AUTO), papeis)).toEqual(cheio);
+  });
+
+  it("linha de caixa sem o número NÃO entra no custo — nada de caixa inteira por kit", () => {
+    // A garantia original, agora cobrada onde ela de fato vale: no cálculo.
+    const r = resolverKitDoPedido(
+      [{ produtoId: "avental", quantidade: "1" }],
+      linhasDaEmbalagem({ envelopeId: "envelope", caixaId: "caixa", esterilizacaoId: "", envelopesPorCaixa: "" }, {}),
+      { ...catalogo(), custoEmbalagemPorChave: new Map([["envelope|porKit|1", "0.51802"]]) }
+    );
+    expect(r.linhasEmbalagem.map((x) => x.insumoId)).toEqual(["envelope"]);
+    expect(r.cmvUnitario).toBe("4.561171"); // 4,043151 do avental + 0,51802 do envelope, sem centavo de caixa
   });
 
   it("etiquetinha entra sempre; gráfica só acompanha o envelope", () => {

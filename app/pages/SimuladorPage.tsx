@@ -1280,6 +1280,7 @@ function MontadorKit({
   // única fonte de verdade, então não há estado paralelo para dessincronizar
   // ao reabrir uma cotação salva.
   const escolhaEmbalagem = escolhaDasLinhas(kit.embalagem, papelPorInsumo);
+  const temCaixaOuEsterilizacao = Boolean(escolhaEmbalagem.caixaId || escolhaEmbalagem.esterilizacaoId);
   const mudarEmbalagem = (mud: Partial<EmbalagemEscolhida>) =>
     aoMudar((k) => ({
       ...k,
@@ -1514,17 +1515,6 @@ function MontadorKit({
           </div>
 
           <div>
-            <Label>Envelopes por caixa</Label>
-            <Input
-              value={escolhaEmbalagem.envelopesPorCaixa}
-              onChange={(ev) => mudarEmbalagem({ envelopesPorCaixa: ev.target.value })}
-            />
-            <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
-              divide a caixa e a esterilização
-            </span>
-          </div>
-
-          <div>
             <Label>Caixa de esterilização</Label>
             <select
               className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
@@ -1550,6 +1540,27 @@ function MontadorKit({
                 <option key={i.id} value={i.id}>{i.nome}</option>
               ))}
             </select>
+            <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
+              deixe em branco se o kit não é estéril
+            </span>
+          </div>
+
+          {/* Depois da caixa de propósito: o número é "quantos envelopes cabem
+              NESTA caixa", então só faz sentido depois de dizer qual é ela — e
+              é onde o número fica guardado. */}
+          <div>
+            <Label>Envelopes por caixa</Label>
+            <Input
+              value={escolhaEmbalagem.envelopesPorCaixa}
+              disabled={!temCaixaOuEsterilizacao}
+              onChange={(ev) => mudarEmbalagem({ envelopesPorCaixa: ev.target.value })}
+              className={temCaixaOuEsterilizacao ? undefined : "bg-slate-50 text-slate-400"}
+            />
+            <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
+              {temCaixaOuEsterilizacao
+                ? "divide a caixa e a esterilização"
+                : "escolha antes a caixa ou a esterilizadora"}
+            </span>
           </div>
         </div>
 

@@ -81,15 +81,24 @@ export function linhasDaEmbalagem(
   if (escolha.envelopeId) {
     linhas.push({ insumoId: escolha.envelopeId, modo: "porKit", quantidade: "1" });
   }
-  // Caixa e esterilização só entram com o número preenchido: sem ele não há
-  // como ratear, e entrar sem rateio cobraria uma caixa inteira por kit.
-  if (porCaixa !== "") {
-    if (escolha.caixaId) {
-      linhas.push({ insumoId: escolha.caixaId, modo: "itensPorCaixa", quantidade: porCaixa });
-    }
-    if (escolha.esterilizacaoId) {
-      linhas.push({ insumoId: escolha.esterilizacaoId, modo: "itensPorCaixa", quantidade: porCaixa });
-    }
+  // A caixa e a esterilização entram assim que são escolhidas, MESMO sem o
+  // número de envelopes por caixa — a linha sai com quantidade vazia.
+  //
+  // Antes elas só entravam com o número preenchido, e isso travava o
+  // formulário: a escolha da vendedora é lida de volta DESTAS linhas
+  // (`escolhaDasLinhas`), então a caixa que não virava linha voltava para
+  // "Selecione…" no mesmo instante, e o número — que só existe na linha da
+  // caixa — se apagava enquanto ela digitava. Nenhum dos dois campos podia ser
+  // preenchido primeiro. Relatado pela Isa em 20/08/2026.
+  //
+  // A linha incompleta não chega ao cálculo: quem consome (`resolverKitDoPedido`,
+  // a busca de custo e a gravação) descarta linha com quantidade vazia, e a
+  // tela avisa em amarelo que falta o número.
+  if (escolha.caixaId) {
+    linhas.push({ insumoId: escolha.caixaId, modo: "itensPorCaixa", quantidade: porCaixa });
+  }
+  if (escolha.esterilizacaoId) {
+    linhas.push({ insumoId: escolha.esterilizacaoId, modo: "itensPorCaixa", quantidade: porCaixa });
   }
 
   // Etiquetinha entra sempre; gráfica acompanha o envelope, porque é a
