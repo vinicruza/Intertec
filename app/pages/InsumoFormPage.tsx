@@ -15,6 +15,7 @@ import {
 import { reais, dataCurta } from "../lib/format";
 import { toMoney } from "@calc";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 const esquema = z.object({
   name: z.string().min(1, "Informe o nome."),
@@ -93,7 +94,7 @@ export default function InsumoFormPage() {
       queryClient.invalidateQueries({ queryKey: ["insumos"] });
       navigate("/insumos");
     },
-    onError: (e: unknown) => setErroSalvar(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErroSalvar(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
   return (

@@ -9,6 +9,7 @@ import {
 import { mesAtual } from "../lib/periodo";
 import { reais } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 // ============================================================
 // Vendas do ERP e consumo de insumos (reunião Intertech 16/07/2026)
@@ -44,7 +45,7 @@ export default function VendasConsumoPage() {
       queryClient.invalidateQueries({ queryKey: ["vendasImportadas", periodo] });
       queryClient.invalidateQueries({ queryKey: ["consumoPeriodo", periodo] });
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao importar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao importar.")),
   });
 
   const vendas = vendasQuery.data ?? [];
@@ -179,7 +180,7 @@ export default function VendasConsumoPage() {
         {consumoQuery.isLoading && <p className="p-4 text-[var(--cor-texto-suave)]">Calculando…</p>}
         {consumoQuery.error && (
           <p className="p-4 text-sm text-red-700">
-            {consumoQuery.error instanceof Error ? consumoQuery.error.message : "Erro ao calcular o consumo."}
+            {mensagemDeErro(consumoQuery.error, "Erro ao calcular o consumo.")}
           </p>
         )}
         {(consumoQuery.data ?? []).length === 0 && !consumoQuery.isLoading && (

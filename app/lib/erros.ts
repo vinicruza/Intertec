@@ -45,9 +45,137 @@ export function traduzErro(msg: string | null | undefined): string {
 // com os dados do pedido" virou "Erro ao gerar pedido." na tela do vendedor, e
 // a causa (uma migração pendente) só apareceu no log do banco.
 export function mensagemDeErro(e: unknown, padrao: string): string {
+  const doBanco = traduzErroDoBanco(e);
+  if (doBanco) return doBanco;
   if (e instanceof Error && pareceFrase(e.message)) return e.message;
   if (e && typeof e === "object" && "message" in e && typeof e.message === "string" && pareceFrase(e.message)) {
     return e.message;
   }
   return padrao;
+}
+
+// ============================================================
+// Erro do banco → frase que a vendedora entende
+// ------------------------------------------------------------
+// O Postgres recusa com o NOME da trava, em inglês e em jargão. Em 19/08/2026
+// uma vendedora digitou "42" no CEP e levou na tela:
+//
+//   new row for relation "orders" violates check constraint
+//   "orders_shipping_zip_formato"
+//
+// Não diz o que fazer, não diz quantos dígitos faltam, não diz que o campo pode
+// ficar em branco. Aqui cada trava alcançável por um formulário vira uma frase
+// que aponta o campo e a saída.
+//
+// O que NÃO está nesta lista cai no genérico por tipo de erro (§ FALLBACK), que
+// ainda é melhor do que o texto cru: diz a natureza do problema em português.
+// ============================================================
+
+const POR_TRAVA: Record<string, string> = {
+  // ---- Pedido ----
+  orders_shipping_zip_formato:
+    "O CEP de entrega precisa ter 8 dígitos. Deixe em branco para usar o CEP do cadastro do cliente.",
+  orders_volumes_check: "A quantidade de volumes precisa ser maior que zero.",
+  orders_weight_kg_check: "O peso precisa ser maior que zero.",
+  orders_payment_term_days_check: "O prazo de pagamento não pode ser negativo.",
+  order_items_quantity_check: "A quantidade de cada item precisa ser maior que zero.",
+  order_items_unit_price_check: "O preço de venda não pode ser negativo.",
+  order_items_one_ref:
+    "Cada linha do pedido tem de ser um produto OU um kit — não os dois. Refaça a linha.",
+
+  // ---- Cadastro de cliente ----
+  customers_tax_id_formato: "O CNPJ precisa ter 14 dígitos e o CPF, 11. Confira o número digitado.",
+  customers_billing_zip_formato: "O CEP de faturamento precisa ter 8 dígitos.",
+  customers_shipping_zip_formato: "O CEP de entrega precisa ter 8 dígitos.",
+  customers_billing_state_formato: "O estado de faturamento é a sigla com 2 letras — por exemplo SP.",
+  customers_shipping_state_formato: "O estado de entrega é a sigla com 2 letras — por exemplo SP.",
+  customers_phone_formato: "O telefone precisa ter 10 ou 11 dígitos, com o DDD.",
+  customers_commercial_phone_formato: "O telefone comercial precisa ter 10 ou 11 dígitos, com o DDD.",
+  customers_financial_phone_formato: "O telefone do financeiro precisa ter 10 ou 11 dígitos, com o DDD.",
+
+  // ---- Kit ----
+  kit_items_quantity_check: "A quantidade de cada produto do kit precisa ser maior que zero.",
+  kit_items_kit_id_product_id_key:
+    "Este produto já está no kit. Some na quantidade da linha existente em vez de repetir o produto.",
+  kit_packaging_quantity_check: "A quantidade da embalagem precisa ser maior que zero.",
+  kit_packaging_quantity_shape:
+    "Falta dizer quantos envelopes cabem na caixa. Sem esse número não há como ratear o custo.",
+  kit_packaging_kit_id_input_id_key: "Este item de embalagem já foi escolhido para o kit.",
+  kits_tenant_id_signature_key:
+    "Já existe um kit com esta composição. O sistema vai reaproveitar o código dele em vez de criar outro.",
+
+  // ---- Produto e insumo ----
+  products_tenant_id_code_key: "Já existe um produto com este código.",
+  product_categories_tenant_id_name_key: "Já existe uma categoria com este nome.",
+  product_categories_tenant_id_prefix_key: "Já existe uma categoria com este prefixo de código.",
+  product_categories_prefix_check:
+    "O prefixo da categoria tem de 2 a 3 caracteres, começando por letra maiúscula — por exemplo CS ou AVC.",
+  product_components_computed_quantity_check:
+    "A quantidade consumida precisa ser maior que zero. Confira largura, comprimento e rendimento.",
+  product_cmv_overrides_cmv_check: "O custo informado precisa ser maior que zero.",
+  inputs_icms_rate_check: "O ICMS do insumo precisa ficar entre 0% e 100%.",
+  inputs_pis_cofins_rate_check: "O PIS/COFINS do insumo precisa ficar entre 0% e 100%.",
+
+  // ---- Tabelas fiscais e parâmetros ----
+  icsm_rates_icms_rate_check: "O ICMS precisa ficar entre 0% e 100%.",
+  icsm_rates_pis_cofins_rate_check: "O PIS/COFINS precisa ficar entre 0% e 100%.",
+  icsm_rates_tenant_id_uf_key: "Esta UF já está na tabela de ICMS.",
+  difal_rates_final_rate_check: "O DIFAL precisa ficar entre 0% e 100%.",
+  difal_rates_tenant_id_uf_key: "Esta UF já está na tabela de DIFAL.",
+  portal_freight_rates_freight_percent_check: "O percentual de frete precisa ficar entre 0% e 100%.",
+  portal_freight_rates_tenant_id_uf_key: "Esta UF já está na tabela de frete do portal.",
+  channels_default_commission_rate_check: "A comissão precisa ficar entre 0% e 100%.",
+  approval_settings_block_below_margin_check: "A margem mínima precisa ficar entre 0% e 100%.",
+
+  // ---- Listas de referência ----
+  carriers_tenant_id_name_key: "Já existe uma transportadora com este nome.",
+  payment_terms_tenant_id_label_key: "Já existe uma condição de pagamento com este nome.",
+  loss_reasons_tenant_id_label_key: "Já existe um motivo de perda com este nome.",
+  customer_types_tenant_id_name_key: "Já existe um tipo de cliente com este nome.",
+  customer_specialties_tenant_id_name_key: "Já existe uma especialidade com este nome.",
+  nf_naming_rules_tenant_id_match_prefix_key: "Já existe uma regra de nomenclatura para este prefixo.",
+
+  // ---- Despesas ----
+  expense_allocations_estimated_production_check: "A produção estimada não pode ser negativa.",
+  expense_allocations_complexity_factor_check: "O fator de complexidade não pode ser negativo.",
+  external_sales_quantity_check: "A quantidade vendida precisa ser maior que zero.",
+};
+
+// A mensagem do Postgres traz o nome da trava entre aspas.
+function nomeDaTrava(texto: string): string | null {
+  const m = /constraint "([^"]+)"/i.exec(texto) ?? /"([a-z0-9_]+_(?:key|check|formato|shape|ref))"/i.exec(texto);
+  return m ? m[1] : null;
+}
+
+export function traduzErroDoBanco(e: unknown): string | null {
+  if (!e || typeof e !== "object") return null;
+  const erro = e as { message?: unknown; code?: unknown; details?: unknown };
+  const texto = [erro.message, erro.details].filter((x) => typeof x === "string").join(" ");
+  if (!texto) return null;
+
+  const trava = nomeDaTrava(texto);
+  if (trava && POR_TRAVA[trava]) return POR_TRAVA[trava];
+
+  // FALLBACK por tipo de erro. Sem a frase exata, ao menos diz a natureza do
+  // problema em português — e nunca despeja o nome da trava na tela.
+  const code = typeof erro.code === "string" ? erro.code : "";
+  if (code === "23505" || /duplicate key|já existe/i.test(texto)) {
+    return "Já existe um registro com estes dados. Confira se não está cadastrando algo repetido.";
+  }
+  if (code === "23503") {
+    return "Este registro está em uso em outro lugar do sistema e não pode ser removido ou alterado assim.";
+  }
+  if (code === "23502") {
+    return "Falta preencher um campo obrigatório.";
+  }
+  if (code === "23514" || /violates check constraint/i.test(texto)) {
+    return "Algum campo está fora do formato esperado. Confira os dados digitados.";
+  }
+  if (code === "42501" || /row-level security|permission denied/i.test(texto)) {
+    return "Seu perfil de acesso não permite esta ação. Fale com o administrador.";
+  }
+  if (/failed to fetch|networkerror|load failed/i.test(texto)) {
+    return "Sem conexão com o servidor. Confira a internet e tente de novo.";
+  }
+  return null;
 }

@@ -21,6 +21,7 @@ import {
   telefoneValido,
 } from "../../lib/cadastro/documentos";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 // ============================================================
 // Cadastro do cliente (formulário de pedido — 05/08/2026)
@@ -253,7 +254,7 @@ export default function ClienteFormPage() {
         commercial_email: a.commercial_email || (dados.email ?? ""),
       }));
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não consegui consultar esse CNPJ agora.");
+      setErro(mensagemDeErro(e, "Não consegui consultar esse CNPJ agora."));
     } finally {
       setBuscandoCnpj(false);
     }
@@ -276,7 +277,7 @@ export default function ClienteFormPage() {
         uf: tipo === "billing" && dados.state ? dados.state : a.uf,
       }));
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não consegui consultar esse CEP agora.");
+      setErro(mensagemDeErro(e, "Não consegui consultar esse CEP agora."));
     } finally {
       setBuscandoCep(null);
     }
@@ -334,7 +335,7 @@ export default function ClienteFormPage() {
       queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
       navigate("/clientes");
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
   if (!novo && isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;

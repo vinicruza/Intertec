@@ -22,6 +22,7 @@ import {
 } from "../lib/db/cadastros";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 import AbaNomenclaturaNF from "./AbaNomenclaturaNF";
+import { mensagemDeErro } from "../lib/erros";
 
 // ============================================================
 // Cadastros — listas de referência do sistema
@@ -119,7 +120,7 @@ function AbaSegmento({
     queryClient.invalidateQueries({ queryKey: ["tiposCliente"] });
     queryClient.invalidateQueries({ queryKey: ["areasCliente"] });
   };
-  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: (item: Parameters<typeof salvarSegmento>[1]) => salvarSegmento(tabela, item),
@@ -261,7 +262,7 @@ function AbaMotivos() {
     queryClient.invalidateQueries({ queryKey: ["motivosCadastro"] });
     queryClient.invalidateQueries({ queryKey: ["motivosPerda"] });
   };
-  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: salvarMotivo,
@@ -367,7 +368,7 @@ function AbaCategorias() {
       setErro(null);
       queryClient.invalidateQueries({ queryKey: ["categoriasProduto"] });
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
   if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
@@ -445,7 +446,7 @@ function AbaTransportadoras() {
     // O simulador carrega a lista junto com o resto do contexto.
     queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
   };
-  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: salvarTransportadora,
@@ -560,7 +561,7 @@ function AbaModosPagamento() {
     queryClient.invalidateQueries({ queryKey: ["modosPagamento"] });
     queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
   };
-  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: salvarModoPagamento,

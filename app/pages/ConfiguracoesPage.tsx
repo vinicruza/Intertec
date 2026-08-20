@@ -28,6 +28,7 @@ import {
 } from "../lib/db/aprovacao";
 import type { Perfil } from "../lib/roles";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 type Aba = "canais" | "margem" | "aprovacao" | "codigoErp" | "icsm" | "difal" | "portal";
 
@@ -278,12 +279,12 @@ function AbaCodigoErp() {
   const salvar = useMutation({
     mutationFn: (p: ParametrosCodigoErp) => salvarParametrosCodigoErp(p),
     onSuccess: () => { setErro(null); queryClient.invalidateQueries({ queryKey: ["paramsCodigoErp"] }); },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
   });
   const gerar = useMutation({
     mutationFn: gerarCodigosErp,
     onSuccess: (n) => { setErro(null); setResultado(`${n} código(s) gerado(s).`); },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao gerar códigos."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao gerar códigos.")),
   });
 
   if (isLoading || !atual) return <Carregando />;

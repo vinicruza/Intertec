@@ -24,6 +24,7 @@ import { reais, percentual } from "../lib/format";
 import { useAuth } from "../auth/AuthProvider";
 import { perfilPodeEditarProduto } from "../lib/roles";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 const ID_EDITANDO = "__editando__";
 
@@ -272,8 +273,12 @@ function CampoQtd({ label, reg }: { label: string; reg: UseFormRegisterReturn })
 
 // A validação de referência circular é do banco (trigger). Traduz a mensagem.
 function mensagemErro(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/circular|ciclo/i.test(msg)) return "Referência circular: um produto não pode conter a si mesmo (direta ou indiretamente).";
-  if (/duplicate key|unique/i.test(msg)) return "Já existe um produto com este código.";
-  return msg;
+  // Duas regras próprias desta tela; o resto sai da tradução comum, que já
+  // conhece as travas do banco e nunca despeja o nome delas na tela.
+  const cru = e instanceof Error ? e.message : String(e);
+  if (/circular|ciclo/i.test(cru)) {
+    return "Referência circular: um produto não pode conter a si mesmo (direta ou indiretamente).";
+  }
+  if (/duplicate key|unique/i.test(cru)) return "Já existe um produto com este código.";
+  return mensagemDeErro(e, "Não foi possível salvar o produto.");
 }

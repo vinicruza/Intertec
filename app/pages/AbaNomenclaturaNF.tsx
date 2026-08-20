@@ -11,6 +11,7 @@ import {
 } from "../lib/db/nomenclaturaNF";
 import { listarProdutos } from "../lib/db/produtos";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
+import { mensagemDeErro } from "../lib/erros";
 
 // ============================================================
 // Cadastros → Nomenclatura NF
@@ -61,7 +62,7 @@ export default function AbaNomenclaturaNF() {
     setErro(null);
     queryClient.invalidateQueries({ queryKey: ["familiasNF"] });
   };
-  const aoErrar = (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao salvar.");
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: salvarFamiliaNF,

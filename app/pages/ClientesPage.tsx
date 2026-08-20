@@ -9,6 +9,7 @@ import {
   listarTiposCliente,
 } from "../lib/db/clientes";
 import { formatarCnpjCpf, somenteDigitos } from "../../lib/cadastro/documentos";
+import { mensagemDeErro } from "../lib/erros";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
 
 // ============================================================
@@ -41,7 +42,7 @@ export default function ClientesPage() {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["pendenciaClientes"] });
     },
-    onError: (e: unknown) => setErro(e instanceof Error ? e.message : "Erro ao categorizar."),
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao categorizar.")),
   });
 
   const tipos = tiposQuery.data ?? [];

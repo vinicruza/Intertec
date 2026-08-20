@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mensagemDeErro, traduzErro } from "@app/lib/erros";
+import { mensagemDeErro, traduzErro, traduzErroDoBanco } from "@app/lib/erros";
 
 // A tela de login já mostrou "{}" para um usuário real: o serviço de
 // autenticação falhou por dentro, devolveu corpo vazio, e a mensagem crua foi
@@ -62,5 +62,69 @@ describe("mensagemDeErro", () => {
     expect(mensagemDeErro(new Error(""), "padrão")).toBe("padrão");
     expect(mensagemDeErro(null, "padrão")).toBe("padrão");
     expect(mensagemDeErro("texto solto", "padrão")).toBe("padrão");
+  });
+});
+
+// O Postgres recusa com o NOME da trava, em inglês e em jargão. Cada trava
+// alcançável por um formulário precisa virar uma frase que aponta o campo e a
+// saída — nunca o nome da trava na tela da vendedora.
+describe("traduzErroDoBanco", () => {
+  const doBanco = (message: string, code = "23514") => ({ message, code, details: null, hint: null });
+
+  it("traduz o CEP do pedido — o caso que originou a revisão", () => {
+    const e = doBanco(
+      'new row for relation "orders" violates check constraint "orders_shipping_zip_formato"'
+    );
+    expect(traduzErroDoBanco(e)).toBe(
+      "O CEP de entrega precisa ter 8 dígitos. Deixe em branco para usar o CEP do cadastro do cliente."
+    );
+  });
+
+  it("traduz CNPJ, telefone e quantidade", () => {
+    expect(traduzErroDoBanco(doBanco('violates check constraint "customers_tax_id_formato"'))).toMatch(
+      /CNPJ precisa ter 14 dígitos/
+    );
+    expect(traduzErroDoBanco(doBanco('violates check constraint "customers_phone_formato"'))).toMatch(
+      /10 ou 11 dígitos, com o DDD/
+    );
+    expect(traduzErroDoBanco(doBanco('violates check constraint "order_items_quantity_check"'))).toMatch(
+      /maior que zero/
+    );
+  });
+
+  it("nunca deixa o nome da trava chegar à tela", () => {
+    const nomes = [
+      "orders_shipping_zip_formato",
+      "customers_tax_id_formato",
+      "kit_packaging_quantity_shape",
+      "products_tenant_id_code_key",
+    ];
+    for (const nome of nomes) {
+      const saida = traduzErroDoBanco(doBanco(`violates check constraint "${nome}"`));
+      expect(saida).not.toBeNull();
+      expect(saida).not.toContain(nome);
+      expect(saida).not.toMatch(/constraint|relation|violates/i);
+    }
+  });
+
+  it("trava desconhecida ainda sai em português, sem jargão", () => {
+    const saida = traduzErroDoBanco(doBanco('violates check constraint "trava_que_nao_mapeei"'));
+    expect(saida).toBe("Algum campo está fora do formato esperado. Confira os dados digitados.");
+  });
+
+  it("registro repetido, campo obrigatório e permissão têm cada um a sua frase", () => {
+    expect(traduzErroDoBanco(doBanco("duplicate key value", "23505"))).toMatch(/já existe um registro/i);
+    expect(traduzErroDoBanco(doBanco("null value in column", "23502"))).toMatch(/campo obrigatório/i);
+    expect(traduzErroDoBanco(doBanco("permission denied", "42501"))).toMatch(/perfil de acesso/i);
+  });
+
+  it("erro que não é do banco passa direto", () => {
+    expect(traduzErroDoBanco(new Error("Cotação incompleta."))).toBeNull();
+    expect(traduzErroDoBanco(null)).toBeNull();
+  });
+
+  it("mensagemDeErro usa a tradução antes de qualquer outra coisa", () => {
+    const e = doBanco('violates check constraint "orders_volumes_check"');
+    expect(mensagemDeErro(e, "Erro ao salvar.")).toBe("A quantidade de volumes precisa ser maior que zero.");
   });
 });

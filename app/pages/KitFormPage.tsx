@@ -11,6 +11,7 @@ import { perfilPodeAcessar } from "../lib/roles";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBusca";
+import { mensagemDeErro } from "../lib/erros";
 
 type ItemEdicao = { produtoId: string; quantidade: string };
 // Envelope e caixas de esterilização: consumidos UMA vez por kit montado
@@ -175,7 +176,7 @@ export default function KitFormPage() {
       navigate("/kits");
     },
     onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : "Erro ao salvar kit.";
+      const msg = mensagemDeErro(e, "Erro ao salvar kit.");
       setErro(/unique|duplicate/i.test(msg) ? "Já existe um kit com esta composição (assinatura única)." : msg);
     },
   });
@@ -199,7 +200,7 @@ export default function KitFormPage() {
   }
 
   if (editando && kitQuery.isError) {
-    const msg = kitQuery.error instanceof Error ? kitQuery.error.message : "Nao foi possivel carregar o kit.";
+    const msg = mensagemDeErro(kitQuery.error, "Não foi possível carregar o kit.");
     return (
       <Card className="max-w-3xl space-y-3">
         <h1 className="text-xl font-semibold">Erro ao abrir kit</h1>

@@ -9,6 +9,7 @@ import {
   type UsuarioAdmin,
 } from "../lib/db/usuarios";
 import { SENHA_MINIMA, senhaSugerida } from "../lib/senha";
+import { mensagemDeErro } from "../lib/erros";
 import { NOME_PERFIL, nomePerfil, type Perfil } from "../lib/roles";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta } from "../lib/format";
@@ -36,7 +37,7 @@ export default function UsuariosPage() {
 
   function comoErro(e: unknown, padrao: string) {
     setAviso(null);
-    setErro(e instanceof Error ? e.message : padrao);
+    setErro(mensagemDeErro(e, padrao));
   }
 
   const salvar = useMutation({
@@ -111,7 +112,7 @@ export default function UsuariosPage() {
       {isLoading && <p className="text-[var(--cor-texto-suave)]">Carregando…</p>}
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error instanceof Error ? error.message : "Não foi possível carregar os usuários."}
+          {mensagemDeErro(error, "Não foi possível carregar os usuários.")}
         </p>
       )}
 
