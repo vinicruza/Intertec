@@ -47,7 +47,7 @@ import {
   percentualParaFracao,
   reais,
 } from "../lib/format";
-import { formatarCep } from "../../lib/cadastro/documentos";
+import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBusca";
 
@@ -78,6 +78,10 @@ const CORES: Record<string, string> = {
 function textoDeCampo(valor: unknown, padrao = ""): string {
   if (valor === null || valor === undefined) return padrao;
   return String(valor);
+}
+
+function somenteDigitosDoCep(valor: string): string {
+  return String(valor ?? "").replace(/\D/g, "");
 }
 
 function normalizarNome(valor: string): string {
@@ -378,6 +382,20 @@ export default function SimuladorPage() {
       if (simulacao.estado !== "ok" || !vendedor || !canal || !ctx) throw new Error("Cotação incompleta.");
       if (pendenciasKit.length > 0) throw new Error(pendenciasKit.join(" "));
 
+      // CEP: o banco exige 8 dígitos ou nada. Sem esta checagem o erro só
+      // aparecia depois de gravar, e aparecia cru — em 19/08/2026 uma
+      // vendedora digitou "42" e levou na tela
+      // 'new row for relation "orders" violates check constraint
+      // "orders_shipping_zip_formato"', que não diz o que fazer.
+      // Em branco continua valendo: nesse caso usa-se o CEP do cadastro.
+      const cepDigitos = somenteDigitosDoCep(cepEntrega);
+      if (cepDigitos !== "" && !cepValido(cepDigitos)) {
+        throw new Error(
+          `O CEP de entrega precisa ter 8 dígitos — você digitou ${cepDigitos.length}. ` +
+            "Deixe em branco para usar o CEP do cadastro do cliente."
+        );
+      }
+
       const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
 
       // A foto da cotação vai junto na versão, para a análise do que não vingou.
@@ -410,7 +428,7 @@ export default function SimuladorPage() {
         fretesCotados,
         pesoKg,
         volumes,
-        cepEntrega,
+        cepEntrega: cepDigitos === "" ? null : cepDigitos,
         modoPagamentoId: modoPagamentoId || null,
         prazoPagamentoDias: null,
         observacao,
@@ -1072,6 +1090,14 @@ export default function SimuladorPage() {
                   : "00000-000"
               }
             />
+            {/* Avisa enquanto digita, não no "Salvar": o banco exige 8 dígitos,
+                e o erro dele chega cru na tela. */}
+            {cepEntrega.trim() !== "" && !cepValido(cepEntrega) && (
+              <p className="mt-1 text-xs text-amber-700">
+                O CEP precisa ter 8 dígitos — faltam{" "}
+                {8 - String(cepEntrega).replace(/\D/g, "").length}.
+              </p>
+            )}
             {/* Só se digita aqui quando a entrega foge do endereço de sempre.
                 Em branco, vale o do cadastro — e o cadastro não é alterado. */}
             <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">

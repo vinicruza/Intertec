@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   cepValido,
@@ -127,5 +128,28 @@ describe("emailPlausivel", () => {
     expect(emailPlausivel("compras @hospital.com")).toBe(false);
     expect(emailPlausivel("")).toBe(false);
     expect(emailPlausivel(null)).toBe(false);
+  });
+});
+
+// O banco exige CEP com 8 dígitos ou nulo (constraint
+// `orders_shipping_zip_formato`). A tela de editar pedido já barrava; o
+// SIMULADOR não. Em 19/08/2026 uma vendedora digitou "42" e levou na tela
+// 'new row for relation "orders" violates check constraint
+// "orders_shipping_zip_formato"' — erro cru do Postgres, que não diz o que
+// fazer nem que o campo pode ficar em branco.
+describe("CEP de entrega no simulador", () => {
+  const fonte = readFileSync("app/pages/SimuladorPage.tsx", "utf8");
+
+  it("barra antes de gravar, com o número de dígitos que faltam", () => {
+    expect(fonte).toMatch(/precisa ter 8 dígitos/);
+    expect(fonte).toMatch(/cepDigitos !== "" && !cepValido\(cepDigitos\)/);
+  });
+
+  it("manda só os dígitos, para o CEP digitado com traço passar", () => {
+    expect(fonte).toMatch(/cepEntrega: cepDigitos === "" \? null : cepDigitos/);
+  });
+
+  it("em branco continua valendo — usa o CEP do cadastro", () => {
+    expect(fonte).toMatch(/Em branco, vale o do cadastro do cliente/);
   });
 });
