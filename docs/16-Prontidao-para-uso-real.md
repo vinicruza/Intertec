@@ -330,13 +330,23 @@ R$ 82,00 por conta da Intertec** (a marca "X" de Frete Cliente está vazia).
 | (−) CMV (700 × 1,337095516) | 935,966861 | 935,966861 |
 | **Margem de contribuição** | **45,178536%** | **41,460179%** |
 
-Digitando o frete de R$ 82,00 no sistema **do mesmo jeito** (frete da Intertec, sem marcar
-"Frete destacado"), o motor devolve **41,460179%** — bate com o `0,4146017863` da planilha até a
-oitava casa decimal. Não há divergência de fórmula neste pedido: há um campo que ficou em branco.
+> **Correção de 20/08, tarde.** A primeira versão desta seção dizia que digitar o frete de R$ 82,00
+> no sistema devolvia 41,460179%, igual à planilha. Isso vale para o motor `calcularPedido` chamado
+> com `fretePorContaCliente: false` — combinação que **o simulador nunca produz**. O simulador
+> sempre passa `fretePorContaCliente: true`, e por isso o frete **nunca** é deduzido da margem. Ver
+> §3.12: é uma lacuna real, não um campo em branco.
 
-Ou seja: neste orçamento **a planilha é que dá a margem menor**, não o sistema. Com o frete lançado
-no sistema, os dois ficam em 41,46% — continua no selo **Amarelo** (faixa de 40% a 50%), só que
-3,7 pontos pior do que ficou gravado.
+Rodando pelo `simular()`, que é o que a tela usa, o mesmo pedido dá:
+
+| No simulador | Receita líquida | Margem |
+|---|---|---|
+| frete R$ 0,00 (como ficou gravado) | 1.707,30 | 45,1785% |
+| frete R$ 82,00, "Frete destacado" **marcado** | 1.680,855 | 44,3160% |
+| frete R$ 82,00, "Frete destacado" **desmarcado** | 1.694,18 | 44,7540% |
+| **Planilha** (frete R$ 82,00 por conta da Intertec) | **1.598,855** | **41,4602%** |
+
+Nenhuma das três bate com a planilha, porque em nenhuma delas o sistema tira os R$ 82,00 do
+resultado. O CMV e as alíquotas continuam idênticos — a diferença é inteira do tratamento do frete.
 
 ### Por que esta aba se comporta diferente das outras três conferências
 
@@ -422,6 +432,125 @@ tirar: o jogo é fixo. No sistema a vendedora desmarca a esterilização, e aí:
 **É essa a razão de o sistema existir para kits montados**: não é dar um número diferente, é deixar a
 vendedora montar a embalagem que o kit realmente usa em vez de pagar por uma esterilização que não
 aconteceu.
+
+## 3.12 O simulador não tem "frete por conta da Intertec" — PRECISA DE DECISÃO
+
+Achado em 20/08 varrendo o caminho de fechamento com o login de cada vendedora.
+
+Na planilha, a linha **"Frete Cliente"** tem dois estados:
+
+- **com "X"** — o frete não reduz a margem (o `N12 = −N6` cancela o `+N6`). O cliente paga.
+- **em branco** — o frete **reduz a margem**. Quem paga é a Intertec.
+
+No sistema existe só a caixa **"Frete destacado"**, e ela decide outra coisa: se o frete é
+**tributado** ou não. O frete em si **nunca** sai do resultado, marcada ou desmarcada:
+
+```ts
+// app/lib/sim/params.ts — simular()
+fretePorContaCliente: true,              // fixo, a tela não muda
+tributarFreteInformado: freteDestacado,  // isto é o que a caixa controla
+```
+
+```ts
+// lib/calculations/order.ts
+const frete = p.fretePorContaCliente ? zero : freteInformado;   // sempre zero vindo da tela
+```
+
+O motor `calcularPedido` sabe deduzir o frete (`fretePorContaCliente: false`, coberto pelos golden
+tests), mas **a tela não tem como chegar lá**. O banco faz igual, então o fechamento não reclama:
+
+```sql
+-- close_order_with_snapshots
+v_freight_tax := case when v_order.freight_paid_by_customer then v_tax_rate*p_freight else 0 end;
+v_net := v_gross - v_freight_tax - v_tax - v_difal - v_commission;   -- o frete não entra
+```
+
+TS e SQL concordam entre si. Quem discorda é a planilha — e, no caso do frete pago pela Intertec, a
+planilha é que está certa: o dinheiro saiu.
+
+### Quanto isso vale hoje
+
+Há **16 orçamentos** com frete > 0 e "Frete destacado" desmarcado. Nos **11 já fechados**:
+
+| Orçamento | Vendedora | UF | Frete | Margem gravada | Margem se o frete saísse | Diferença |
+|---|---|---|---|---|---|---|
+| ORC-2026-0010 | Camila | MA | 380,00 | 67,25% | 51,37% | **15,88 pts** |
+| ORC-2026-0008 | Isabela | SP | 140,00 | 61,54% | 51,18% | 10,36 pts |
+| ORC-2026-0016 | Isabela | SP | 80,00 | 60,83% | 51,29% | 9,54 pts |
+| ORC-2026-0013 | Isabela | SP | 60,00 | 70,20% | 62,44% | 7,76 pts |
+| ORC-2026-0020 | Isabela | RJ | 37,00 | 56,16% | **48,60%** | 7,56 pts |
+| ORC-2026-0043 | Isabela | SP | 153,00 | 52,85% | **47,92%** | 4,93 pts |
+| ORC-2026-0006 | Isabela | ES | 35,00 | 44,11% | 41,11% | 3,00 pts |
+| ORC-2026-0011 | Isabela | RJ | 195,00 | 57,81% | 55,01% | 2,80 pts |
+| ORC-2026-0021 | Camila | SP | 70,00 | 54,47% | 51,70% | 2,78 pts |
+| ORC-2026-0014 | Isabela | SP | 200,00 | 46,02% | 43,94% | 2,07 pts |
+| ORC-2026-0022 | Camila | SP | 70,00 | 54,47% | 54,13% | 0,34 pts |
+
+**ORC-2026-0020 e ORC-2026-0043 sairiam do verde** e teriam ido para aprovação.
+
+### A pergunta para o cliente
+
+> Quando a Intertec paga o frete (o "X" da planilha fica em branco), esse frete deve **derrubar a
+> margem do pedido**, como a planilha faz?
+
+Se a resposta for sim — e a leitura financeira diz que sim, o dinheiro saiu — a correção é trocar a
+caixa única por **duas opções de quem paga o frete**, e mexer nos dois lados (TypeScript e SQL) na
+mesma entrega, porque o fechamento reconcilia os dois. **Não fiz a mudança**: ela altera a margem de
+todo orçamento com frete e é assunto de `Calculations.md`, que só muda com o cliente confirmando.
+
+## 3.13 Os 4 kits do catálogo estão sem embalagem nenhuma
+
+Achado na mesma varredura. `kit_packaging` está **vazia** — os quatro kits cadastrados têm itens mas
+nenhuma linha de envelope, caixa, etiquetinha ou gráfica:
+
+| Código | Kit | Itens | Linhas de embalagem | Custo só dos produtos | Já usado em |
+|---|---|---|---|---|---|
+| KC0020 | kit exclusivo | 3 | **0** | 8,8585 | 2 pedidos |
+| KC0021 | KIT DIAVERUM 1 | 4 | **0** | 11,8997 | 1 pedido |
+| KC0022 | KIT LUIS FERNANDO NERY | 4 | **0** | 5,5061 | 1 pedido |
+| KC0023 | KIT HOSP SANTA BEATRIZ | 2 | **0** | 16,0531 | 1 pedido |
+
+Faz sentido: todos foram criados **antes** de o formulário de embalagem funcionar (o travamento
+circular corrigido em 20/08, §3.14). Cada um está barato em algo entre **R$ 1,24** (envelope + caixa
++ etiquetinha + gráfica, sem esterilização) e **R$ 2,03** (o jogo completo do "Kit Aleatório") por
+unidade.
+
+Não dá para adivinhar qual envelope cada um usa — precisa da vendedora que montou. Enquanto não for
+preenchido, todo pedido com esses kits mostra margem melhor do que a real.
+
+## 3.14 Varredura por login — 20/08
+
+Rodei, com o JWT de cada usuária, tudo o que o simulador chama: as 15 consultas de carga, as três
+RPCs de kit, a gravação da cotação, o envio para aprovação, a aprovação e o fechamento. Tudo dentro
+de uma transação desfeita ao final — nada ficou gravado (conferido: 45 pedidos e 4 kits antes e
+depois).
+
+**Carga do simulador — 8 logins, 17 chamadas cada, zero erro.** Camila, Isabela, Mari, Nathalia,
+Suellen, Patricia, Bryan e Giovanna recebem os 372 produtos, os 80 insumos de embalagem (com nome,
+sem preço), os 4 kits, as 27 UFs e as 12 transportadoras. As cinco vendedoras têm vendedor vinculado
+(`meu_vendedor()` casa por nome e casou para todas as cinco).
+
+**Gravação e fechamento — funcionam para todas.** Testei os dois caminhos reais:
+
+| Caminho | Camila | Suellen |
+|---|---|---|
+| Margem verde (52,84%) → fecha direto | ✅ fechou | ✅ fechou |
+| Margem vermelha (−27,79%) → envia, Patrícia aprova, fecha | ✅ fechou | ✅ fechou |
+
+O custo da embalagem vem certo do servidor para o perfil Comercial (era o problema da Suellen em
+19/08): envelope 0,82836, caixa 9,9813÷30 = 0,33271, etiquetinha 0,00896, gráfica 0,066.
+
+**As barreiras que apareceram são todas propositais e com mensagem clara:**
+
+- "Preencha a transportadora antes de enviar para aprovação."
+- "Seu perfil não tem permissão para aprovar pedidos" (Comercial tentando aprovar).
+- "Esta cotação não está aguardando aprovação" (aprovar um rascunho).
+- "Pedido precisa estar aprovado antes do fechamento".
+
+**Uma armadilha de canto, sem efeito prático hoje:** um pedido de margem VERDE que tenha sido enviado
+para aprovação não fecha mais sozinho — a auto-aprovação por margem exige `approval_status =
+'rascunho'`. Na tela isso não acontece, porque só pedido vermelho ou amarelo é enviado. Fica anotado
+caso a régua de aprovação mude.
 
 ## 4. O que ainda precisa acontecer antes de liberar
 
