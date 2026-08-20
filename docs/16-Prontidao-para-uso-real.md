@@ -433,6 +433,54 @@ tirar: o jogo é fixo. No sistema a vendedora desmarca a esterilização, e aí:
 vendedora montar a embalagem que o kit realmente usa em vez de pagar por uma esterilização que não
 aconteceu.
 
+## 3.11b A regra do frete destacado do Bryan — CONFERIDA, o sistema já faz certo
+
+Áudio do Bryan de 19/08/2026:
+
+> "Se o frete estiver **destacado na nota**, o imposto deve ser calculado sobre o valor do pedido
+> **mais o frete**. Se o frete **não estiver destacado** na nota, ou seja, se ele não aparecer na
+> nota fiscal, o imposto deve ser calculado **somente sobre o valor do pedido**, que será o valor
+> total da nota fiscal."
+
+**O sistema já faz exatamente isso, nos dois lados.** A confusão é que o sistema não tem uma linha só
+de imposto: tem duas — "Imposto sobre a venda" e "Imposto sobre o frete". A regra do Bryan fala do
+total, e é o total que precisa bater.
+
+Conferido nos três orçamentos reais, na tela (`simular()`) e no banco
+(`close_order_with_snapshots`), com resultado idêntico:
+
+| Orçamento | Alíquota | Frete | Estado | Imposto venda | Imposto frete | **Total** | Regra do Bryan |
+|---|---|---|---|---|---|---|---|
+| OLHO CLINICA (SP) | 27,25% | 55,00 | destacado | 114,4500 | 14,9875 | **129,4375** | 27,25% × 475 = 129,4375 ✅ |
+| OLHO CLINICA (SP) | 27,25% | 55,00 | não destacado | 114,4500 | 0 | **114,4500** | 27,25% × 420 = 114,4500 ✅ |
+| Oclusor (BA) | 16,25% | 82,00 | destacado | 409,5000 | 13,3250 | **422,8250** | 16,25% × 2.602 = 422,8250 ✅ |
+| Oclusor (BA) | 16,25% | 82,00 | não destacado | 409,5000 | 0 | **409,5000** | 16,25% × 2.520 = 409,5000 ✅ |
+| INOVE (PR) | 21,25% | 190,00 | destacado | 717,1875 | 40,3750 | **757,5625** | 21,25% × 3.565 = 757,5625 ✅ |
+| INOVE (PR) | 21,25% | 190,00 | não destacado | 717,1875 | 0 | **717,1875** | 21,25% × 3.375 = 717,1875 ✅ |
+
+A caixa **"Frete destacado"** da tela é justamente o "destacado na nota" do Bryan.
+
+A regra ficou travada em teste automatizado — `tests/calc/imposto-frete-destacado.test.ts`, 10
+asserções, escritas sobre o TOTAL das duas linhas e não sobre cada uma, para continuarem valendo se
+o desenho da tela mudar.
+
+**Onde o Bryan diz que a planilha está errada, ele tem razão** — mas o erro é o oposto do que ele
+imaginou. Ele suspeitou que o sistema calculasse só sobre o pedido; o que acontece é que **10 das 12
+abas da planilha cobram o imposto sobre o frete DUAS vezes** (§2.5): uma na linha "Imposto Frete" e
+outra dentro da linha "Imposto", que usa `alíquota × (F24 + N6)`. Somando, o frete é tributado em
+dobro. A aba dele (`Patricia`) e a `Temporaria Patricia` já foram corrigidas para `alíquota × F24`,
+e é por isso que só elas batem com o sistema.
+
+**Atenção ao corrigir as outras 10 abas:** a correção é trocar `*(F24+N6)` por `*F24` na linha
+"Imposto" — e aí o par de linhas passa a implementar a regra do Bryan sozinho, porque a linha
+"Imposto Frete" só é preenchida quando o frete está destacado.
+
+### O que o áudio NÃO responde
+
+O áudio trata da **base do imposto**. Ele não diz se o frete **sai do resultado** quando quem paga é
+a Intertec — que é outra linha da cascata e é a pendência da §3.12. As duas coisas são independentes:
+dá para acertar o imposto (já está) e ainda assim mostrar margem melhor do que a real.
+
 ## 3.12 O simulador não tem "frete por conta da Intertec" — PRECISA DE DECISÃO
 
 Achado em 20/08 varrendo o caminho de fechamento com o login de cada vendedora.
