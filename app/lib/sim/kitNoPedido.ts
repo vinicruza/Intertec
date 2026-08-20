@@ -37,6 +37,93 @@ export type ProdutoDoKit = { produtoId: string; quantidade: string };
 export type ModoEmbalagem = "porKit" | "itensPorCaixa";
 export type EmbalagemDoKit = { insumoId: string; modo: ModoEmbalagem; quantidade: string };
 
+// Papel do insumo na embalagem do kit (coluna `kit_role` no banco):
+//
+//   envelope       1 por kit
+//   caixa          1/N por kit, N = envelopes por caixa
+//   esterilizacao  1/N por kit — o MESMO N da caixa
+//   automatico     1 por kit, sem a vendedora escolher (etiquetinha, gráfica)
+export type PapelNoKit = "envelope" | "caixa" | "esterilizacao" | "automatico";
+
+// O que a vendedora de fato escolhe na embalagem do kit.
+//
+// O cliente descreveu o modelo em 19/08/2026: ela informa DUAS coisas — qual
+// envelope e quantos envelopes cabem na caixa. O resto sai daí. A caixa e a
+// esterilização compartilham o MESMO número porque a esterilizadora cobra por
+// caixa, e é a mesma caixa que vai ao cliente.
+export type EmbalagemEscolhida = {
+  envelopeId: string;
+  caixaId: string;
+  esterilizacaoId: string;
+  envelopesPorCaixa: string;
+};
+
+export const EMBALAGEM_VAZIA: EmbalagemEscolhida = {
+  envelopeId: "",
+  caixaId: "",
+  esterilizacaoId: "",
+  envelopesPorCaixa: "",
+};
+
+// Traduz a escolha da tela nas linhas que o cálculo e o banco entendem.
+//
+// Antes a vendedora montava a lista à mão, escolhendo o modo em cada linha e
+// digitando o número duas vezes — uma na caixa, outra na esterilização. Se os
+// dois números divergissem, o custo saía errado e nada avisava. Aqui é um
+// número só, por construção.
+export function linhasDaEmbalagem(
+  escolha: EmbalagemEscolhida,
+  idsAutomaticos: { etiquetinha?: string; grafica?: string } = {}
+): EmbalagemDoKit[] {
+  const linhas: EmbalagemDoKit[] = [];
+  const porCaixa = String(escolha.envelopesPorCaixa ?? "").trim();
+
+  if (escolha.envelopeId) {
+    linhas.push({ insumoId: escolha.envelopeId, modo: "porKit", quantidade: "1" });
+  }
+  // Caixa e esterilização só entram com o número preenchido: sem ele não há
+  // como ratear, e entrar sem rateio cobraria uma caixa inteira por kit.
+  if (porCaixa !== "") {
+    if (escolha.caixaId) {
+      linhas.push({ insumoId: escolha.caixaId, modo: "itensPorCaixa", quantidade: porCaixa });
+    }
+    if (escolha.esterilizacaoId) {
+      linhas.push({ insumoId: escolha.esterilizacaoId, modo: "itensPorCaixa", quantidade: porCaixa });
+    }
+  }
+
+  // Etiquetinha entra sempre; gráfica acompanha o envelope, porque é a
+  // impressão dele. Confirmado nos 19 kits do catálogo: etiquetinha em 19 de
+  // 19, gráfica nos 9 com envelope e em nenhum dos 10 sem.
+  if (idsAutomaticos.etiquetinha) {
+    linhas.push({ insumoId: idsAutomaticos.etiquetinha, modo: "porKit", quantidade: "1" });
+  }
+  if (idsAutomaticos.grafica && escolha.envelopeId) {
+    linhas.push({ insumoId: idsAutomaticos.grafica, modo: "porKit", quantidade: "1" });
+  }
+  return linhas;
+}
+
+// Caminho de volta: lê a escolha a partir das linhas gravadas.
+//
+// Assim `kit.embalagem` continua sendo a única fonte de verdade — o formulário
+// não guarda estado próprio e não há o que dessincronizar ao reabrir uma
+// cotação salva.
+export function escolhaDasLinhas(
+  linhas: EmbalagemDoKit[],
+  papelPorInsumo: Map<string, PapelNoKit | null>
+): EmbalagemEscolhida {
+  const acha = (papel: PapelNoKit) => linhas.find((l) => papelPorInsumo.get(l.insumoId) === papel);
+  const caixa = acha("caixa");
+  const esterilizacao = acha("esterilizacao");
+  return {
+    envelopeId: acha("envelope")?.insumoId ?? "",
+    caixaId: caixa?.insumoId ?? "",
+    esterilizacaoId: esterilizacao?.insumoId ?? "",
+    envelopesPorCaixa: caixa?.quantidade ?? esterilizacao?.quantidade ?? "",
+  };
+}
+
 // Identidade de uma linha de embalagem para efeito de CUSTO. O custo é
 // calculado no servidor (o Comercial não lê o preço dos insumos), então a tela
 // guarda o resultado num mapa e precisa de uma chave estável para consultá-lo.

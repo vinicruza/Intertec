@@ -361,3 +361,30 @@ describe("embalagem do kit no fechamento", () => {
     expect(bloco).not.toMatch(/price_without_tax|price_with_tax/);
   });
 });
+
+// O papel de cada insumo na embalagem do kit é dado no banco, não deduzido do
+// nome. Casar por prefixo quebraria calado no dia em que alguém renomeasse
+// "Caixa 6" para "Caixa 06" — e quebraria no custo de um orçamento.
+describe("papel do insumo na embalagem do kit", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20260819210000_papel_do_insumo_no_kit.sql",
+    "utf8"
+  );
+
+  it("a coluna existe e só aceita os quatro papéis", () => {
+    expect(sql).toMatch(/add column if not exists kit_role text/);
+    for (const papel of ["envelope", "caixa", "esterilizacao", "automatico"]) {
+      expect(sql).toContain(`'${papel}'`);
+    }
+  });
+
+  it("etiquetinha e gráfica são as automáticas", () => {
+    expect(sql).toMatch(/kit_role = 'automatico'\s+where name in \('Etiquetinha','Gráfica'\)/);
+  });
+
+  it("a lista do seletor devolve o papel e continua sem preço", () => {
+    const bloco = sql.slice(sql.indexOf("create function public.insumos_para_embalagem"));
+    expect(bloco).toMatch(/papel text/);
+    expect(bloco.slice(0, 700)).not.toMatch(/price_without_tax|price_with_tax/);
+  });
+});

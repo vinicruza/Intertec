@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolverKitDoPedido, type CatalogoParaKit } from "@app/lib/sim/kitNoPedido";
+import { resolverKitDoPedido, type CatalogoParaKit, linhasDaEmbalagem, EMBALAGEM_VAZIA } from "@app/lib/sim/kitNoPedido";
 import { assinaturaKitCompleta, type CustoProdutoKit } from "@calc";
 
 // Kit montado dentro do pedido (reunião Intertech 16/07/2026).
@@ -199,5 +199,53 @@ describe("kit montado dentro do pedido", () => {
       );
       expect(r.cmvUnitario).toBeNull();
     });
+  });
+});
+
+// O modelo que o cliente descreveu em 19/08/2026: a vendedora informa qual
+// envelope e quantos envelopes cabem na caixa. Caixa e esterilização dividem o
+// MESMO número, porque a esterilizadora cobra por caixa e é a mesma caixa que
+// vai ao cliente.
+describe("embalagem escolhida pela vendedora", () => {
+  const AUTO = { etiquetinha: "etiq", grafica: "graf" };
+  const escolha = {
+    envelopeId: "env30x40",
+    caixaId: "caixa6",
+    esterilizacaoId: "horizont",
+    envelopesPorCaixa: "30",
+  };
+
+  it("gera envelope 1 por kit, caixa e esterilização rateadas pelo mesmo número", () => {
+    const l = linhasDaEmbalagem(escolha, AUTO);
+    expect(l).toEqual([
+      { insumoId: "env30x40", modo: "porKit", quantidade: "1" },
+      { insumoId: "caixa6", modo: "itensPorCaixa", quantidade: "30" },
+      { insumoId: "horizont", modo: "itensPorCaixa", quantidade: "30" },
+      { insumoId: "etiq", modo: "porKit", quantidade: "1" },
+      { insumoId: "graf", modo: "porKit", quantidade: "1" },
+    ]);
+  });
+
+  it("caixa e esterilização usam sempre o mesmo número — não há como divergir", () => {
+    const l = linhasDaEmbalagem({ ...escolha, envelopesPorCaixa: "50" }, AUTO);
+    const rateadas = l.filter((x) => x.modo === "itensPorCaixa");
+    expect(rateadas).toHaveLength(2);
+    expect(new Set(rateadas.map((x) => x.quantidade)).size).toBe(1);
+  });
+
+  it("sem o número de envelopes por caixa, caixa e esterilização NÃO entram", () => {
+    // Entrar sem rateio cobraria uma caixa inteira em cada kit.
+    const l = linhasDaEmbalagem({ ...escolha, envelopesPorCaixa: "" }, AUTO);
+    expect(l.some((x) => x.modo === "itensPorCaixa")).toBe(false);
+  });
+
+  it("etiquetinha entra sempre; gráfica só acompanha o envelope", () => {
+    const semEnvelope = linhasDaEmbalagem({ ...escolha, envelopeId: "" }, AUTO);
+    expect(semEnvelope.some((x) => x.insumoId === "etiq")).toBe(true);
+    expect(semEnvelope.some((x) => x.insumoId === "graf")).toBe(false);
+  });
+
+  it("kit sem embalagem nenhuma continua possível", () => {
+    expect(linhasDaEmbalagem(EMBALAGEM_VAZIA, {})).toEqual([]);
   });
 });

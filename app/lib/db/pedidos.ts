@@ -1,6 +1,6 @@
 import { Decimal, type CustoProdutoKit } from "@calc";
 import { supabase } from "../supabase";
-import { chaveDaEmbalagem, type CatalogoParaKit, type EmbalagemDoKit } from "../sim/kitNoPedido";
+import { chaveDaEmbalagem, type CatalogoParaKit, type EmbalagemDoKit, type PapelNoKit } from "../sim/kitNoPedido";
 import type { KitParaCopiar } from "../sim/itensDoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
 import { numeroDigitado } from "../format";
@@ -31,6 +31,8 @@ export type ItemVendavel = {
 };
 
 // Insumo disponível como embalagem/esterilização do kit montado no simulador.
+export type { PapelNoKit };
+
 export type InsumoEmbalagem = {
   id: string;
   nome: string;
@@ -39,7 +41,12 @@ export type InsumoEmbalagem = {
   // Marcado como embalagem/esterilização (envelope, caixa...). É o que filtra
   // a lista no montador de kit — sem isso, aparecia todo insumo do catálogo.
   embalagem: boolean;
+  // Papel na embalagem do kit, definido no banco (coluna `kit_role`). O
+  // formulário do montador é feito em cima disto: uma lista por papel, e as
+  // linhas "automatico" entram sozinhas. Nulo = não participa da embalagem.
+  papel: PapelNoKit | null;
 };
+
 
 export type ContextoSimulador = {
   vendedores: VendedorOpcao[];
@@ -254,6 +261,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       nome: string;
       embalagem: boolean | null;
       mao_de_obra: boolean | null;
+      papel: PapelNoKit | null;
     }>).map((i) => ({
       id: i.id,
       nome: i.nome,
@@ -262,6 +270,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       precoSemImposto: null,
       maoDeObra: i.mao_de_obra ?? false,
       embalagem: i.embalagem ?? false,
+      papel: i.papel ?? null,
     })),
     kitPorAssinatura,
     kitsParaCopiar,

@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante } from "@calc";
 import { aplicarFreteDestacadoAosItens, seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
-import { chaveDaEmbalagem, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
+import {
+  chaveDaEmbalagem,
+  escolhaDasLinhas,
+  linhasDaEmbalagem,
+  type EmbalagemEscolhida,
+  type ModoEmbalagem,
+  type PapelNoKit,
+} from "../lib/sim/kitNoPedido";
 import { mensagemDeErro } from "../lib/erros";
 import {
   KIT_NOVO,
@@ -1228,18 +1235,34 @@ function MontadorKit({
   verNumeros: boolean;
   aoMudar: (muda: (k: KitNovoEdicao) => KitNovoEdicao) => void;
 }) {
-  // Escape hatch: nem todo insumo de embalagem já foi marcado como tal na
-  // tela de Insumos (é o Administrador quem marca). Sem isto, quem monta o
-  // kit e não acha o insumo certo na lista filtrada ficaria travado — e
-  // Comercial nem tem acesso à tela de Insumos para corrigir sozinho.
-  const [mostrarTodos, setMostrarTodos] = useState(false);
-  // Um insumo já escolhido nunca some da lista, mesmo filtrado: senão, tirar
-  // o "mostrar todos" depois de escolher um insumo fora da marcação faria a
-  // seleção sumir da tela sem avisar.
-  function opcoesPara(insumoIdAtual: string): typeof ctx.insumosEmbalagem {
-    if (mostrarTodos) return ctx.insumosEmbalagem;
-    return ctx.insumosEmbalagem.filter((i) => i.embalagem || i.id === insumoIdAtual);
-  }
+  // O papel de cada insumo vem do banco (coluna `kit_role`), não de casar
+  // prefixo de nome: renomear "Caixa 6" para "Caixa 06" quebraria o formulário
+  // calado, e no custo de um orçamento.
+  const porPapel = (papel: PapelNoKit) => ctx.insumosEmbalagem.filter((i) => i.papel === papel);
+  const papelPorInsumo = useMemo(
+    () => new Map(ctx.insumosEmbalagem.map((i) => [i.id, i.papel])),
+    [ctx.insumosEmbalagem]
+  );
+  const idsAutomaticos = useMemo(() => {
+    const auto = ctx.insumosEmbalagem.filter((i) => i.papel === "automatico");
+    return {
+      etiquetinha: auto.find((i) => /etiquet/i.test(i.nome))?.id,
+      grafica: auto.find((i) => /gr[áa]fica/i.test(i.nome))?.id,
+    };
+  }, [ctx.insumosEmbalagem]);
+  const automaticosDoKit = ctx.insumosEmbalagem
+    .filter((i) => i.papel === "automatico")
+    .map((i) => i.nome);
+
+  // A escolha é DERIVADA das linhas gravadas: `kit.embalagem` segue sendo a
+  // única fonte de verdade, então não há estado paralelo para dessincronizar
+  // ao reabrir uma cotação salva.
+  const escolhaEmbalagem = escolhaDasLinhas(kit.embalagem, papelPorInsumo);
+  const mudarEmbalagem = (mud: Partial<EmbalagemEscolhida>) =>
+    aoMudar((k) => ({
+      ...k,
+      embalagem: linhasDaEmbalagem({ ...escolhaDasLinhas(k.embalagem, papelPorInsumo), ...mud }, idsAutomaticos),
+    }));
 
   const nomePorProduto = new Map(ctx.produtos.map((p) => [p.id, p.nome]));
   const opcoesDeProduto: OpcaoDeBusca[] = ctx.produtos.map((p) => ({
@@ -1435,84 +1458,95 @@ function MontadorKit({
         ))}
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label>Embalagem e esterilização</Label>
-            <p className="text-xs text-[var(--cor-texto-suave)]">
-              O envelope é <strong>um por kit</strong>. A caixa de esterilização atende vários
-              kits: escolha <strong>"kits por caixa"</strong> e diga quantos kits cabem nela — o
-              custo é rateado automaticamente. Não é a quantidade de caixas usadas.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="text-xs font-medium text-[var(--cor-primaria)] hover:underline"
-            onClick={() => aoMudar((k) => ({ ...k, embalagem: [...k.embalagem, { insumoId: "", modo: "porKit", quantidade: "1" }] }))}
-          >
-            + Adicionar embalagem
-          </button>
+      {/* Embalagem do kit — modelo descrito pelo cliente em 19/08/2026.
+          A vendedora informa DUAS coisas: qual envelope e quantos envelopes
+          cabem na caixa. Caixa e esterilização dividem o mesmo número, porque a
+          esterilizadora cobra por caixa e é a mesma caixa que vai ao cliente.
+          Antes daqui era uma lista livre em que ela escolhia o modo linha a
+          linha e digitava o número duas vezes — e nada impedia 30 numa e 50 na
+          outra, o que sai errado sem avisar. */}
+      <div className="space-y-3">
+        <div>
+          <Label>Embalagem e esterilização</Label>
+          <p className="text-xs text-[var(--cor-texto-suave)]">
+            O envelope é <strong>um por kit</strong>. A caixa atende vários kits: diga quantos
+            envelopes cabem nela e o custo da caixa e da esterilização é rateado sozinho — não
+            precisa contar caixas.
+          </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-[var(--cor-texto-suave)]">
-          <input type="checkbox" checked={mostrarTodos} onChange={(e) => setMostrarTodos(e.target.checked)} />
-          Não achei o insumo — mostrar todos os insumos do catálogo
-        </label>
-        {kit.embalagem.map((e, j) => (
-          <div key={j} className="flex items-end gap-2">
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <Label>Envelope</Label>
             <select
-              className="flex-1 rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={e.insumoId}
-              onChange={(ev) =>
-                aoMudar((k) => ({
-                  ...k,
-                  embalagem: k.embalagem.map((x, idx) => (idx === j ? { ...x, insumoId: ev.target.value } : x)),
-                }))
-              }
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={escolhaEmbalagem.envelopeId}
+              onChange={(ev) => mudarEmbalagem({ envelopeId: ev.target.value })}
             >
               <option value="">Selecione…</option>
-              {opcoesPara(e.insumoId).map((ins) => (
-                <option key={ins.id} value={ins.id}>{ins.nome}</option>
+              {porPapel("envelope").map((i) => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
               ))}
             </select>
-            <select
-              className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
-              value={e.modo}
-              onChange={(ev) =>
-                aoMudar((k) => ({
-                  ...k,
-                  embalagem: k.embalagem.map((x, idx) =>
-                    idx === j ? { ...x, modo: ev.target.value as ModoEmbalagem } : x
-                  ),
-                }))
-              }
-            >
-              <option value="porKit">un. por kit</option>
-              <option value="itensPorCaixa">kits por caixa</option>
-            </select>
-            <div>
-              <Input
-                className="w-24"
-                value={e.quantidade}
-                onChange={(ev) =>
-                  aoMudar((k) => ({
-                    ...k,
-                    embalagem: k.embalagem.map((x, idx) => (idx === j ? { ...x, quantidade: ev.target.value } : x)),
-                  }))
-                }
-              />
-              <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
-                {e.modo === "itensPorCaixa" ? "kits por caixa" : "un. por kit"}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="pb-2 text-xs text-red-600 hover:underline"
-              onClick={() => aoMudar((k) => ({ ...k, embalagem: k.embalagem.filter((_, idx) => idx !== j) }))}
-            >
-              Remover
-            </button>
+            <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">1 por kit</span>
           </div>
-        ))}
+
+          <div>
+            <Label>Envelopes por caixa</Label>
+            <Input
+              value={escolhaEmbalagem.envelopesPorCaixa}
+              onChange={(ev) => mudarEmbalagem({ envelopesPorCaixa: ev.target.value })}
+            />
+            <span className="text-[0.65rem] text-[var(--cor-texto-suave)]">
+              divide a caixa e a esterilização
+            </span>
+          </div>
+
+          <div>
+            <Label>Caixa de esterilização</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={escolhaEmbalagem.caixaId}
+              onChange={(ev) => mudarEmbalagem({ caixaId: ev.target.value })}
+            >
+              <option value="">Selecione…</option>
+              {porPapel("caixa").map((i) => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <Label>Esterilizadora</Label>
+            <select
+              className="w-full rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
+              value={escolhaEmbalagem.esterilizacaoId}
+              onChange={(ev) => mudarEmbalagem({ esterilizacaoId: ev.target.value })}
+            >
+              <option value="">Selecione…</option>
+              {porPapel("esterilizacao").map((i) => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* As automáticas aparecem, mas não se mexe nelas. Custo escondido foi
+            a origem de metade dos problemas desta semana: a vendedora precisa
+            ver que o kit leva etiqueta e gráfica, mesmo sem poder alterar. */}
+        {automaticosDoKit.length > 0 && (
+          <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-xs text-[var(--cor-texto-suave)]">
+            Entram sozinhas, 1 por kit: <strong>{automaticosDoKit.join(" e ")}</strong>.
+          </p>
+        )}
+
+        {escolhaEmbalagem.envelopesPorCaixa.trim() === "" &&
+          (escolhaEmbalagem.caixaId || escolhaEmbalagem.esterilizacaoId) && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Falta dizer quantos envelopes cabem na caixa. Sem esse número não há como ratear, e a
+              caixa e a esterilização ficam de fora do custo.
+            </p>
+          )}
       </div>
 
       {verNumeros && resolvida && !resolvida.erro && resolvida.linhasProdutos.length > 0 && (
