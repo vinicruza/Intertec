@@ -686,10 +686,66 @@ R$ 110,95, que é `0,184919 × 600`.
 **base de custo desatualizada**. E o efeito é grande — 3,78 pontos neste pedido, o bastante para
 trocar o selo de Verde para Amarelo e mandar o pedido para aprovação.
 
-### O que precisa ser feito
+### Aplicado em 21/08/2026, com o Bryan confirmando
 
-Espelhar os 12 preços em `inputs`. Não foi feito ainda porque muda o CMV de 202 produtos em produção
-de uma vez, e as datas não confirmam a edição. Depende da resposta do Bryan.
+Espelhar os 12 preços não bastou. Foram precisas **três** correções, e as duas últimas eram defeitos
+do sistema que só apareceram porque a planilha se mexeu:
+
+**1. Os 12 preços de insumo** acima → 364 produtos recalculados.
+
+**2. Mais 10 insumos da família `Produto ...`**, que a primeira conferência não pegou. São
+intermediários que na planilha são CALCULADOS a partir das bobinas e no sistema são **insumo com
+preço fixo** — então não seguem a bobina sozinhos:
+
+| Insumo | Sistema | Planilha | Diferença |
+|---|---|---|---|
+| Produto Campo de mesa 2,00x1,30 | 3,511797 | 3,168375 | −0,343422 |
+| Produto Avental TNT 40gr ML | 2,875067 | 2,625093 | −0,249974 |
+| Produto Avental TNT 30gr ML | 2,093082 | 1,922336 | −0,170746 |
+| Produto Campo de mesa 1,00x1,20 | 1,406699 | 1,248197 | −0,158502 |
+| Produto Campo catarata | 2,043469 | 1,918614 | −0,124855 |
+| Produto Campo de mesa 0,70x1,00 | 0,890307 | 0,797848 | −0,092460 |
+| Produto Campo cataratinha | 1,519080 | 1,481623 | −0,037456 |
+| + 3 "Produto Campo Simples … + Tape" | | | só precisão |
+
+Eram eles que seguravam os 12 produtos `Kit …`: a diferença do Kit Veterinário era exatamente
+`2 × 0,092460`, a do Kit Vascular `1 × 0,158502`, a do Kit Universal `1 × 0,343422`.
+
+**⚠️ Fragilidade que fica:** toda vez que a Intertec mudar o preço de uma bobina, esses 10 insumos
+precisam ser atualizados **à mão**, porque no sistema eles não derivam de nada. O certo é modelá-los
+como produto com ficha técnica, igual à planilha. Fica anotado para uma sprint futura.
+
+**3. O CMV travado por override não propagava** — corrigido em
+`20260821140000_override_propaga_no_recalculo.sql`.
+
+53 produtos têm o CMV congelado em `product_cmv_overrides` (importados da aba "04 - Formula especial"
+em 13/08, enquanto a ficha técnica deles não é modelada). O override era aplicado por **gatilho**, na
+gravação em `product_costs`, produto a produto. Dois furos:
+
+- um produto-**pai** somava o custo CALCULADO do filho, ignorando o override dele;
+- produto com override e **sem ficha técnica** não passa pelo laço do recálculo, então nunca era
+  gravado — foi o que travou os quatro `Campo Simples … + Tape 80cm`.
+
+Agora o override entra dentro do laço, camada a camada, e propaga para cima como qualquer custo.
+
+### Resultado da conferência
+
+**338 produtos conferidos, 338 batendo.** Sobram só os dois grupos já conhecidos:
+
+- **16 aventais com compressa sem tamanho** — a planilha ainda não tem as versões P/G (§3.8, pendente
+  com o Bryan).
+- **3 defeitos da planilha** — §3.7 a e b.
+
+### O orçamento CENTRO DA VISAO, refeito
+
+| | Sistema | Planilha |
+|---|---|---|
+| Receita líquida | 2.935,05 | 2.935,05 |
+| CMV | 1.358,06 | 1.358,06 |
+| **Margem** | **53,73%** 🟢 | **53,73%** 🟢 |
+
+Bate linha a linha, incluindo o imposto sobre o frete — o pedido está com "Frete destacado" marcado,
+e nesse caso a regra do Bryan e a planilha concordam.
 
 ## 4. O que ainda precisa acontecer antes de liberar
 
