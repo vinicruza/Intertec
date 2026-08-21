@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { totaisDaFichaDoPedido } from "@calc";
+import { dec, totaisDaFichaDoPedido } from "@calc";
 import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
 import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
@@ -83,8 +83,14 @@ export default function PedidoFichaPage() {
     (pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null);
   const impressoEm = formatarDataHora(new Date());
 
+  const titulo = pedido.order_number ? `PEDIDO ${pedido.order_number}` : "ORÇAMENTO";
+  const subtitulo = pedido.order_number
+    ? `ORÇAMENTO ${pedido.quote_number ?? "—"}`
+    : pedido.quote_number ?? "—";
+  const totalACobrar = totais.subtotal.plus(dec(pedido.freight ?? "0"));
+
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-[210mm] space-y-4">
       {/* Barra de ações — não sai na impressão. */}
       <div className="flex items-center justify-between print:hidden">
         <Button
@@ -96,236 +102,276 @@ export default function PedidoFichaPage() {
         <Button onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      <div className="space-y-5 rounded-lg border border-[var(--cor-borda)] bg-white p-8 text-sm text-black print:border-0 print:p-0">
-        <div className="flex items-start justify-between border-b border-black/20 pb-3">
-          <div className="pt-2">
-            <IntertechLogo compact className="print:translate-y-1" />
-          </div>
+      <div className="ficha-pedido space-y-4 rounded-xl border border-[var(--cor-borda)] bg-white p-8 text-[11px] leading-snug text-black shadow-[var(--sombra-cartao)] print:rounded-none print:border-0 print:p-0 print:shadow-none">
+        {/* ---------- Cabeçalho ---------- */}
+        <div className="flex items-start justify-between gap-6">
+          <IntertechLogo size="lg" className="h-16 [&_img]:h-16" />
           <div className="text-right">
-            <p className="text-xs font-semibold uppercase tracking-normal">
-              Orçamento
+            <p className="text-2xl font-extrabold leading-none tracking-tight text-[var(--cor-primaria)]">
+              {titulo}
             </p>
-            <p className="font-mono text-lg font-bold">{pedido.quote_number ?? "—"}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-normal">Pedido</p>
-            <p className="font-mono text-base font-bold">{pedido.order_number ?? "—"}</p>
-            <p className="text-xs">
+            <p className="mt-1 text-sm font-semibold text-[var(--cor-primaria)]">{subtitulo}</p>
+            <p className="mt-2 text-[10px] text-black/60">
               {fechado ? `Pedido gerado em ${dataCurta(pedido.closed_at)}` : "Orçamento em aberto"}
             </p>
-            <p className="text-xs">Impresso em {impressoEm}</p>
+            <p className="text-[10px] text-black/60">Impresso em {impressoEm}</p>
           </div>
         </div>
+        <div className="mt-1 mb-3 h-[3px] rounded-full bg-[var(--cor-primaria)]" />
 
-        {/* ---------- Cabeçalho: os dados do cliente ---------- */}
-        <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">
-            Cliente
-          </h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <Dado rotulo="Cód. cliente" valor={codigoCliente ?? null} />
-            <Dado rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
-            <Dado rotulo="Cliente" valor={cliente?.name} className="col-span-2" />
-            <Dado rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
-            <Dado rotulo="Data" valor={dataCurta(pedido.created_at)} />
-            <Dado rotulo="CEP faturamento" valor={formatarCep(cliente?.billing_zip) || null} />
-            <Dado rotulo="Cidade/UF faturamento" valor={cidadeUf(cliente?.billing_city, cliente?.billing_state)} />
-            <Dado rotulo="CEP entrega" valor={formatarCep(cepEntrega) || null} />
-            <Dado rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} />
-            <Dado rotulo="Contato" valor={cliente?.contact_name} />
-            <Dado rotulo="E-mail" valor={cliente?.email} className="col-span-2" />
-            <Dado rotulo="Vendedor" valor={pedido.sellers?.name} />
+        {/* ---------- Dados da empresa / cliente ---------- */}
+        <section className="ficha-bloco">
+          <Secao titulo="Dados da empresa / cliente" icone={<IconePessoa />} />
+          <div className="grid grid-cols-2 gap-x-8 rounded-xl border border-[var(--cor-borda)] px-4 py-2">
+            <Campo rotulo="Empresa" valor={cliente?.name} />
+            <Campo rotulo="CEP ent." valor={formatarCep(cepEntrega) || null} />
+            <Campo rotulo="Cód. cliente" valor={codigoCliente ?? null} />
+            <Campo rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} />
+            <Campo rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
+            <Campo rotulo="Contato" valor={cliente?.contact_name} />
+            <Campo rotulo="Data" valor={dataCurta(pedido.created_at)} />
+            <Campo rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
+            <Campo rotulo="CEP fat." valor={formatarCep(cliente?.billing_zip) || null} />
+            <Campo rotulo="E-mail" valor={cliente?.email} />
+            <Campo rotulo="Cidade/UF faturamento" valor={cidadeUf(cliente?.billing_city, cliente?.billing_state)} />
+            <Campo rotulo="Vendedor" valor={pedido.sellers?.name} ultimo />
           </div>
           {/* Endereço de entrega diferente do de sempre precisa saltar aos
               olhos: é o erro de expedição mais caro que existe. */}
           {pedido.shipping_zip && pedido.shipping_zip !== cliente?.shipping_zip && (
-            <p className="mt-2 border border-black/40 px-2 py-1 text-xs font-bold">
+            <p className="mt-2 rounded-lg border border-black/40 bg-amber-50 px-3 py-1.5 text-[10px] font-bold">
               ATENÇÃO: a entrega deste pedido vai para o CEP {formatarCep(pedido.shipping_zip)},
               diferente do cadastro do cliente.
             </p>
           )}
-        </div>
+        </section>
 
         {/* ---------- Itens ---------- */}
-        <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Itens</h2>
-          <table className="w-full">
-            <thead>
-              <tr className="text-left align-bottom">
-                <th className="py-1 font-medium">Código / descrição / nome na NF</th>
-                <th className="w-16 py-1 text-right font-medium">Qtd</th>
-                <th className="w-24 py-1 text-right font-medium">Valor unit.</th>
-                <th className="w-24 py-1 text-right font-medium">Valor total</th>
-                {verNumeros && <th className="w-24 py-1 text-right font-medium">CMV un.</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {pedido.itens.map((i, idx) => {
-                // Kit montado neste pedido só ganha código quando o pedido é
-                // ganho — até lá a folha diz isso, em vez de imprimir "—".
-                const adHoc = i.ad_hoc_kit_composicao;
-                const codigo =
-                  i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
-                  (adHoc ? "kit novo" : "—");
-                const nome =
-                  i.products?.name ??
-                  i.kits?.name ??
-                  (adHoc ? i.ad_hoc_kit_label?.trim() || "Kit montado no pedido" : "—");
-                // Kit sai SÓ com o código na folha impressa (pedido da
-                // Intertech em 21/08/2026). O nome interno — "KIT HOSP SANTA
-                // BEATRIZ" — não diz nada a quem confere e a quem fatura: quem
-                // descreve o kit é a lista de componentes logo abaixo, que é de
-                // onde sai o lançamento da nota. O código fica, que é como o
-                // kit é encontrado no sistema.
-                const ehKit = Boolean(i.kits || adHoc);
-                // O kit sai DESCRITO ITEM POR ITEM: é dessa lista que sai o
-                // lançamento da nota, pedido explícito na reunião. Fechado, sai
-                // da composição congelada; em aberto, da composição montada.
-                const composicao =
-                  (i.kit_composition_snapshot as ComposicaoKit | null) ?? adHoc ?? null;
-                return (
-                  <tr key={i.id} className="border-t border-black/10 align-top">
-                    <td className="py-2">
-                      <span className="font-mono font-bold">{codigo}</span>
-                      {!ehKit && <> — {nome}</>}
-                      {/* Os dois nomes, um embaixo do outro: a conferência
-                          reconhece o produto pelo nome de casa (com gramatura),
-                          e o faturamento precisa do nome fiscal. */}
-                      {i.products?.nf_description && i.products.nf_description !== nome && (
-                        <div className="mt-0.5 text-xs">
-                          <span className="text-black/50">NF:</span> {i.products.nf_description}
-                        </div>
-                      )}
-                      {composicao && composicao.length > 0 && (
-                        <ul className="mt-1 ml-4 list-disc text-xs">
-                          {composicao.map((c, j) => (
-                            <li key={j}>{c.quantidade}× {c.nome}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td className="py-2 text-right">{i.quantity}</td>
-                    <td className="py-2 text-right">{reais(i.unit_price)}</td>
-                    <td className="py-2 text-right font-medium">
-                      {reais(totais.linhas[idx]?.total.toString())}
-                    </td>
-                    {verNumeros && (
-                      <td className="py-2 text-right">
-                        {reais(fechado ? i.cmv_unit_snapshot : cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : i.cmv_unit_snapshot)}
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-black/40 font-bold">
-                <td className="py-2" colSpan={3}>Subtotal</td>
-                <td className="py-2 text-right">{reais(totais.subtotal.toString())}</td>
-                {verNumeros && <td />}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        {/* ---------- Condições ---------- */}
-        <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Condições</h2>
-          <Dado rotulo="Condição de pagamento" valor={modoPagamento} />
-          <p className="mt-2">
-            <strong>Obs.:</strong>{" "}
-            {pedido.order_notes ? (
-              <span className="whitespace-pre-line">{pedido.order_notes}</span>
-            ) : (
-              <span className="inline-block w-2/3 border-b border-black/30" />
-            )}
-          </p>
-        </div>
-
-        {/* ---------- Expedição ---------- */}
-        <div>
-          <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Expedição</h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <Dado rotulo="Transportadora" valor={transportadora} />
-            <Dado rotulo="Frete" valor={reais(pedido.freight)} />
-            <Dado
-              rotulo="Frete destacado"
-              valor={pedido.freight_paid_by_customer ? "Sim, rateado nos itens" : "Não"}
-            />
-            <Dado rotulo="Peso" valor={pedido.weight_kg ? `${pedido.weight_kg} kg` : null} />
-            <Dado rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
-          </div>
-          {fretesCotados.length > 0 && (
-            <table className="mt-3 w-full text-xs">
+        <section className="ficha-bloco">
+          <Secao titulo="Itens do pedido" icone={<IconeDocumento />} />
+          <div className="overflow-hidden rounded-xl border border-[var(--cor-borda)]">
+            <table className="w-full">
               <thead>
-                <tr className="border-b border-black/20 text-left">
-                  <th className="py-1 font-medium">Opção de frete</th>
-                  <th className="py-1 text-right font-medium">Valor</th>
-                  <th className="py-1 text-right font-medium">Prazo</th>
-                  <th className="py-1 text-right font-medium">Cotação</th>
+                <tr className="bg-[var(--cor-primaria)] text-[10px] font-semibold uppercase tracking-wide text-white">
+                  <th className="w-20 px-3 py-2 text-left">Código</th>
+                  <th className="px-3 py-2 text-left">Descrição</th>
+                  <th className="w-14 px-2 py-2 text-center">Qtde</th>
+                  <th className="w-24 px-3 py-2 text-center">Valor unit.</th>
+                  <th className="w-24 px-3 py-2 text-center">Valor total</th>
+                  {verNumeros && <th className="w-20 px-3 py-2 text-center">CMV un.</th>}
                 </tr>
               </thead>
               <tbody>
-                {fretesCotados.map((opcao) => (
-                  <tr key={opcao.id} className={opcao.selected ? "font-bold" : ""}>
-                    <td className="py-1">
-                      {opcao.selected ? "Escolhida: " : ""}
-                      {opcao.carrierOther || opcao.carrierName || "—"}
-                    </td>
-                    <td className="py-1 text-right">{opcao.amount ? reais(opcao.amount) : "—"}</td>
-                    <td className="py-1 text-right">
-                      {opcao.leadTimeDays ? `${opcao.leadTimeDays} dias` : "—"}
-                    </td>
-                    <td className="py-1 text-right">{opcao.quoteCode || "—"}</td>
-                  </tr>
-                ))}
+                {pedido.itens.map((i, idx) => {
+                  // Kit montado neste pedido só ganha código quando o pedido é
+                  // ganho — até lá a folha diz isso, em vez de imprimir "—".
+                  const adHoc = i.ad_hoc_kit_composicao;
+                  const codigo =
+                    i.item_code_snapshot ?? i.products?.code ?? i.kits?.code ??
+                    (adHoc ? "kit novo" : "—");
+                  const nome =
+                    i.products?.name ??
+                    i.kits?.name ??
+                    (adHoc ? i.ad_hoc_kit_label?.trim() || "Kit montado no pedido" : "—");
+                  // Kit sai SÓ com o código na folha impressa (pedido da
+                  // Intertech em 21/08/2026). O nome interno — "KIT HOSP SANTA
+                  // BEATRIZ" — não diz nada a quem confere e a quem fatura: quem
+                  // descreve o kit é a lista de componentes logo abaixo, que é de
+                  // onde sai o lançamento da nota. O código fica, que é como o
+                  // kit é encontrado no sistema.
+                  const ehKit = Boolean(i.kits || adHoc);
+                  // O kit sai DESCRITO ITEM POR ITEM: é dessa lista que sai o
+                  // lançamento da nota, pedido explícito na reunião. Fechado, sai
+                  // da composição congelada; em aberto, da composição montada.
+                  const composicao =
+                    (i.kit_composition_snapshot as ComposicaoKit | null) ?? adHoc ?? null;
+                  return (
+                    <tr key={i.id} className="border-t border-[var(--cor-borda)] align-middle">
+                      <td className="px-3 py-2 align-top font-mono text-[10px] font-semibold">{codigo}</td>
+                      <td className="px-3 py-2 align-top">
+                        {!ehKit && <div className="font-semibold">{nome}</div>}
+                        {/* Os dois nomes, um embaixo do outro: a conferência
+                            reconhece o produto pelo nome de casa (com gramatura),
+                            e o faturamento precisa do nome fiscal. */}
+                        {i.products?.nf_description && i.products.nf_description !== nome && (
+                          <div className="text-[10px] italic text-black/70">
+                            <span className="font-semibold not-italic">NF:</span>{" "}
+                            {i.products.nf_description}
+                          </div>
+                        )}
+                        {composicao && composicao.length > 0 && (
+                          <ul className="mt-1 ml-3 list-disc text-[10px] text-black/75">
+                            {composicao.map((c, j) => (
+                              <li key={j}>{c.quantidade}× {c.nome}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-center align-top">{i.quantity}</td>
+                      <td className="px-3 py-2 text-center align-top">{reais(i.unit_price)}</td>
+                      <td className="px-3 py-2 text-center align-top font-semibold">
+                        {reais(totais.linhas[idx]?.total.toString())}
+                      </td>
+                      {verNumeros && (
+                        <td className="px-3 py-2 text-center align-top text-black/70">
+                          {reais(fechado ? i.cmv_unit_snapshot : cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : i.cmv_unit_snapshot)}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-          )}
+          </div>
+        </section>
+
+        {/* ---------- Expedição + Resumo financeiro, lado a lado ---------- */}
+        <div className="grid grid-cols-[7fr_5fr] gap-4">
+          <section className="ficha-bloco">
+            <Secao titulo="Expedição / logística" icone={<IconeCaminhao />} />
+            {fretesCotados.length > 0 && (
+              <div className="overflow-hidden rounded-xl border border-[var(--cor-borda)]">
+                <table className="w-full table-fixed text-[9px]">
+                  <thead>
+                    <tr className="bg-[var(--cor-primaria)] font-semibold text-white">
+                      <th className="w-12 px-1 py-1.5">Escolhida</th>
+                      <th className="px-1 py-1.5">Transportadora</th>
+                      <th className="w-24 px-1 py-1.5">Cód. cotação</th>
+                      <th className="w-20 px-1 py-1.5">Valor</th>
+                      <th className="w-12 px-1 py-1.5">Prazo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fretesCotados.map((opcao) => (
+                      <tr
+                        key={opcao.id}
+                        className={`border-t border-[var(--cor-borda)] text-center ${opcao.selected ? "font-semibold" : ""}`}
+                      >
+                        <td className="px-1 py-1.5">
+                          <Selecao marcada={opcao.selected} />
+                        </td>
+                        <td className="truncate px-1 py-1.5">{opcao.carrierName || "—"}</td>
+                        <td className="truncate px-1 py-1.5">{opcao.carrierOther || opcao.quoteCode || "—"}</td>
+                        <td className="whitespace-nowrap px-1 py-1.5">{opcao.amount ? reais(opcao.amount) : "—"}</td>
+                        <td className="whitespace-nowrap px-1 py-1.5">
+                          {opcao.leadTimeDays ? `${opcao.leadTimeDays}d` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Transportadora escolhida sem cotação lançada: a folha ainda
+                precisa dizer por quem vai. */}
+            {fretesCotados.length === 0 && (
+              <div className="rounded-xl border border-[var(--cor-borda)] px-4 py-2">
+                <Campo rotulo="Transportadora" valor={transportadora} ultimo />
+              </div>
+            )}
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <Caixinha rotulo="Peso (kg)" valor={pedido.weight_kg ? String(pedido.weight_kg) : null} />
+              <Caixinha rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
+              <Caixinha rotulo="CEP de entrega" valor={formatarCep(cepEntrega) || null} />
+            </div>
+          </section>
+
+          <section className="ficha-bloco">
+            <Secao titulo="Resumo financeiro" icone={<IconeCifrao />} />
+            <div className="overflow-hidden rounded-xl border border-[var(--cor-borda)]">
+              <table className="w-full">
+                <tbody>
+                  <LinhaResumo rotulo="Subtotal" valor={reais(totais.subtotal.toString())} />
+                  <LinhaResumo rotulo="Frete" valor={reais(pedido.freight)} />
+                  {/* ST, DIFAL e FCP saem como traço de propósito: nenhum dos
+                      três é acrescentado à cobrança do cliente. O DIFAL é
+                      recolhido pela Intertech ao estado (confirmado em
+                      05/08/2026) e aparece como dedução no bloco de margem,
+                      abaixo; o ST não existe no sistema. */}
+                  <LinhaResumo rotulo="ST" valor="—" />
+                  <LinhaResumo rotulo="DIFAL" valor="—" />
+                  <LinhaResumo rotulo="FCP" valor="—" />
+                  <LinhaResumo rotulo="DIFAL + FCP" valor="—" />
+                  <tr className="bg-[var(--cor-primaria-clara)]">
+                    <td className="px-4 py-2 text-base font-bold text-[var(--cor-primaria)]">TOTAL:</td>
+                    <td className="px-4 py-2 text-right text-base font-extrabold text-[var(--cor-primaria)]">
+                      {reais(totalACobrar.toString())}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1 text-[9px] leading-tight text-black/55">
+              Total = subtotal dos itens + frete. Impostos, DIFAL e FCP não entram na cobrança do
+              cliente: são deduções da receita da Intertech.
+            </p>
+          </section>
         </div>
 
-        {/* ---------- Resumo financeiro (só para quem vê margem) ---------- */}
+        {/* ---------- Pagamento e observação ---------- */}
+        <section className="ficha-bloco rounded-xl border border-[var(--cor-borda)] px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--cor-primaria)]">
+            Pagamento:{" "}
+            <span className="font-normal normal-case tracking-normal text-black">
+              {modoPagamento ?? ""}
+            </span>
+          </p>
+          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-[var(--cor-primaria)]">
+            Obs.:{" "}
+            <span className="font-normal normal-case tracking-normal text-black">
+              {pedido.order_notes ? (
+                <span className="whitespace-pre-line">{pedido.order_notes}</span>
+              ) : (
+                ""
+              )}
+            </span>
+          </p>
+          {/* Linhas para completar à mão o que não estava no sistema na hora. */}
+          {!pedido.order_notes && (
+            <div className="mt-1">
+              <div className="h-5 border-b border-black/20" />
+              <div className="h-5 border-b border-black/20" />
+              <div className="h-5 border-b border-black/20" />
+            </div>
+          )}
+        </section>
+
+        {/* ---------- Margem (só para quem pode ver) ---------- */}
         {totaisFinanceiros && verNumeros && (
-          <div>
-            <h2 className="mb-2 border-b border-black/20 pb-1 font-bold">Resumo financeiro</h2>
+          <section className="ficha-bloco">
+            <Secao titulo="Margem — uso interno" icone={<IconeCifrao />} />
             {!fechado && cascataQuery.isLoading && (
-              <p className="mb-2 text-xs text-black/60">Calculando valores financeiros vigentes…</p>
+              <p className="mb-1 text-[10px] text-black/60">Calculando valores financeiros vigentes…</p>
             )}
             {!fechado && cascata && !cascata.ok && (
-              <p className="mb-2 border border-black/20 px-2 py-1 text-xs">
+              <p className="mb-1 rounded-lg border border-black/20 px-2 py-1 text-[10px]">
                 Não foi possível calcular a cascata vigente: {cascata.erro}
               </p>
             )}
-            <table className="w-full">
-              <tbody>
-                <Linha rotulo="Receita bruta" valor={totaisFinanceiros.receita_bruta} />
-                {/* DIFAL em linha própria, e não mais somado a "impostos": o
-                    formulário o pede separado, e a conferência precisa
-                    enxergá-lo isolado para conversar com o contador. */}
-                <Linha rotulo="(−) Impostos sobre venda" valor={totaisFinanceiros.impostos} />
-                <Linha
-                  rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
-                  valor={totaisFinanceiros.difal}
-                />
-                <Linha rotulo="(−) Frete" valor={totaisFinanceiros.frete} />
-                <Linha rotulo="(−) Comissão" valor={totaisFinanceiros.comissao} />
-                <Linha rotulo="= Receita líquida" valor={totaisFinanceiros.receita_liquida} negrito />
-                <Linha rotulo="(−) CMV" valor={totaisFinanceiros.cmv} />
-                <Linha rotulo="= Margem de contribuição" valor={totaisFinanceiros.margem_contribuicao} negrito />
-              </tbody>
-            </table>
-            {/* Sem esta frase, alguém soma as linhas de imposto ao subtotal e
-                lê como o que se cobra do cliente. São coisas diferentes —
-                confirmado com a Intertech em 05/08/2026: DIFAL é recolhido
-                pela Intertech ao estado, não cobrado do cliente. */}
-            <p className="mt-2 text-xs">
-              Impostos e DIFAL acima são <strong>deduções da receita da Intertech</strong>, não
-              valores acrescentados à cobrança do cliente — DIFAL é recolhido pela Intertech ao
-              estado quando o cliente não é contribuinte (FCP já incluído na alíquota). O
-              tratamento de ST na cobrança ainda está pendente de confirmação com a Intertech.
-            </p>
-          </div>
+            <div className="overflow-hidden rounded-xl border border-[var(--cor-borda)]">
+              <table className="w-full">
+                <tbody>
+                  <Linha rotulo="Receita bruta" valor={totaisFinanceiros.receita_bruta} />
+                  {/* DIFAL em linha própria, e não somado a "impostos": a
+                      conferência precisa enxergá-lo isolado para conversar com
+                      o contador. */}
+                  <Linha rotulo="(−) Impostos sobre venda" valor={totaisFinanceiros.impostos} />
+                  <Linha
+                    rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
+                    valor={totaisFinanceiros.difal}
+                  />
+                  <Linha rotulo="(−) Frete" valor={totaisFinanceiros.frete} />
+                  <Linha rotulo="(−) Comissão" valor={totaisFinanceiros.comissao} />
+                  <Linha rotulo="= Receita líquida" valor={totaisFinanceiros.receita_liquida} negrito />
+                  <Linha rotulo="(−) CMV" valor={totaisFinanceiros.cmv} />
+                  <Linha rotulo="= Margem de contribuição" valor={totaisFinanceiros.margem_contribuicao} negrito />
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
 
-        <div className="grid grid-cols-2 gap-8 pt-8 text-xs">
+        <div className="grid grid-cols-2 gap-10 pt-6 text-[10px]">
           <div className="border-t border-black/40 pt-1 text-center">Conferido por</div>
           <div className="border-t border-black/40 pt-1 text-center">
             {pedido.approval_status === "aprovado"
@@ -338,23 +384,109 @@ export default function PedidoFichaPage() {
   );
 }
 
-// Campo do cabeçalho. Vazio vira uma linha para preencher à mão — a folha
-// continua utilizável enquanto o cadastro não estiver completo, que é a
-// situação dos 13 mil clientes herdados da planilha.
-function Dado({
+// ---------- Peças do desenho da ficha ----------
+
+// Cabeçalho de seção: selo azul arredondado + título em caixa alta.
+function Secao({ titulo, icone }: { titulo: string; icone: React.ReactNode }) {
+  return (
+    <div className="mb-1.5 flex items-center gap-2">
+      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--cor-primaria)] text-white">
+        {icone}
+      </span>
+      <h2 className="text-[13px] font-bold uppercase tracking-wide text-[var(--cor-primaria)]">
+        {titulo}
+      </h2>
+    </div>
+  );
+}
+
+// Linha rótulo/valor do cartão de cliente. Vazio vira espaço para preencher à
+// mão — a folha continua utilizável enquanto o cadastro não estiver completo,
+// que é a situação dos 13 mil clientes herdados da planilha.
+function Campo({
   rotulo,
   valor,
-  className,
+  ultimo,
 }: {
   rotulo: string;
   valor: string | null | undefined;
-  className?: string;
+  ultimo?: boolean;
 }) {
   return (
-    <p className={className}>
-      <strong>{rotulo}:</strong>{" "}
-      {valor ? valor : <span className="inline-block min-w-32 border-b border-black/30" />}
-    </p>
+    <div className={`flex gap-3 py-1.5 ${ultimo ? "" : "border-b border-[var(--cor-borda)]"}`}>
+      <span className="w-32 shrink-0 font-semibold text-[var(--cor-primaria)]">{rotulo}:</span>
+      <span className="min-w-0 flex-1 break-words">{valor || " "}</span>
+    </div>
+  );
+}
+
+// Caixinha do bloco de expedição (peso, volumes, CEP).
+function Caixinha({ rotulo, valor }: { rotulo: string; valor: string | null }) {
+  return (
+    <div className="rounded-xl border border-[var(--cor-borda)] px-3 py-1.5">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-[var(--cor-primaria)]">{rotulo}</p>
+      <p className="mt-0.5 min-h-[1.1rem]">{valor || " "}</p>
+    </div>
+  );
+}
+
+// Marcador da opção de frete escolhida.
+function Selecao({ marcada }: { marcada: boolean }) {
+  return (
+    <span
+      className={`mx-auto flex h-3 w-3 items-center justify-center rounded-full border ${
+        marcada ? "border-[var(--cor-primaria)]" : "border-black/30"
+      }`}
+    >
+      {marcada && <span className="h-1.5 w-1.5 rounded-full bg-[var(--cor-primaria)]" />}
+    </span>
+  );
+}
+
+function LinhaResumo({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <tr className="border-b border-[var(--cor-borda)]">
+      <td className="px-4 py-1.5 font-semibold text-[var(--cor-primaria)]">{rotulo}:</td>
+      <td className="px-4 py-1.5 text-right">{valor}</td>
+    </tr>
+  );
+}
+
+function IconePessoa() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+      <circle cx="8" cy="5" r="2.6" />
+      <path d="M2.6 14c0-2.8 2.4-4.6 5.4-4.6s5.4 1.8 5.4 4.6z" />
+    </svg>
+  );
+}
+
+function IconeDocumento() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M4.2 2h4.6L12 5.2v8.8H4.2z" strokeLinejoin="round" />
+      <path d="M6.2 8.2h4M6.2 10.6h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconeCaminhao() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+      <rect x="1" y="4" width="7.5" height="6.5" rx="1" />
+      <path d="M9 6h2.7L14.5 8.6v1.9H9z" />
+      <circle cx="4.6" cy="12" r="1.6" />
+      <circle cx="11.8" cy="12" r="1.6" />
+    </svg>
+  );
+}
+
+function IconeCifrao() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+      <path d="M7.3 1.6h1.4v1.5h-1.4zM7.3 12.9h1.4v1.5h-1.4z" />
+      <path d="M8 3.1c2 0 3.3 1 3.3 2.4h-1.7c0-.6-.6-1-1.6-1s-1.6.4-1.6 1c0 1.8 5 .7 5 3.6 0 1.5-1.4 2.5-3.4 2.5s-3.5-1-3.5-2.6h1.7c0 .7.7 1.2 1.8 1.2s1.7-.4 1.7-1c0-1.9-5-.8-5-3.6C4.7 4.1 6 3.1 8 3.1z" />
+    </svg>
   );
 }
 

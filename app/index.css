@@ -55,4 +55,14 @@ thead { background: #fafafd; }
   body { background: white; }
   main { padding: 0 !important; }
   [class*="shadow"] { box-shadow: none !important; }
+
+  /* A ficha do pedido tem faixas e cabeçalhos em azul. Sem isto o navegador
+     "economiza tinta" e imprime tudo branco, desmontando o desenho. */
+  .ficha-pedido, .ficha-pedido * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Uma folha por pedido: os blocos não podem quebrar no meio. */
+  .ficha-bloco { break-inside: avoid; }
+  @page { size: A4; margin: 10mm; }
 }
