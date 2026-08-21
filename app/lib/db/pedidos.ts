@@ -3,7 +3,7 @@ import { supabase } from "../supabase";
 import { chaveDaEmbalagem, type CatalogoParaKit, type EmbalagemDoKit, type PapelNoKit } from "../sim/kitNoPedido";
 import type { KitParaCopiar } from "../sim/itensDoPedido";
 import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
-import { numeroDigitado } from "../format";
+import { normalizarFreteCotado, numeroDigitado, type FreteCotado } from "../format";
 
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
 
@@ -99,7 +99,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // antes de o pedido chegar à conferência com o cabeçalho vazio.
     supabase.from("customers").select("id, external_code, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
-    supabase.from("difal_rates").select("uf, final_rate"),
+    supabase.from("difal_rates").select("uf, final_rate, charges_difal"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
     supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
@@ -208,7 +208,16 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     }));
 
   const tabelaPorUF = new Map<string, TabelasUF>();
-  const difalPorUF = new Map((difal.data ?? []).map((d) => [d.uf as string, d.final_rate as string]));
+  // UF que não cobra DIFAL entra como zero, e não some da tabela: a alíquota
+  // continua registrada em Configurações para quando voltar a valer. A regra é
+  // E lógico com o pedido — a UF precisa cobrar E o pedido precisa aplicar
+  // (canal Revendas/Descpro, ou a marcação manual do simulador).
+  const difalPorUF = new Map(
+    (difal.data ?? []).map((d) => [
+      d.uf as string,
+      (d.charges_difal as boolean | null) === false ? "0" : (d.final_rate as string),
+    ])
+  );
   const portalPorUF = new Map((portal.data ?? []).map((p) => [p.uf as string, p.freight_percent as string]));
   for (const r of icsm.data ?? []) {
     const uf = r.uf as string;
@@ -380,16 +389,9 @@ export type DadosSimulacao = {
   observacao: string | null;
 };
 
-export type FreteCotado = {
-  id: string;
-  carrierId: string | null;
-  carrierName: string | null;
-  carrierOther: string | null;
-  amount: string | null;
-  leadTimeDays: string | null;
-  quoteCode: string | null;
-  selected: boolean;
-};
+// Reexportados para quem já importava daqui.
+export type { FreteCotado } from "../format";
+export { normalizarFreteCotado } from "../format";
 
 // Salva a cotação e EMPILHA UMA VERSÃO (reunião 16/07/2026: "se ele faz 10
 // alterações, vamos registrar as 10"). Snapshots financeiros continuam sendo
@@ -458,9 +460,13 @@ export async function salvarCotacao(
   });
   if (error) throw error;
   const resultado = data as ResultadoCotacao;
+  // Normaliza o valor e o prazo antes de gravar: eles vêm do que a pessoa
+  // digitou ("384,00", "3.223,00") e ficam num jsonb, sem o `numeric` do banco
+  // para arrumar. Gravando cru, a ficha de expedição não conseguia formatar e
+  // mostrava "—" no lugar do valor cotado (relatado em 21/08/2026).
   const { error: erroFretes } = await supabase
     .from("orders")
-    .update({ freight_quotes: d.fretesCotados })
+    .update({ freight_quotes: d.fretesCotados.map(normalizarFreteCotado) })
     .eq("id", resultado.id);
   if (erroFretes) throw erroFretes;
   const { data: numeros, error: erroNumeros } = await supabase

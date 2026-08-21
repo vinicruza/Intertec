@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   atualizarCanal,
+  atualizarCobraDifal,
   atualizarDifal,
   atualizarIcsm,
   atualizarPortal,
@@ -488,6 +489,10 @@ function LinhaIcsm({ linha, onSalvar }: { linha: IcsmLinha; onSalvar: (icms: str
 function AbaDifal() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["difal"], queryFn: listarDifal });
+  const cobrar = useMutation({
+    mutationFn: (v: { id: string; cobra: boolean }) => atualizarCobraDifal(v.id, v.cobra),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["difal"] }),
+  });
   const salvar = useMutation({
     mutationFn: (v: { id: string; final: string }) => atualizarDifal(v.id, v.final),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["difal"] }),
@@ -502,18 +507,32 @@ function AbaDifal() {
           <th className="px-4 py-3 font-medium">Pobreza (FCP)</th>
           <th className="px-4 py-3 font-medium">Alíquota base</th>
           <th className="px-4 py-3 font-medium">DIFAL final</th>
+          <th className="px-4 py-3 font-medium">Cobra DIFAL</th>
         </tr>
       </thead>
       <tbody>
         {(data ?? []).map((r: DifalLinha) => (
-          <LinhaDifal key={r.id} linha={r} onSalvar={(final) => salvar.mutate({ id: r.id, final })} />
+          <LinhaDifal
+            key={r.id}
+            linha={r}
+            onSalvar={(final) => salvar.mutate({ id: r.id, final })}
+            onCobrar={(cobra) => cobrar.mutate({ id: r.id, cobra })}
+          />
         ))}
       </tbody>
     </TabelaUF>
   );
 }
 
-function LinhaDifal({ linha, onSalvar }: { linha: DifalLinha; onSalvar: (final: string) => void }) {
+function LinhaDifal({
+  linha,
+  onSalvar,
+  onCobrar,
+}: {
+  linha: DifalLinha;
+  onSalvar: (final: string) => void;
+  onCobrar: (cobra: boolean) => void;
+}) {
   const [final, setFinal] = useState(linha.final_rate);
   const alterado = final !== linha.final_rate;
   return (
@@ -525,8 +544,25 @@ function LinhaDifal({ linha, onSalvar }: { linha: DifalLinha; onSalvar: (final: 
       <td className="px-4 py-3 text-[var(--cor-texto-suave)]">{linha.fcp_rate ?? "—"}</td>
       <td className="px-4 py-3 text-[var(--cor-texto-suave)]">{linha.base_rate ?? "—"}</td>
       <td className="px-4 py-3">
-        <Input className="w-24" value={final} onChange={(e) => setFinal(e.target.value)} />
+        <Input
+          className="w-24"
+          value={final}
+          onChange={(e) => setFinal(e.target.value)}
+          disabled={!linha.charges_difal}
+        />
         {alterado && <Button className="ml-2 px-2 py-1 text-xs" onClick={() => onSalvar(final)}>Salvar</Button>}
+      </td>
+      {/* Desmarcar não apaga a alíquota: ela fica registrada, só não entra na
+          conta. Assim dá para religar depois sem pesquisar o número de novo. */}
+      <td className="px-4 py-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={linha.charges_difal}
+            onChange={(e) => onCobrar(e.target.checked)}
+          />
+          {linha.charges_difal ? "Cobra" : "Não cobra"}
+        </label>
       </td>
     </tr>
   );

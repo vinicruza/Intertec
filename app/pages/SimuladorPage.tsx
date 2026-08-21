@@ -120,6 +120,16 @@ export default function SimuladorPage() {
   const [clienteNovo, setClienteNovo] = useState("");
   const [canalId, setCanalId] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
+  // O que a pessoa DIGITOU no campo de comissão, enquanto está digitando.
+  //
+  // Sem isto o campo não aceitava casa decimal: ele mostrava a fração de volta
+  // como porcentagem a cada tecla, e "2," virava "2" na mesma hora — a vírgula
+  // era apagada antes da próxima tecla, e não havia como chegar em "2,5".
+  // Mesmo problema com o zero à direita ("2,50" virava "2,5" no meio da
+  // digitação). Relatado em 21/08/2026.
+  //
+  // null = ninguém está digitando; mostra a fração formatada.
+  const [comissaoTexto, setComissaoTexto] = useState<string | null>(null);
   const [frete, setFrete] = useState("0");
   const [freteCliente, setFreteCliente] = useState(false);
   // DIFAL (05/08/2026): padrão do canal, com override por pedido — o mesmo
@@ -182,6 +192,7 @@ export default function SimuladorPage() {
     setClienteNovoCodigo("");
     setClienteNovo("");
     setComissao(p.commission_rate == null ? null : textoDeCampo(p.commission_rate));
+    setComissaoTexto(null);
     setFrete(textoDeCampo(p.freight, "0"));
     setFreteCliente(p.freight_paid_by_customer);
     setAplicaDifalOverride(p.applies_difal);
@@ -654,6 +665,7 @@ export default function SimuladorPage() {
                   setVendedorId(e.target.value);
                   setCanalId(novoVendedor?.channel_id ?? "");
                   setComissao(null);
+                  setComissaoTexto(null);
                   setAplicaDifalOverride(null);
                 }}
               >
@@ -673,6 +685,7 @@ export default function SimuladorPage() {
                 onChange={(e) => {
                   setCanalId(e.target.value);
                   setComissao(null);
+                  setComissaoTexto(null);
                   setAplicaDifalOverride(null);
                 }}
               >
@@ -740,10 +753,16 @@ export default function SimuladorPage() {
             <Label>Comissão (%)</Label>
             <div className="flex items-center gap-1">
               <Input
-                value={fracaoParaPercentual(comissao ?? canal?.regras.comissaoPadrao ?? "")}
+                inputMode="decimal"
+                value={comissaoTexto ?? fracaoParaPercentual(comissao ?? canal?.regras.comissaoPadrao ?? "")}
                 onChange={(e) => {
-                  if (podeEditarComissao) setComissao(percentualParaFracao(e.target.value));
+                  if (!podeEditarComissao) return;
+                  // Guarda o texto como veio e converte em paralelo: a conta usa
+                  // a fração, o campo mostra o que a pessoa está escrevendo.
+                  setComissaoTexto(e.target.value);
+                  setComissao(percentualParaFracao(e.target.value));
                 }}
+                onBlur={() => setComissaoTexto(null)}
                 disabled={!podeEditarComissao}
                 placeholder="ex.: 2,5"
               />

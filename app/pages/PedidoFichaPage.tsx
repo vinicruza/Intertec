@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { totaisDaFichaDoPedido } from "@calc";
-import { calcularCascataVigente, obterPedidoCompleto } from "../lib/db/fechamento";
+import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
 import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, reais } from "../lib/format";
@@ -37,6 +37,13 @@ export default function PedidoFichaPage() {
   const { data: pedido, isLoading } = useQuery({
     queryKey: ["pedido", id],
     queryFn: () => obterPedidoCompleto(id!),
+  });
+  // Quem aprovou, para a assinatura da ficha. Consulta à parte porque a
+  // política de `profiles` não deixa a vendedora ler o perfil de quem aprovou.
+  const { data: aprovadoPor } = useQuery({
+    queryKey: ["nomeUsuario", pedido?.approved_by],
+    queryFn: () => nomeDoUsuario(pedido?.approved_by ?? null),
+    enabled: Boolean(pedido?.approved_by),
   });
   const cascataQuery = useQuery({
     queryKey: ["cascataVigente", id],
@@ -313,7 +320,9 @@ export default function PedidoFichaPage() {
         <div className="grid grid-cols-2 gap-8 pt-8 text-xs">
           <div className="border-t border-black/40 pt-1 text-center">Conferido por</div>
           <div className="border-t border-black/40 pt-1 text-center">
-            {pedido.approval_status === "aprovado" ? `Aprovado em ${dataCurta(pedido.approved_at)}` : "Aprovado por"}
+            {pedido.approval_status === "aprovado"
+              ? `Aprovado por ${aprovadoPor ?? "—"} em ${dataCurta(pedido.approved_at)}`
+              : "Aprovado por"}
           </div>
         </div>
       </div>

@@ -56,7 +56,7 @@ export async function atualizarRegraMargem(
 }
 
 export type IcsmLinha = { id: string; uf: string; icms_rate: string; pis_cofins_rate: string };
-export type DifalLinha = { id: string; uf: string; fcp_rate: string | null; base_rate: string | null; final_rate: string; flagged_for_review: boolean };
+export type DifalLinha = { id: string; uf: string; fcp_rate: string | null; base_rate: string | null; final_rate: string; flagged_for_review: boolean; charges_difal: boolean };
 export type PortalLinha = { id: string; uf: string; freight_percent: string };
 
 export async function listarIcsm(): Promise<IcsmLinha[]> {
@@ -72,13 +72,19 @@ export async function atualizarIcsm(id: string, icms_rate: string, pis_cofins_ra
 export async function listarDifal(): Promise<DifalLinha[]> {
   const { data, error } = await supabase
     .from("difal_rates")
-    .select("id, uf, fcp_rate, base_rate, final_rate, flagged_for_review")
+    .select("id, uf, fcp_rate, base_rate, final_rate, flagged_for_review, charges_difal")
     .order("uf");
   if (error) throw error;
   return data as DifalLinha[];
 }
 export async function atualizarDifal(id: string, final_rate: string): Promise<void> {
   const { error } = await supabase.from("difal_rates").update({ final_rate }).eq("id", id);
+  if (error) throw error;
+}
+
+// Liga/desliga a cobrança de DIFAL de uma UF sem apagar a alíquota pesquisada.
+export async function atualizarCobraDifal(id: string, charges_difal: boolean): Promise<void> {
+  const { error } = await supabase.from("difal_rates").update({ charges_difal }).eq("id", id);
   if (error) throw error;
 }
 

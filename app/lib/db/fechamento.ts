@@ -80,6 +80,7 @@ export type PedidoCompleto = {
   status: "simulation" | "closed" | "lost";
   approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
   approved_at: string | null;
+  approved_by: string | null;
   approval_notes: string | null;
   submitted_by: string | null;
   submitted_at: string | null;
@@ -172,7 +173,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -528,4 +529,16 @@ export async function duplicarPedido(orderId: string): Promise<string> {
 export async function cancelarPedido(orderId: string, motivo: string): Promise<void> {
   const { error } = await supabase.rpc("cancel_order", { p_order_id: orderId, p_reason: motivo });
   if (error) throw error;
+}
+
+// Nome de quem aprovou, para a ficha (pedido da Intertech em 21/08/2026).
+//
+// Vai por RPC porque a política `profiles_select` só deixa cada pessoa ler o
+// próprio perfil: o embed do PostgREST voltaria nulo para a vendedora, sem
+// erro. `nome_do_usuario` devolve só o nome, dentro do mesmo tenant.
+export async function nomeDoUsuario(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const { data, error } = await supabase.rpc("nome_do_usuario", { p_id: id });
+  if (error) return null; // a ficha não deixa de imprimir por causa do nome
+  return (data as string | null) ?? null;
 }

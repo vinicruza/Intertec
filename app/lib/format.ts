@@ -72,7 +72,12 @@ export function percentualParaFracao(percentual: string): string | null {
 export function reais(valor: ValorNumerico): string {
   if (valor === null || valor === undefined || valor === "") return "—";
   try {
-    return "R$ " + toMoney(dec(String(valor))).replace(".", ",");
+    // Passa por `numeroDigitado` porque nem tudo que chega aqui veio do motor
+    // já normalizado: o valor das opções de frete cotadas é gravado como a
+    // pessoa digitou ("384,00", "3.223,00"). Sem isto, `dec()` estourava e a
+    // coluna "Valor" da ficha de expedição saía como "—" com o valor gravado
+    // no banco — relatado em 21/08/2026.
+    return "R$ " + toMoney(dec(numeroDigitado(String(valor)))).replace(".", ",");
   } catch {
     return "—";
   }
@@ -103,4 +108,39 @@ export function haQuanto(iso: string | null | undefined): string {
   if (horas < 24) return `há ${horas} hora${horas === 1 ? "" : "s"}`;
   const dias = Math.floor(horas / 24);
   return `há ${dias} dia${dias === 1 ? "" : "s"}`;
+}
+
+// ============================================================
+// Opções de frete cotadas (ficha de expedição)
+// ============================================================
+//
+// O valor e o prazo são digitados pela expedição e guardados num jsonb
+// (`orders.freight_quotes`), sem o `numeric` do banco para arrumar o formato.
+// Iam crus — "384,00", "3.223,00" — e a ficha não conseguia formatar, mostrando
+// "—" no lugar do valor gravado. Relatado em 21/08/2026.
+export type FreteCotado = {
+  id: string;
+  carrierId: string | null;
+  carrierName: string | null;
+  carrierOther: string | null;
+  amount: string | null;
+  leadTimeDays: string | null;
+  quoteCode: string | null;
+  selected: boolean;
+};
+
+// Campo vazio continua nulo — não vira zero, que seria um frete cotado a R$ 0,00.
+export function normalizarFreteCotado(f: FreteCotado): FreteCotado {
+  const numero = (v: string | null): string | null => {
+    const limpo = numeroDigitado(v ?? "").trim();
+    if (limpo === "") return null;
+    try {
+      return dec(limpo).toString();
+    } catch {
+      // Texto que não é número volta como veio: quem grava não é quem julga, e
+      // perder o que a pessoa digitou é pior do que guardar um valor estranho.
+      return v;
+    }
+  };
+  return { ...f, amount: numero(f.amount), leadTimeDays: numero(f.leadTimeDays) };
 }
