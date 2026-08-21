@@ -169,6 +169,13 @@ export default function PedidoFichaPage() {
                   i.products?.name ??
                   i.kits?.name ??
                   (adHoc ? i.ad_hoc_kit_label?.trim() || "Kit montado no pedido" : "—");
+                // Kit sai SÓ com o código na folha impressa (pedido da
+                // Intertech em 21/08/2026). O nome interno — "KIT HOSP SANTA
+                // BEATRIZ" — não diz nada a quem confere e a quem fatura: quem
+                // descreve o kit é a lista de componentes logo abaixo, que é de
+                // onde sai o lançamento da nota. O código fica, que é como o
+                // kit é encontrado no sistema.
+                const ehKit = Boolean(i.kits || adHoc);
                 // O kit sai DESCRITO ITEM POR ITEM: é dessa lista que sai o
                 // lançamento da nota, pedido explícito na reunião. Fechado, sai
                 // da composição congelada; em aberto, da composição montada.
@@ -177,7 +184,8 @@ export default function PedidoFichaPage() {
                 return (
                   <tr key={i.id} className="border-t border-black/10 align-top">
                     <td className="py-2">
-                      <span className="font-mono font-bold">{codigo}</span> — {nome}
+                      <span className="font-mono font-bold">{codigo}</span>
+                      {!ehKit && <> — {nome}</>}
                       {/* Os dois nomes, um embaixo do outro: a conferência
                           reconhece o produto pelo nome de casa (com gramatura),
                           e o faturamento precisa do nome fiscal. */}

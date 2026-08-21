@@ -245,7 +245,13 @@ export default function SimuladorPage() {
   const soMeuVendedor = perfil?.perfil === "comercial";
   const vendedoresDisponiveis = useMemo(() => {
     if (!ctx) return [];
-    if (podeEscolherVendedor) return ctx.vendedores.filter((v) => v.canalNome === "Interno");
+    // Administrador escolhe QUALQUER vendedor ativo, não só os do canal
+    // Interno. O filtro anterior escondia dele os vendedores externos — e o
+    // João, cadastrado em 21/08/2026, não usa o sistema: é o administrativo que
+    // lança em nome dele, então precisa achá-lo aqui. Escondia também a Mari,
+    // que é do Marketplace. Cada opção já mostra o canal ao lado do nome, então
+    // não há como confundir a que situação o vendedor pertence.
+    if (podeEscolherVendedor) return ctx.vendedores;
     if (!soMeuVendedor) return [];
     return ctx.vendedores.filter((v) => v.id === ctx.meuVendedorId);
   }, [ctx, podeEscolherVendedor, soMeuVendedor]);
