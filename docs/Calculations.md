@@ -355,6 +355,41 @@ Sem arredondamento por linha (§9.9): arredondar antes de somar daria um subtota
 
 Colunas: Pobreza (FCP) + Alíquota → DIFAL final. **SP não tem linha** (venda interna → SUMIF retorna 0, comportamento correto por acaso). Em 4 UFs o valor final não bate com Pobreza + Alíquota (ver Seção 9, item 5).
 
+#### 7.2.1 Quais UFs cobram — `charges_difal` (21/08/2026, confirmado em 24/08/2026)
+
+Ter alíquota na tabela e **cobrar** são duas coisas diferentes. Até 21/08 só havia dois jeitos de não
+cobrar: o canal não aplicar (Revendas, Descpro), ou a UF não ter linha — que obriga a APAGAR a
+alíquota pesquisada. A coluna `difal_rates.charges_difal` separou as duas, e virou uma chave por
+estado na tela de Configurações.
+
+```
+DIFAL = (UF cobra) E (pedido aplica) ? alíquota_final(UF) × base : 0
+```
+
+As duas condições são independentes e ambas precisam ser verdadeiras: `charges_difal` desliga por
+**estado**; `orders.applies_difal` desliga por **pedido** (§12.1).
+
+**Quem cobra hoje — decisão do financeiro, confirmada em 24/08/2026:**
+
+| | UFs |
+|---|---|
+| **Cobram** (14) | AM, CE, MG, MS, MT, PB, PE, PI, RN, RO, RR, SC, SE, TO |
+| **Não cobram** (13) | AC, AL, AP, BA, DF, ES, GO, MA, PA, PR, RJ, RS, SP |
+
+SP não cobra por definição — venda interna, alíquota 0. Os outros 12 **mantêm a alíquota
+registrada** e não entram na conta: é exatamente para isso que a coluna existe, em vez de apagar a
+linha.
+
+**O que ainda falta registrar:** o motivo estado a estado. A conferência de 24/08 (docs/17 §3)
+encontrou os 13 desmarcados sem justificativa em documento nenhum e sem rastro no `audit_logs` — a
+tela grava direto. O financeiro confirmou que a escolha é dele; o porquê de cada UF continua não
+escrito, e é o que impede alguém de conferir a lista daqui a seis meses.
+
+**Efeito colateral conhecido:** desligar uma UF não muda nada visível no orçamento — o DIFAL sai
+zero e a margem aparece maior. Três pedidos fechados nasceram assim (docs/17 §3), somando
+R$ 2.335,53 fora da margem. Se a Intertech recolhe o imposto mesmo assim, esse valor sai do caixa
+sem aparecer no resultado.
+
 ### 7.3 Frete estimado por UF (canal portal/marketplace) — aba `Portal`
 
 Percentual da receita por UF (ex.: SP 9%... AM 27%). Usado apenas nas abas Mari e Temporaria Patricia: `frete = %(UF) × receita_pedido`. Nas demais abas o frete é digitado.

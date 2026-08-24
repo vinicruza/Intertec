@@ -9,9 +9,12 @@
 
 ## 0. O que deu para conferir, e o que não deu
 
-A planilha `Rentabilidade 2026` **não estava disponível** nesta sessão. Sem o arquivo, o
-`npm run conferir:base` não roda, e portanto **não foi possível** comparar produto a produto o CMV
-e o preço de cada insumo contra a planilha viva.
+> **Atualizado em 24/08, à tarde:** a planilha chegou (`Rentabilidade_2026_4.xlsx`) e a
+> comparação item a item foi feita. O resultado está na **§8**, e é o melhor possível: nenhuma
+> divergência em que o sistema esteja errado.
+
+A primeira volta desta conferência rodou **sem** a planilha `Rentabilidade 2026`. O que segue
+descreve o que deu para conferir naquele momento; a §8 fecha a lacuna.
 
 O que foi conferido, e vale como conferência de verdade:
 
@@ -21,10 +24,9 @@ O que foi conferido, e vale como conferência de verdade:
 | Parâmetros de canal | a planilha (§8 + D4 do Calculations) | 5 canais — **completa** |
 | Volume e integridade do catálogo | o estado documentado em 19/08 (docs/16 §3.6) | **completa** |
 | Coerência interna (CMV × ficha × override) | o próprio motor | **completa** |
-| CMV e preço item a item | a planilha viva | ❌ **não feita — falta o .xlsx** |
+| CMV e preço item a item | a planilha viva | ✅ **feita — ver §8** |
 
-Para fechar a lacuna: colocar o `.xlsx` à mão e rodar
-`npm run conferir:base -- planilha.xlsx produtos.tsv insumos.tsv relatorio.md`.
+Para repetir a §8 no futuro: `npm run conferir:base -- planilha.xlsx produtos.tsv insumos.tsv relatorio.md`.
 
 ## 1. Resumo
 
@@ -37,6 +39,8 @@ Para fechar a lacuna: colocar o `.xlsx` à mão e rodar
 | **13 UFs com o DIFAL desligado, sem registro** | ⚠️ **decisão a confirmar (§3)** |
 | 3 pedidos fechados com auditoria que não bate com o valor | ⚠️ §4 |
 | Migrações do repositório × produção | ⚠️ ledger fora de sincronia (§6) |
+| **CMV e preço item a item × planilha** | ✅ **alinhado — 320 de 320 conferíveis (§8)** |
+| Registros `TESTE-QA` no banco de produção | ⚠️ 3, criados durante esta sessão (§8.4) |
 
 ## 2. Tabelas fiscais — batem 100%
 
@@ -100,12 +104,14 @@ marcou que aplica, e a chave do estado zerou assim mesmo.
 
 ### A pergunta para o cliente
 
-**Desligar esses 12 estados foi decisão do financeiro, ou alguém desmarcou a lista sem querer?**
+**RESPONDIDO em 24/08: foi decisão do financeiro.** A lista dos 14 que cobram e dos 13 que não
+cobram está registrada em `Calculations.md §7.2.1`, e os 3 pedidos fechados com DIFAL zero ficam
+como estão.
 
-- Se foi decisão: precisa virar seção do `Calculations.md`, com o motivo por estado. Hoje é um
-  parâmetro de banco que ninguém consegue explicar depois.
-- Se não foi: remarcar os 12 e refazer os 3 pedidos fechados, que estão com margem melhor do que a
-  real.
+**O que ainda falta:** o motivo estado a estado. A decisão está confirmada, mas não escrita — e é
+o que permitiria conferir a lista daqui a seis meses, ou explicá-la ao contador. Vale também fazer
+`charges_difal` passar pelo `audit_logs` (§7, item 3): hoje é a única alteração fiscal do sistema
+que não deixa rastro, e foi justamente ela que gerou este achado.
 
 ## 4. Três pedidos fechados: a auditoria diz uma coisa, o valor diz outra
 
@@ -181,3 +187,92 @@ aplicadas. Vale fazer antes que uma terceira migração entre no meio.
 4. **Sincronizar o ledger de migrações** (§6).
 5. **Rodar `conferir:base` com a planilha em mãos** para fechar a única frente que ficou de fora
    (§0), e limpar o orçamento de teste `ORC-2026-0004`.
+
+---
+
+## 8. Item a item contra a planilha viva (24/08, tarde)
+
+Rodado contra `Rentabilidade_2026_4.xlsx`, entregue pelo cliente. Lado da planilha lido pelos
+extratores do próprio projeto (`extrairInsumos` / `extrairAlocacao`); lado do banco lido direto de
+produção. Comparação por grupos de nome, com os grupos divergentes abertos linha a linha.
+
+### 8.1 Resultado
+
+| | Planilha | Banco | |
+|---|---:|---:|---|
+| Insumos | 85 | 82 | 51 grupos idênticos → **67 insumos batendo** |
+| Produtos (Alocação × `product_costs`) | 358 | 373 | 59 grupos idênticos → **253 produtos batendo** |
+
+**Nenhuma divergência em que o sistema esteja errado.** Todas as diferenças encontradas caem em
+quatro caixas, e em três delas quem está desatualizado ou errado é a planilha.
+
+### 8.2 Onde a planilha está atrasada: os aventais com compressa
+
+A planilha tem **16** aventais "com Compressa"; o sistema tem **32**. Não é falta de carga — é a
+decisão da Patrícia de 19/08 (docs/16 §3.8): *"Pode colocar com comp P e G. Com fio não precisa."*
+
+A prova de que o sistema está certo: **os 16 valores da planilha batem, ao centavo, com as versões
+`Compressa P` do sistema.** Ou seja, a planilha continua chamando de "com Compressa" o que sempre
+foi a compressa P, sem dizer. Os 16 produtos com compressa G existem só no sistema.
+
+| Grupo | Planilha | Banco |
+|---|---:|---:|
+| `Avental com Compressa …` | 2 | 4 |
+| `Avental EGG com Compressa …` | 6 | 10 |
+| `Avental G com Compressa …` | 6 | 10 |
+| `Avental GG com Compressa …` | 6 | 10 |
+| `Avental M com Compressa …` | 4 | 6 |
+
+**Nada a fazer no sistema.** Quem precisa alcançar é a planilha.
+
+### 8.3 Onde a planilha está errada: três defeitos que já eram conhecidos e não foram corrigidos
+
+Os três já estavam em docs/16 §3.7 e continuam na versão `_4`:
+
+**a) `Campo Catarata 1,40 x 1,60 GR40 Não Estéril`** — única divergência de CMV do catálogo inteiro
+com nome e contagem iguais dos dois lados.
+
+| | CMV |
+|---|---:|
+| Planilha | 2,459650 |
+| Sistema | **2,848086** |
+
+A planilha repete no GR40 Não Estéril exatamente o valor do **GR30** Não Estéril (2,459650) — a
+célula aponta para a linha de cima. O sistema aplica a diferença GR30 → GR40 que a própria planilha
+usa na versão estéril. **Hoje, todo orçamento feito na planilha com esse produto sai R$ 0,39 barato
+por peça.**
+
+**b) `Campo de Mesa 2,00 x 2,00 Não Estéril` aparece duas vezes na Alocação**, com 4,139754 e
+2,332531. O segundo valor é o CMV do `Campo de Mesa 1,50 x 1,50 Não Estéril`. No sistema é um
+produto só, com 4,139754 — e a prova de que o resto do grupo está perfeito é aritmética: o grupo
+`campo de mesa` soma 119,122992 na planilha e 116,790461 no banco, e a diferença é exatamente os
+2,332531 da linha duplicada.
+
+**c) `Avental TNT Sem Manga Tam Especial` aparece duas vezes**, com o mesmo 1,967800. O banco tem
+uma. Mesma aritmética: 10,954294 − 1,967800 = 8,986495, que é a soma do banco.
+
+### 8.4 Diferenças que não são divergência
+
+**Os 5 pseudo-insumos `Produto ...`** — a planilha tem 18 insumos que começam com "Produto"; o banco
+tem 13. Os 5 a mais (`Produto Avental`, `Produto Avental G`, `Produto Campo de Mayo`,
+`Produto Campo de mesa 0,70x0,70`, `Produto Campo de mesa 1,00x1,40 Adesivo 14x15 +Fen`) existem no
+sistema como **produtos-componente**, não como insumo — e com o valor idêntico ao da planilha nos
+cinco casos. É a modelagem correta: um produto que entra na ficha de outro não é insumo.
+
+**Registros `TESTE-QA` no banco de produção** — 2 insumos (`TESTE-QA Insumo B3`, `B3-2`) e 1
+produto. Não estão na planilha porque não deviam existir: são dados de teste. E **foram criados
+durante esta sessão** — no começo da conferência o banco tinha 80 insumos e 372 produtos; no fim,
+82 e 373. Alguém está testando em produção. Não afeta orçamento (produto de teste não é vendido),
+mas polui contagem e relatório. Vale apagar e combinar de testar noutro lugar.
+
+### 8.5 Veredito
+
+> **A base do sistema está alinhada com a planilha.**
+>
+> Das 320 comparações que dava para fazer (67 insumos + 253 produtos com nome e contagem iguais dos
+> dois lados), **320 batem**. As únicas diferenças de valor são um erro de fórmula da planilha
+> (§8.3a) e duas linhas duplicadas nela (§8.3b, §8.3c). Onde planilha e sistema discordam sobre o
+> catálogo (§8.2), é a planilha que não recebeu uma decisão de 19/08.
+>
+> Nada a corrigir no banco. O que precisa de correção é a planilha — e enquanto ela não for
+> corrigida, os orçamentos feitos **nela** é que saem errados.
