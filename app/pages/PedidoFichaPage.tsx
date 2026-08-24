@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { dec, totaisDaFichaDoPedido } from "@calc";
+import { totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
 import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
 import { podeVerCascataOperacional } from "../lib/db/aprovacao";
 import { useAuth } from "../auth/AuthProvider";
@@ -21,12 +21,13 @@ import { IntertechLogo } from "@components/brand/IntertechLogo";
 // margem de contribuição, além do kit descrito item por item, porque é dessa
 // lista que sai o lançamento no faturamento.
 //
-// O que ainda NÃO está aqui: o bloco fiscal do formulário (ST, FCP separado e
-// o TOTAL a cobrar). O ST não existe no sistema e está para ser confirmado com
-// a Intertech; e se DIFAL e FCP são custo da Intertech ou cobrança do cliente
-// depende de uma regra por cliente que ainda não foi definida. Enquanto isso,
-// os impostos aparecem como o sistema os trata hoje — deduções da receita —,
-// com o rótulo dizendo isso em letras, para ninguém ler a folha como fatura.
+// O bloco fiscal do formulário já sai com valor no DIFAL (24/08/2026, §12.4):
+// quem monta o pedido precisa enxergar o imposto que o estado de destino cobra.
+// Continua sendo dedução da receita da Intertech, nunca cobrança do cliente
+// (§12.1) — o rótulo diz isso em letras, e o TOTAL não soma o DIFAL, para
+// ninguém ler a folha como fatura. Sem valor seguem só o ST, que não existe no
+// sistema (§12.2), e o FCP, que não tem número próprio: já vem embutido na
+// alíquota final do DIFAL (§7.2).
 
 type ComposicaoKit = Array<{ nome: string; quantidade: string }>;
 
@@ -87,7 +88,32 @@ export default function PedidoFichaPage() {
   const subtitulo = pedido.order_number
     ? `ORÇAMENTO ${pedido.quote_number ?? "—"}`
     : pedido.quote_number ?? "—";
-  const totalACobrar = totais.subtotal.plus(dec(pedido.freight ?? "0"));
+  const totalACobrar = totalACobrarDoCliente(totais.subtotal, pedido.freight ?? "0");
+
+  // ---------- DIFAL na folha (pedido da vendedora, 24/08/2026) ----------
+  //
+  // Até aqui esta linha saía com traço fixo, e o valor do DIFAL só existia no
+  // bloco "Margem — uso interno", que é admin. A vendedora, que é quem monta o
+  // pedido, não via o número em lugar nenhum — daí a reclamação de que a
+  // cotação "não está puxando o valor do DIFAL". O sistema estava calculando o
+  // tempo todo; era a folha que não mostrava.
+  //
+  // O que muda aqui é SÓ a folha imprimir o que o motor já calcula. A regra
+  // fiscal não muda: o DIFAL continua sendo custo da Intertech, não cobrança do
+  // cliente (Calculations.md §12.1), então o TOTAL segue sendo subtotal + frete
+  // — travado em `totalACobrarDoCliente`, com teste.
+  //
+  // FCP não ganha número próprio: já vem embutido na alíquota final da tabela
+  // `difal_rates` (§7.2), e o sistema nunca calculou os dois separados. Por isso
+  // "DIFAL + FCP" repete o valor do DIFAL, e a linha do FCP diz onde ele está em
+  // vez de inventar um valor. ST segue sem valor: não existe no sistema (§12.2).
+  const difalCalculado = totaisFinanceiros?.difal;
+  const difalNaFolha =
+    difalCalculado != null
+      ? reais(difalCalculado)
+      : !fechado && cascataQuery.isLoading
+        ? "calculando…"
+        : "—";
 
   return (
     <div className="mx-auto max-w-[210mm] space-y-4">
@@ -283,15 +309,20 @@ export default function PedidoFichaPage() {
                 <tbody>
                   <LinhaResumo rotulo="Subtotal" valor={reais(totais.subtotal.toString())} />
                   <LinhaResumo rotulo="Frete" valor={reais(pedido.freight)} />
-                  {/* ST, DIFAL e FCP saem como traço de propósito: nenhum dos
-                      três é acrescentado à cobrança do cliente. O DIFAL é
-                      recolhido pela Intertech ao estado (confirmado em
-                      05/08/2026) e aparece como dedução no bloco de margem,
-                      abaixo; o ST não existe no sistema. */}
-                  <LinhaResumo rotulo="ST" valor="—" />
-                  <LinhaResumo rotulo="DIFAL" valor="—" />
-                  <LinhaResumo rotulo="FCP" valor="—" />
-                  <LinhaResumo rotulo="DIFAL + FCP" valor="—" />
+                  {/* Valor à vista, mas fora do TOTAL: nenhum dos três é
+                      acrescentado à cobrança do cliente (§12.1). */}
+                  <LinhaResumo rotulo="ST" valor="—" detalhe="não calculado pelo sistema" />
+                  <LinhaResumo
+                    rotulo="DIFAL"
+                    valor={difalNaFolha}
+                    detalhe={
+                      pedido.applies_difal
+                        ? "recolhido pela Intertech — não cobrado do cliente"
+                        : "dispensado — cliente contribuinte"
+                    }
+                  />
+                  <LinhaResumo rotulo="FCP" valor="—" detalhe="já embutido na alíquota do DIFAL" />
+                  <LinhaResumo rotulo="DIFAL + FCP" valor={difalNaFolha} />
                   <tr className="bg-[var(--cor-primaria-clara)]">
                     <td className="px-4 py-2 text-base font-bold text-[var(--cor-primaria)]">TOTAL:</td>
                     <td className="px-4 py-2 text-right text-base font-extrabold text-[var(--cor-primaria)]">
@@ -303,7 +334,9 @@ export default function PedidoFichaPage() {
             </div>
             <p className="mt-1 text-[9px] leading-tight text-black/55">
               Total = subtotal dos itens + frete. Impostos, DIFAL e FCP não entram na cobrança do
-              cliente: são deduções da receita da Intertech.
+              cliente: são deduções da receita da Intertech. O DIFAL aparece pelo valor para
+              conferência com o contador; o FCP já vem embutido na alíquota do DIFAL, por isso
+              “DIFAL + FCP” repete o mesmo valor.
             </p>
           </section>
         </div>
@@ -443,10 +476,23 @@ function Selecao({ marcada }: { marcada: boolean }) {
   );
 }
 
-function LinhaResumo({ rotulo, valor }: { rotulo: string; valor: string }) {
+function LinhaResumo({
+  rotulo,
+  valor,
+  detalhe,
+}: {
+  rotulo: string;
+  valor: string;
+  detalhe?: string;
+}) {
   return (
     <tr className="border-b border-[var(--cor-borda)]">
-      <td className="px-4 py-1.5 font-semibold text-[var(--cor-primaria)]">{rotulo}:</td>
+      <td className="px-4 py-1.5 font-semibold text-[var(--cor-primaria)]">
+        {rotulo}:
+        {detalhe && (
+          <span className="ml-1 text-[9px] font-normal text-black/55">({detalhe})</span>
+        )}
+      </td>
       <td className="px-4 py-1.5 text-right">{valor}</td>
     </tr>
   );

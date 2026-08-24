@@ -567,10 +567,48 @@ Os áudios da Intertech (05/08/2026) definem o termo (substituição tributária
 como se calcula. Falta saber se é calculado por regra (MVA, alíquota por UF, como as tabelas de
 §7) ou digitado à mão no pedido. **Em confirmação com a Intertech.**
 
+### 12.4 A folha passa a MOSTRAR o valor do DIFAL (24/08/2026)
+
+**Origem.** A vendedora mandou o print de uma cotação para Patrocínio/MG (CEP 38700-196) dizendo
+que *"não está puxando o valor do Difal"* e que *"MG cobra"*. Ela estava certa nas duas coisas — e
+mesmo assim não havia erro de cálculo.
+
+**O que estava acontecendo.** O motor calculava o DIFAL normalmente: MG tem 6% na `difal_rates`
+(seed 0008), e 6% × (1.865,00 + 145,00) = **R$ 120,60**. O valor só não aparecia para ela. A linha
+"DIFAL" do bloco RESUMO FINANCEIRO da ficha vinha com traço **fixo no código**, e o único lugar que
+imprimia o número — o bloco "Margem — uso interno" — é `admin` (`podeVerCascataOperacional`). Quem
+monta o pedido é o comercial, que portanto não via o DIFAL em lugar nenhum do sistema.
+
+O traço era intencional quando foi escrito (§12.1: nenhum dos três é cobrado do cliente), mas
+esconder o valor resolveu o problema errado: o risco é a folha ser lida como fatura, e disso quem
+protege é o **TOTAL**, não a ausência do número.
+
+**Decisão.** A folha mostra o valor; a cobrança não muda.
+
+```
+DIFAL         = o valor calculado, à vista na folha
+DIFAL + FCP   = o mesmo valor (FCP não tem número próprio — §7.2)
+FCP           = sem valor: já embutido na alíquota final do DIFAL
+ST            = sem valor: não existe no sistema (§12.2)
+TOTAL         = subtotal dos itens + frete        ← NÃO soma DIFAL
+```
+
+**Nada muda no cálculo.** Cascata, base do DIFAL (§6.3), override por pedido (§12.1), fechamento no
+banco e golden tests: tudo intocado. A mudança é de exibição.
+
+**Uma trava nova.** O `TOTAL` era uma soma solta dentro do componente de tela. Com o DIFAL impresso
+uma linha acima dele, somar um no outro virou um erro de uma tecla — então a conta desceu para
+`lib/calculations/fichaPedido.ts` como `totalACobrarDoCliente(subtotal, frete)`, com teste que fixa
+o pedido do print: total 2.010,00, com o DIFAL de 120,60 de fora.
+
+**Quando o pedido não tem DIFAL** (cliente contribuinte, `applies_difal = false`), a linha sai com
+o valor calculado e o rótulo diz o motivo — "dispensado — cliente contribuinte" —, em vez de um
+traço mudo, que foi exatamente o que gerou este chamado.
+
 ### 12.3 O que foi implementado
 
 Dados cadastrais do cliente (CNPJ/CPF, CEP de faturamento, CEP de entrega, contato, telefone,
 e-mail), expedição do pedido (transportadora, peso, volumes, CEP de entrega do pedido), condições
 (prazo de pagamento, observação), a ficha impressa redesenhada no formato do formulário, e o
-override de DIFAL por pedido (§12.1). Fora o DIFAL — que já era cálculo e continua sendo, só que
+override de DIFAL por pedido (§12.1) e o valor do DIFAL impresso na folha (§12.4). Fora o DIFAL — que já era cálculo e continua sendo, só que
 mais preciso —, nenhum desses campos entra na cascata de margem.

@@ -73,3 +73,46 @@ describe("DIFAL: a UF precisa cobrar E o pedido precisa aplicar", () => {
     expect(rodar("0.135", CANAL_COM_DIFAL).baseDifal.toString()).toBe("2602");
   });
 });
+
+// ============================================================
+// Regressão: o pedido de Patrocínio/MG (24/08/2026)
+// ============================================================
+//
+// A vendedora reclamou que a cotação "não está puxando o valor do DIFAL", e
+// que "MG cobra". Ela estava certa nas duas coisas: MG cobra 6% (seed 0008) e
+// o valor não aparecia na folha — mas o motor SEMPRE calculou. O defeito era
+// de exibição, não de cálculo (Calculations.md §12.4). Este teste fixa o
+// número do pedido dela para o dia em que alguém achar que o cálculo é que
+// estava errado.
+
+describe("pedido de Patrocínio/MG (CEP 38700-196)", () => {
+  const ITENS_DO_PRINT = [
+    { nome: "CT0013 Campo Catarata 1,00x1,20", precoVenda: "9.80", quantidade: "100", cmvUnitario: "1", despesaUnitaria: "0" },
+    { nome: "CA0006 Campo Com Adesivo 0,50x0,50", precoVenda: "7.20", quantidade: "50", cmvUnitario: "1", despesaUnitaria: "0" },
+    { nome: "CM0003 Campo de Mesa 0,70x0,70", precoVenda: "5.90", quantidade: "50", cmvUnitario: "1", despesaUnitaria: "0" },
+    { nome: "OC0002 Oclusor Não Estéril", precoVenda: "2.30", quantidade: "100", cmvUnitario: "1", despesaUnitaria: "0" },
+  ];
+
+  function pedidoDeMG(fretePorContaCliente: boolean) {
+    return simular({
+      itens: ITENS_DO_PRINT,
+      freteManual: "145", // BRASPRESS, a transportadora marcada no print
+      fretePorContaCliente,
+      comissao: null,
+      aplicaDifal: null, // sem override: vale o padrão do canal
+      canal: CANAL_COM_DIFAL,
+      uf: { aliquotaIcsm: "0.1625", difalFinal: "0.06", fretePortalPct: null }, // MG = 6%
+    }).resultado;
+  }
+
+  it("6% sobre receita + frete = 120,60", () => {
+    const r = pedidoDeMG(false);
+    expect(r.receitaBruta.toString()).toBe("1865");
+    expect(r.baseDifal.toString()).toBe("2010");
+    expect(r.difal.toString()).toBe("120.6");
+  });
+
+  it("frete destacado não muda o DIFAL — a base usa o frete INFORMADO (§6.3)", () => {
+    expect(pedidoDeMG(true).difal.toString()).toBe("120.6");
+  });
+});

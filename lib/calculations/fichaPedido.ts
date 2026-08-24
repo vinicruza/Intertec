@@ -48,3 +48,26 @@ export function totaisDaFichaDoPedido(itens: ItemFichaPedido[]): TotaisFichaPedi
     subtotal: linhas.reduce((s, l) => s.plus(l.total), new Decimal(0)),
   };
 }
+
+// ============================================================
+// Total a cobrar do cliente (24/08/2026)
+// ============================================================
+//
+//   total_a_cobrar = subtotal dos itens + frete
+//
+// E NADA MAIS. ST, DIFAL e FCP têm linha na folha porque o formulário de papel
+// tem essas linhas, mas nenhum dos três entra na cobrança: o DIFAL é recolhido
+// pela Intertech ao estado de destino e sai como dedução da receita
+// (Calculations.md §12.1, confirmado por áudio da Intertech em 05/08/2026).
+//
+// Esta conta era uma linha solta dentro da tela da ficha. Ela desceu para cá
+// quando a folha passou a IMPRIMIR o valor do DIFAL (§12.4): com o número à
+// vista ao lado do TOTAL, somar um no outro vira um erro de uma tecla — e
+// transformaria a folha de conferência numa fatura que cobra do cliente um
+// imposto que é custo da empresa. Aqui a regra fica travada por teste.
+export function totalACobrarDoCliente(
+  subtotal: EntradaDecimal,
+  frete: EntradaDecimal
+): Decimal {
+  return dec(subtotal).plus(dec(frete));
+}
