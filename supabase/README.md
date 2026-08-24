@@ -9,6 +9,8 @@
 
 - **`gestao-usuarios`** — criar acesso, redefinir senha e excluir acesso pela tela de Usuários. Roda no servidor porque usa a chave de administração do projeto (`SUPABASE_SERVICE_ROLE_KEY`, injetada pelo Supabase; nunca no repositório). Antes de agir, repassa o pedido ao banco com o token de quem pediu e chama `assert_can_manage_user` — quem decide permissão é o banco, sempre.
 - Publicar: `supabase functions deploy gestao-usuarios` (ou pelo painel). `verify_jwt` fica **ligado**.
+- **`consulta-receita`** — busca de CNPJ e de CEP nas bases públicas, feita pelo servidor. Existe porque, com a chamada saindo do navegador de cada vendedora, o limite de consultas do serviço público era gasto por máquina, e a recusa dele chegava ao navegador sem cabeçalho de CORS — virando "sem conexão" na tela de quem estava com a internet perfeita (relato de 24/08/2026). Aqui a chamada sai de um IP só, com tempo limite de 8s e cache em memória (CNPJ 24h, CEP 7 dias). Não é proxy aberto: exige sessão autenticada e só aceita 14 dígitos (CNPJ) ou 8 (CEP).
+- Publicar: `supabase functions deploy consulta-receita`. `verify_jwt` fica **ligado**. Enquanto não estiver publicada, a tela cai sozinha no caminho antigo (navegador → serviço público), então a busca continua funcionando durante a virada.
 
 ## Regra que não pode ser esquecida
 

@@ -20,6 +20,8 @@ import {
   somenteDigitos,
   telefoneValido,
 } from "../../lib/cadastro/documentos";
+import { consultarCep as consultarCepNoServico, consultarCnpj as consultarCnpjNoServico } from "../lib/db/consultaReceita";
+import { camposDoCep, camposDoCnpj, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 import { mensagemDeErro } from "../lib/erros";
 
@@ -40,45 +42,6 @@ const UFS = [
   "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB",
   "PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",
 ];
-
-type EnderecoApi = {
-  cep?: string;
-  state?: string;
-  city?: string;
-  neighborhood?: string;
-  street?: string;
-};
-
-type CnpjApi = {
-  cnpj?: string;
-  razao_social?: string;
-  nome_fantasia?: string;
-  cep?: string;
-  logradouro?: string;
-  numero?: string;
-  complemento?: string;
-  bairro?: string;
-  municipio?: string;
-  uf?: string;
-  ddd_telefone_1?: string;
-  email?: string;
-};
-
-async function buscarCnpjBrasilApi(cnpj: string): Promise<CnpjApi> {
-  const d = somenteDigitos(cnpj);
-  if (d.length !== 14 || !cnpjCpfValido(d)) throw new Error("Informe um CNPJ válido antes de buscar.");
-  const resposta = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${d}`);
-  if (!resposta.ok) throw new Error("Não consegui consultar esse CNPJ agora.");
-  return (await resposta.json()) as CnpjApi;
-}
-
-async function buscarCepBrasilApi(cep: string): Promise<EnderecoApi> {
-  const d = somenteDigitos(cep);
-  if (d.length !== 8) throw new Error("Informe um CEP com 8 dígitos antes de buscar.");
-  const resposta = await fetch(`https://brasilapi.com.br/api/cep/v2/${d}`);
-  if (!resposta.ok) throw new Error("Não consegui consultar esse CEP agora.");
-  return (await resposta.json()) as EnderecoApi;
-}
 
 type Campos = {
   external_code: string;
@@ -231,30 +194,32 @@ export default function ClienteFormPage() {
   };
   const podeSalvar = !Object.values(erros).some(Boolean);
 
+  // A consulta é conveniência: preenche o que o serviço público souber e não
+  // derruba o que já estava digitado. Falhar aqui nunca impede o cadastro.
   async function consultarCnpj() {
     setBuscandoCnpj(true);
     setErro(null);
     try {
-      const dados = await buscarCnpjBrasilApi(c.tax_id);
+      const d = camposDoCnpj(await consultarCnpjNoServico(c.tax_id));
       setC((a) => ({
         ...a,
-        tax_id: formatarCnpjCpf(dados.cnpj ?? a.tax_id),
-        name: dados.razao_social || a.name,
-        uf: dados.uf || a.uf,
-        billing_zip: formatarCep(dados.cep ?? a.billing_zip),
-        billing_street: dados.logradouro ?? a.billing_street,
-        billing_number: dados.numero ?? a.billing_number,
-        billing_complement: dados.complemento ?? a.billing_complement,
-        billing_district: dados.bairro ?? a.billing_district,
-        billing_city: dados.municipio ?? a.billing_city,
-        billing_state: dados.uf ?? a.billing_state,
-        phone: formatarTelefone(dados.ddd_telefone_1 ?? a.phone),
-        email: dados.email ?? a.email,
-        commercial_phone: a.commercial_phone || formatarTelefone(dados.ddd_telefone_1),
-        commercial_email: a.commercial_email || (dados.email ?? ""),
+        tax_id: d.tax_id || a.tax_id,
+        name: d.name || a.name,
+        uf: d.uf || a.uf,
+        billing_zip: d.billing_zip || a.billing_zip,
+        billing_street: d.billing_street || a.billing_street,
+        billing_number: d.billing_number || a.billing_number,
+        billing_complement: d.billing_complement || a.billing_complement,
+        billing_district: d.billing_district || a.billing_district,
+        billing_city: d.billing_city || a.billing_city,
+        billing_state: d.billing_state || a.billing_state,
+        phone: d.phone || a.phone,
+        email: d.email || a.email,
+        commercial_phone: a.commercial_phone || d.phone,
+        commercial_email: a.commercial_email || d.email,
       }));
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não consegui consultar esse CNPJ agora."));
+      setErro(mensagemDaConsulta(e, "cnpj"));
     } finally {
       setBuscandoCnpj(false);
     }
@@ -264,20 +229,19 @@ export default function ClienteFormPage() {
     setBuscandoCep(tipo);
     setErro(null);
     try {
-      const prefixo = tipo === "billing" ? "billing" : "shipping";
       const cep = tipo === "billing" ? c.billing_zip : c.shipping_zip;
-      const dados = await buscarCepBrasilApi(cep);
+      const d = camposDoCep(await consultarCepNoServico(cep));
       setC((a) => ({
         ...a,
-        [`${prefixo}_zip`]: formatarCep(dados.cep ?? cep),
-        [`${prefixo}_street`]: dados.street ?? a[`${prefixo}_street` as keyof Campos],
-        [`${prefixo}_district`]: dados.neighborhood ?? a[`${prefixo}_district` as keyof Campos],
-        [`${prefixo}_city`]: dados.city ?? a[`${prefixo}_city` as keyof Campos],
-        [`${prefixo}_state`]: dados.state ?? a[`${prefixo}_state` as keyof Campos],
-        uf: tipo === "billing" && dados.state ? dados.state : a.uf,
+        [`${tipo}_zip`]: d.zip || a[`${tipo}_zip`],
+        [`${tipo}_street`]: d.street || a[`${tipo}_street`],
+        [`${tipo}_district`]: d.district || a[`${tipo}_district`],
+        [`${tipo}_city`]: d.city || a[`${tipo}_city`],
+        [`${tipo}_state`]: d.state || a[`${tipo}_state`],
+        uf: tipo === "billing" ? d.state || a.uf : a.uf,
       }));
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não consegui consultar esse CEP agora."));
+      setErro(mensagemDaConsulta(e, "cep"));
     } finally {
       setBuscandoCep(null);
     }
