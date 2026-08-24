@@ -278,6 +278,10 @@ tinha 6. Entram agora os que não encostam em cálculo:
 - **Cadastro do cliente** (tela nova — até aqui só existia a categorização): CNPJ/CPF com
   conferência de dígito verificador, CEP de faturamento, CEP de entrega, contato, telefone,
   e-mail. Documento duplicado é bloqueado, com o nome do cliente que já o tem.
+  A busca de CNPJ e de CEP passa pela Edge Function `consulta-receita` (24/08/2026), com o
+  caminho direto do navegador como reserva. É conveniência, nunca obrigação: todo campo que ela
+  preencheria pode ser digitado, e falha de consulta não impede salvar o cliente nem afeta
+  simulador, pedidos ou qualquer cálculo.
 - **Expedição do pedido**: transportadora (lista editável em Cadastros), peso, volumes e CEP de
   entrega deste pedido — que sobrepõe o do cadastro sem alterá-lo, e sai destacado na ficha
   quando difere. Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
