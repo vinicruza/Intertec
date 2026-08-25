@@ -240,8 +240,8 @@ export default function PedidoFichaPage() {
           <div className="rounded-xl border border-[var(--cor-borda)] px-4 py-2">
             <LinhaDeDados>
               <Par rotulo="Empresa" valor={cliente?.name} className="min-w-0 flex-1" />
-              <Par rotulo="Cód. cliente" valor={codigoCliente ?? null} className="w-32 shrink-0" />
               <Par rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} className="w-44 shrink-0" />
+              <Par rotulo="Cód. cliente" valor={codigoCliente ?? null} className="w-32 shrink-0" />
             </LinhaDeDados>
             <LinhaDeDados>
               <Par rotulo="CEP fat." valor={formatarCep(cliente?.billing_zip) || null} className="w-1/2" larguraRotulo="w-28" />
@@ -432,19 +432,6 @@ export default function PedidoFichaPage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-1 text-[9px] leading-tight text-black/55">
-              Total = subtotal dos itens + frete. Impostos, DIFAL e FCP não entram na cobrança do
-              cliente: são deduções da receita da Intertech. O FCP já vem embutido na alíquota do
-              DIFAL, por isso não tem valor próprio e “DIFAL + FCP” repete o valor do DIFAL.
-              {!difalDestacado && (
-                <>
-                  {" "}
-                  <strong>Não destacado</strong> nesta UF: o estado não está cobrando o DIFAL neste
-                  momento, então ele não sai destacado na nota — mas continua deduzido da margem no
-                  bloco de uso interno, porque a cobrança pode vir a qualquer momento.
-                </>
-              )}
-            </p>
           </section>
         </div>
 
@@ -514,7 +501,7 @@ export default function PedidoFichaPage() {
         )}
 
         <div className="grid grid-cols-2 gap-10 pt-6 text-[10px]">
-          <div className="border-t border-black/40 pt-1 text-center">Conferido por</div>
+          <div />
           <div className="border-t border-black/40 pt-1 text-center">
             {pedido.approval_status === "aprovado"
               ? `Aprovado por ${aprovadoPor ?? "—"} em ${dataCurta(pedido.approved_at)}`
