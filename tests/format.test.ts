@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fracaoParaPercentual, haQuanto, numeroDigitado, percentual, problemaNoCampoNumerico, reais } from "../app/lib/format";
+import { fracaoParaPercentual, haQuanto, numeroDigitado, percentual, problemaNaCidade, problemaNoCampoNumerico, reais } from "../app/lib/format";
 
 describe("formatação defensiva de valores do Supabase", () => {
   it.each([
@@ -92,5 +92,25 @@ describe("problemaNoCampoNumerico", () => {
   it("zero e negativo caem na mesma regra da trava do banco", () => {
     expect(volumes("0")).toContain("maior que zero");
     expect(peso("-1")).toContain("maior que zero");
+  });
+});
+
+// Relatado em 25/08/2026: o CEP foi digitado no campo Cidade, e a ficha
+// imprimiria "Cidade/UF entrega: 15775039".
+describe("problemaNaCidade", () => {
+  it("acusa o CEP digitado no campo da cidade", () => {
+    expect(problemaNaCidade("15775039")).toContain("parece um CEP");
+    expect(problemaNaCidade("29055-260")).toContain("parece um CEP");
+  });
+
+  it("aceita cidade de verdade, inclusive com número no nome", () => {
+    expect(problemaNaCidade("Vitória")).toBeNull();
+    expect(problemaNaCidade("São Paulo")).toBeNull();
+    expect(problemaNaCidade("Embu-Guaçu")).toBeNull();
+  });
+
+  it("em branco é válido: a cidade é opcional", () => {
+    expect(problemaNaCidade("")).toBeNull();
+    expect(problemaNaCidade(null)).toBeNull();
   });
 });

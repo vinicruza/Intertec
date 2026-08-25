@@ -178,3 +178,17 @@ export function problemaNoCampoNumerico(
   }
   return null;
 }
+
+// ---------- Cidade de entrega ----------
+//
+// O campo fica ao lado do CEP e recebe o CEP por engano — aconteceu em
+// 25/08/2026, e a ficha imprimiria "Cidade/UF entrega: 15775039". Nome de
+// cidade sempre tem letra; um punhado de dígitos, nunca.
+export function problemaNaCidade(valor: ValorNumerico): string | null {
+  const limpo = valor == null ? "" : String(valor).trim();
+  if (limpo === "") return null;
+  if (!/\p{L}/u.test(limpo)) {
+    return "Isso parece um CEP. Aqui vai o nome da cidade — o CEP fica no campo ao lado.";
+  }
+  return null;
+}

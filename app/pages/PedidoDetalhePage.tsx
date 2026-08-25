@@ -32,7 +32,7 @@ import {
 } from "../lib/db/aprovacao";
 import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, percentual, problemaNoCampoNumerico, reais } from "../lib/format";
+import { dataCurta, percentual, problemaNaCidade, problemaNoCampoNumerico, reais } from "../lib/format";
 import { mensagemDeErro } from "../lib/erros";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
@@ -878,6 +878,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
   // banco vai recusar em inglês (ver `problemaNoCampoNumerico`).
   const problemaPeso = problemaNoCampoNumerico(d.pesoKg, { inteiro: false, rotulo: "O peso" });
   const problemaVolumes = problemaNoCampoNumerico(d.volumes, { inteiro: true, rotulo: "Volumes" });
+  const problemaCidade = problemaNaCidade(d.cidadeEntrega);
 
   return (
     <div className="space-y-4">
@@ -1090,19 +1091,26 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
               onChange={(e) => mudar("cidadeEntrega")(e.target.value)}
               placeholder="preenchida pelo CEP"
             />
+            {problemaCidade && <p className="mt-1 text-xs text-red-600">{problemaCidade}</p>}
           </div>
           <div>
             <Label>UF de entrega</Label>
             <Input
               value={d.ufEntrega ?? ""}
               onChange={(e) => mudar("ufEntrega")(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="BA"
+              placeholder="preenchida pelo CEP"
             />
           </div>
         </div>
 
         <Button
-          disabled={gravar.isPending || cepInvalido || problemaPeso !== null || problemaVolumes !== null}
+          disabled={
+            gravar.isPending ||
+            cepInvalido ||
+            problemaPeso !== null ||
+            problemaVolumes !== null ||
+            problemaCidade !== null
+          }
           onClick={() => gravar.mutate()}
         >
           {gravar.isPending ? "Salvando…" : "Salvar condições e expedição"}

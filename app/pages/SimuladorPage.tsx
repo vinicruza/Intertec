@@ -46,6 +46,7 @@ import {
   numeroDigitado,
   percentual,
   percentualParaFracao,
+  problemaNaCidade,
   problemaNoCampoNumerico,
   reais,
 } from "../lib/format";
@@ -408,7 +409,10 @@ export default function SimuladorPage() {
   // `problemaNoCampoNumerico`).
   const problemaPeso = problemaNoCampoNumerico(pesoKg, { inteiro: false, rotulo: "O peso" });
   const problemaVolumes = problemaNoCampoNumerico(volumes, { inteiro: true, rotulo: "Volumes" });
-  const pendenciasExpedicao = [problemaPeso, problemaVolumes].filter((p): p is string => p !== null);
+  const problemaCidade = problemaNaCidade(cidadeEntrega);
+  const pendenciasExpedicao = [problemaPeso, problemaVolumes, problemaCidade].filter(
+    (p): p is string => p !== null
+  );
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -1205,13 +1209,14 @@ export default function SimuladorPage() {
                 {buscandoCep ? "Buscando…" : "Buscar"}
               </Button>
             </div>
+            {problemaCidade && <p className="mt-1 text-xs text-red-600">{problemaCidade}</p>}
           </div>
           <div>
             <Label>UF de entrega</Label>
             <Input
               value={ufEntrega}
               onChange={(e) => setUfEntrega(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="BA"
+              placeholder="preenchida pelo CEP"
             />
           </div>
         </div>
