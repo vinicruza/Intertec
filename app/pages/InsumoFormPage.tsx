@@ -36,6 +36,13 @@ const VAZIO: InsumoFormulario = {
   is_labor: false, is_packaging: false,
 };
 
+// Os campos do formulário são de texto, mas o banco entrega `numeric` como
+// NÚMERO. Sem esta conversão o zod recusa o formulário sem exibir mensagem
+// (só `name` e `purchase_price` mostram erro) e a edição não grava.
+function texto(valor: string | number | null | undefined, padrao = ""): string {
+  return valor === null || valor === undefined ? padrao : String(valor);
+}
+
 export default function InsumoFormPage() {
   const { id } = useParams();
   const editando = Boolean(id);
@@ -64,9 +71,9 @@ export default function InsumoFormPage() {
     if (i) {
       reset({
         name: i.name, category: i.category ?? "", purchase_unit: i.purchase_unit ?? "",
-        purchase_price: i.purchase_price ?? "", conversion_factor: i.conversion_factor ?? "1",
-        consumption_unit: i.consumption_unit ?? "", icms_rate: i.icms_rate ?? "0",
-        pis_cofins_rate: i.pis_cofins_rate ?? "0",
+        purchase_price: texto(i.purchase_price), conversion_factor: texto(i.conversion_factor, "1"),
+        consumption_unit: i.consumption_unit ?? "", icms_rate: texto(i.icms_rate, "0"),
+        pis_cofins_rate: texto(i.pis_cofins_rate, "0"),
         is_labor: i.is_labor ?? false,
         is_packaging: i.is_packaging ?? false,
       });

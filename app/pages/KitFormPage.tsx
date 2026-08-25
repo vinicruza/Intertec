@@ -104,7 +104,7 @@ export default function KitFormPage() {
       {
         custoPorProduto,
         insumoPorId: new Map(
-          todosInsumos.map((i) => [i.id, { nome: i.name, precoSemImposto: i.price_without_tax, maoDeObra: i.is_labor }])
+          todosInsumos.map((i) => [i.id, { nome: i.name, precoSemImposto: i.price_without_tax === null ? null : String(i.price_without_tax), maoDeObra: i.is_labor }])
         ),
         kitPorAssinatura: new Map(),
       }

@@ -1,20 +1,25 @@
 import { Decimal, dec, precoSemImposto } from "@calc";
 import { supabase } from "../supabase";
 
-// Linha da tabela `inputs` como vem do banco (numeric chega como texto — nunca float).
+// Linha da tabela `inputs` como vem do banco.
+//
+// ATENÇÃO: o PostgREST serializa `numeric` como NÚMERO no JSON, não como texto.
+// Este arquivo dizia o contrário, e o tipo mentindo escondeu do compilador a
+// falha que travava a edição de insumo: o formulário é de texto, o zod exigia
+// texto, e o que vinha do banco era número — reprovado em silêncio.
 export type InsumoLinha = {
   id: string;
   name: string;
   category: string | null;
   status: "active" | "inactive";
   purchase_unit: string | null;
-  purchase_price: string | null;
-  conversion_factor: string;
+  purchase_price: number | null;
+  conversion_factor: number;
   consumption_unit: string | null;
-  price_with_tax: string | null;
-  icms_rate: string;
-  pis_cofins_rate: string;
-  price_without_tax: string | null;
+  price_with_tax: number | null;
+  icms_rate: number;
+  pis_cofins_rate: number;
+  price_without_tax: number | null;
   price_updated_at: string | null;
   updated_at: string | null;
   // Mão de obra (costureira): entra no CMV cheio e sai do CMV de competência.
@@ -38,9 +43,12 @@ export type InsumoFormulario = {
   is_packaging: boolean;
 };
 
-// Converte texto do formulário (aceita vírgula) em Decimal.
-function paraDecimal(texto: string): Decimal {
-  const limpo = texto.trim().replace(",", ".");
+// Converte em Decimal o que vem do formulário (texto, aceita vírgula) ou do
+// banco (numeric, que o PostgREST entrega como número). Aceitar os dois evita
+// o `.trim()` estourando em número — era isso que deixava a prévia em branco.
+function paraDecimal(valor: string | number): Decimal {
+  if (typeof valor === "number") return dec(String(valor));
+  const limpo = valor.trim().replace(",", ".");
   return dec(limpo === "" ? "0" : limpo);
 }
 
