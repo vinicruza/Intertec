@@ -128,3 +128,59 @@ describe("traduzErroDoBanco", () => {
     expect(mensagemDeErro(e, "Erro ao salvar.")).toBe("A quantidade de volumes precisa ser maior que zero.");
   });
 });
+
+// ============================================================
+// Erro de conversão de tipo (22P02) — relatado em 25/08/2026
+// ============================================================
+//
+// Uma vendedora escreveu a COMPOSIÇÃO das caixas no campo Volumes e levou na
+// tela, em inglês:
+//
+//   invalid input syntax for type integer: "2 cx6+1cx3 = 3"
+//
+// Não é violação de trava, então não tem nome de constraint e escapava de toda
+// a tradução — e a mensagem "parecia frase", o que a fazia passar inteira.
+describe("erro de conversão de tipo do Postgres", () => {
+  it("traduz o caso relatado, repetindo o que a pessoa digitou", () => {
+    const msg = traduzErroDoBanco({
+      code: "22P02",
+      message: 'invalid input syntax for type integer: "2 cx6+1cx3 = 3"',
+    });
+    expect(msg).toBe(
+      'Um dos campos recebeu "2 cx6+1cx3 = 3", e ali cabe um número inteiro. Corrija o campo e salve de novo.'
+    );
+  });
+
+  it("cobre os outros tipos que um formulário alcança", () => {
+    const de = (tipo: string) =>
+      traduzErroDoBanco({ code: "22P02", message: `invalid input syntax for type ${tipo}: "abc"` });
+    expect(de("numeric")).toContain("um número");
+    expect(de("date")).toContain("uma data");
+    expect(de("uuid")).toContain("um código de registro");
+    expect(de("boolean")).toContain("sim ou não");
+  });
+
+  it("tipo desconhecido ainda sai em português, nunca cru", () => {
+    const msg = traduzErroDoBanco({ code: "22P02", message: 'invalid input syntax for type jsonb: "x"' });
+    expect(msg).toContain("outro tipo de dado");
+    expect(msg).not.toContain("invalid input syntax");
+  });
+
+  it("22P02 sem valor legível cai no genérico, e não no texto cru", () => {
+    const msg = traduzErroDoBanco({ code: "22P02", message: "invalid input syntax" });
+    expect(msg).toBe(
+      "Algum campo recebeu texto onde o sistema espera outro tipo de dado. Confira o que foi digitado."
+    );
+  });
+
+  // A trava que importa: `mensagemDeErro` é o caminho que as telas usam, e
+  // antes daqui ele devolvia o texto em inglês por ele "parecer frase".
+  it("mensagemDeErro nunca devolve o texto cru do Postgres", () => {
+    const msg = mensagemDeErro(
+      { code: "22P02", message: 'invalid input syntax for type integer: "2 cx6+1cx3 = 3"' },
+      "Erro ao salvar."
+    );
+    expect(msg).not.toContain("invalid input syntax");
+    expect(msg).toContain("número inteiro");
+  });
+});

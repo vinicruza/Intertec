@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fracaoParaPercentual, haQuanto, numeroDigitado, percentual, reais } from "../app/lib/format";
+import { fracaoParaPercentual, haQuanto, numeroDigitado, percentual, problemaNoCampoNumerico, reais } from "../app/lib/format";
 
 describe("formatação defensiva de valores do Supabase", () => {
   it.each([
@@ -52,5 +52,45 @@ describe("tempo decorrido (fila de aprovação)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// ============================================================
+// Campo numérico de formulário — relatado em 25/08/2026
+// ============================================================
+//
+// O campo Volumes aceitava qualquer digitação e só reclamava depois da viagem
+// ao banco, em inglês. A vendedora queria registrar como as caixas foram
+// montadas — informação legítima, campo errado.
+describe("problemaNoCampoNumerico", () => {
+  const volumes = (v: string) => problemaNoCampoNumerico(v, { inteiro: true, rotulo: "Volumes" });
+  const peso = (v: string) => problemaNoCampoNumerico(v, { inteiro: false, rotulo: "O peso" });
+
+  it("pega o caso relatado e diz onde a informação cabe", () => {
+    const p = volumes("2 cx6+1cx3 = 3");
+    expect(p).toContain("aceita só o número de volumes");
+    expect(p).toContain("observações");
+  });
+
+  it("aceita o que é válido", () => {
+    expect(volumes("3")).toBeNull();
+    expect(peso("12,5")).toBeNull();
+    expect(peso("33")).toBeNull();
+  });
+
+  it("campo em branco é válido: peso e volumes são opcionais", () => {
+    expect(volumes("")).toBeNull();
+    expect(volumes("   ")).toBeNull();
+    expect(peso(null as unknown as string)).toBeNull();
+  });
+
+  it("volume quebrado não passa; peso quebrado passa", () => {
+    expect(volumes("2,5")).toContain("número inteiro");
+    expect(peso("2,5")).toBeNull();
+  });
+
+  it("zero e negativo caem na mesma regra da trava do banco", () => {
+    expect(volumes("0")).toContain("maior que zero");
+    expect(peso("-1")).toContain("maior que zero");
   });
 });

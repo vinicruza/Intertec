@@ -32,7 +32,7 @@ import {
 } from "../lib/db/aprovacao";
 import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, percentual, reais } from "../lib/format";
+import { dataCurta, percentual, problemaNoCampoNumerico, reais } from "../lib/format";
 import { mensagemDeErro } from "../lib/erros";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
@@ -874,6 +874,10 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
 
   const escolhida = (transportadoras ?? []).find((t) => t.id === d.carrierId) ?? null;
   const cepInvalido = (d.cepEntrega ?? "").trim() !== "" && !cepValido(d.cepEntrega);
+  // Mesma trava do simulador: o campo não deixa sair da tela um texto que o
+  // banco vai recusar em inglês (ver `problemaNoCampoNumerico`).
+  const problemaPeso = problemaNoCampoNumerico(d.pesoKg, { inteiro: false, rotulo: "O peso" });
+  const problemaVolumes = problemaNoCampoNumerico(d.volumes, { inteiro: true, rotulo: "Volumes" });
 
   return (
     <div className="space-y-4">
@@ -1050,10 +1054,12 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
           <div>
             <Label>Peso (kg)</Label>
             <Input value={d.pesoKg ?? ""} onChange={(e) => mudar("pesoKg")(e.target.value)} placeholder="ex.: 12,5" />
+            {problemaPeso && <p className="mt-1 text-xs text-red-600">{problemaPeso}</p>}
           </div>
           <div>
             <Label>Volumes</Label>
             <Input value={d.volumes ?? ""} onChange={(e) => mudar("volumes")(e.target.value)} placeholder="ex.: 3" />
+            {problemaVolumes && <p className="mt-1 text-xs text-red-600">{problemaVolumes}</p>}
           </div>
           <div>
             <Label>CEP de entrega</Label>
@@ -1095,7 +1101,10 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
           </div>
         </div>
 
-        <Button disabled={gravar.isPending || cepInvalido} onClick={() => gravar.mutate()}>
+        <Button
+          disabled={gravar.isPending || cepInvalido || problemaPeso !== null || problemaVolumes !== null}
+          onClick={() => gravar.mutate()}
+        >
           {gravar.isPending ? "Salvando…" : "Salvar condições e expedição"}
         </Button>
       </Card>

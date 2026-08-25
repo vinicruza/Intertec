@@ -144,3 +144,37 @@ export function normalizarFreteCotado(f: FreteCotado): FreteCotado {
   };
   return { ...f, amount: numero(f.amount), leadTimeDays: numero(f.leadTimeDays) };
 }
+
+// ---------- Campo numérico de formulário ----------
+//
+// Peso e Volumes viajam como texto e o banco converte: volumes é inteiro,
+// peso é decimal. Qualquer outra coisa o Postgres recusa com jargão de SQL em
+// inglês (erro 22P02) — e, em 25/08/2026, foi o que uma vendedora leu na tela
+// ao escrever a COMPOSIÇÃO das caixas no campo Volumes: "2 cx6+1cx3 = 3".
+//
+// Ela não estava errada em querer registrar isso; errado era o campo aceitar a
+// digitação e só reclamar depois da viagem, em outra língua. Aqui o problema é
+// pego antes de sair da tela, e a frase diz onde a informação cabe.
+export function problemaNoCampoNumerico(
+  valor: ValorNumerico,
+  opcoes: { inteiro: boolean; rotulo: string }
+): string | null {
+  const limpo = valor == null ? "" : String(valor).trim();
+  if (limpo === "") return null; // campo opcional: em branco é válido
+
+  const normalizado = numeroDigitado(limpo);
+  if (!/^-?\d+(\.\d+)?$/.test(normalizado)) {
+    return opcoes.inteiro
+      ? `${opcoes.rotulo} aceita só o número de volumes — por exemplo 3. Para descrever como eles foram montados, use o campo de observações.`
+      : `${opcoes.rotulo} aceita só número — por exemplo 12,5.`;
+  }
+
+  const numero = Number(normalizado);
+  if (opcoes.inteiro && !Number.isInteger(numero)) {
+    return `${opcoes.rotulo} precisa ser um número inteiro — não dá para despachar meia caixa.`;
+  }
+  if (numero <= 0) {
+    return `${opcoes.rotulo} precisa ser maior que zero. Deixe em branco se ainda não souber.`;
+  }
+  return null;
+}

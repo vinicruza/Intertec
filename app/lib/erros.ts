@@ -141,6 +141,21 @@ const POR_TRAVA: Record<string, string> = {
   external_sales_quantity_check: "A quantidade vendida precisa ser maior que zero.",
 };
 
+// Nome do tipo do Postgres → como se diz isso para quem preenche o formulário.
+const TIPOS_EM_PORTUGUES: Record<string, string> = {
+  integer: "um número inteiro",
+  bigint: "um número inteiro",
+  smallint: "um número inteiro",
+  numeric: "um número",
+  "double precision": "um número",
+  real: "um número",
+  date: "uma data",
+  timestamp: "uma data",
+  "timestamp with time zone": "uma data",
+  uuid: "um código de registro escolhido na lista",
+  boolean: "apenas sim ou não",
+};
+
 // A mensagem do Postgres traz o nome da trava entre aspas.
 function nomeDaTrava(texto: string): string | null {
   const m = /constraint "([^"]+)"/i.exec(texto) ?? /"([a-z0-9_]+_(?:key|check|formato|shape|ref))"/i.exec(texto);
@@ -170,6 +185,19 @@ export function traduzErroDoBanco(e: unknown): string | null {
   }
   if (code === "23514" || /violates check constraint/i.test(texto)) {
     return "Algum campo está fora do formato esperado. Confira os dados digitados.";
+  }
+  // 22P02 — o Postgres recusou o texto ao converter para o tipo da coluna.
+  // Não tem nome de trava, então escapava de toda a tradução acima e ia cru
+  // para a tela: em 25/08/2026 uma vendedora escreveu a composição das caixas
+  // no campo Volumes e leu, em inglês,
+  // `invalid input syntax for type integer: "2 cx6+1cx3 = 3"`.
+  const cast = /invalid input syntax for type ([a-z ]+): "([^"]*)"/i.exec(texto);
+  if (cast) {
+    const tipo = TIPOS_EM_PORTUGUES[cast[1].toLowerCase().trim()] ?? "outro tipo de dado";
+    return `Um dos campos recebeu "${cast[2]}", e ali cabe ${tipo}. Corrija o campo e salve de novo.`;
+  }
+  if (code === "22P02") {
+    return "Algum campo recebeu texto onde o sistema espera outro tipo de dado. Confira o que foi digitado.";
   }
   if (code === "42501" || /row-level security|permission denied/i.test(texto)) {
     return "Seu perfil de acesso não permite esta ação. Fale com o administrador.";

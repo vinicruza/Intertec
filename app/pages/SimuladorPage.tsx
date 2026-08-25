@@ -46,6 +46,7 @@ import {
   numeroDigitado,
   percentual,
   percentualParaFracao,
+  problemaNoCampoNumerico,
   reais,
 } from "../lib/format";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
@@ -401,6 +402,13 @@ export default function SimuladorPage() {
   // Kit incompleto não é salvo: ao Gerar Pedido ele vira código oficial de
   // catálogo, então nome e composição precisam estar fechados desde a cotação.
   const pendenciasKit = pendenciasDosKits(linhas, resolvidas);
+
+  // Peso e Volumes viajam como texto e o banco converte. Barrar aqui evita a
+  // viagem inteira para voltar com jargão de SQL em inglês (ver
+  // `problemaNoCampoNumerico`).
+  const problemaPeso = problemaNoCampoNumerico(pesoKg, { inteiro: false, rotulo: "O peso" });
+  const problemaVolumes = problemaNoCampoNumerico(volumes, { inteiro: true, rotulo: "Volumes" });
+  const pendenciasExpedicao = [problemaPeso, problemaVolumes].filter((p): p is string => p !== null);
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -1144,10 +1152,12 @@ export default function SimuladorPage() {
           <div>
             <Label>Peso (kg)</Label>
             <Input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} placeholder="ex.: 12,5" />
+            {problemaPeso && <p className="mt-1 text-xs text-red-600">{problemaPeso}</p>}
           </div>
           <div>
             <Label>Volumes</Label>
             <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
+            {problemaVolumes && <p className="mt-1 text-xs text-red-600">{problemaVolumes}</p>}
           </div>
           <div>
             <Label>CEP de entrega</Label>
@@ -1307,8 +1317,14 @@ export default function SimuladorPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={() => salvar.mutate()}
-              disabled={salvar.isPending || pendenciasKit.length > 0}
-              title={pendenciasKit.length > 0 ? "Corrija as pendências dos kits antes de salvar." : undefined}
+              disabled={salvar.isPending || pendenciasKit.length > 0 || pendenciasExpedicao.length > 0}
+              title={
+                pendenciasKit.length > 0
+                  ? "Corrija as pendências dos kits antes de salvar."
+                  : pendenciasExpedicao.length > 0
+                    ? pendenciasExpedicao.join(" ")
+                    : undefined
+              }
             >
               {salvar.isPending ? "Salvando…" : cotacaoId ? "Salvar nova versão" : "Salvar cotação"}
             </Button>
@@ -1330,6 +1346,9 @@ export default function SimuladorPage() {
                       ? "salva; complete os dados para enviar à aprovação"
                       : ""} ✓
               </span>
+            )}
+            {pendenciasExpedicao.length > 0 && (
+              <span className="text-sm text-amber-700">{pendenciasExpedicao.join(" ")}</span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}
           </div>
