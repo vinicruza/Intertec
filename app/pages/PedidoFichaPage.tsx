@@ -96,17 +96,20 @@ export default function PedidoFichaPage() {
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
   // senão vale o do cadastro. É a única regra de precedência da folha.
   const cepEntrega = pedido.shipping_zip ?? cliente?.shipping_zip ?? null;
-  // A cidade de entrega vinha vazia SEMPRE que o pedido tinha CEP gravado —
-  // inclusive quando era o mesmo CEP do cadastro, que é o caso comum. A folha
-  // saía com "BA" no lugar de "Salvador / BA". Só a entrega excepcional de
-  // verdade (CEP diferente do cadastro) fica sem cidade, porque `orders` não
-  // guarda cidade de entrega: aí quem avisa é a tarja de ATENÇÃO logo abaixo.
+  // Cidade/UF de entrega, em três degraus: o que foi digitado NESTE pedido
+  // manda; senão, quando o CEP é o mesmo do cadastro, vale o cadastro; e só
+  // então sobra a UF sozinha — caso em que quem avisa da entrega diferente é a
+  // tarja de ATENÇÃO logo abaixo.
+  //
+  // `pedido.uf` é a UF FISCAL (base do DIFAL) e entra aqui só como último
+  // recurso: ela não é, por definição, a UF do endereço de entrega.
   const entregaIgualAoCadastro =
     !pedido.shipping_zip || pedido.shipping_zip === cliente?.shipping_zip;
-  const cidadeEntrega = entregaIgualAoCadastro ? cliente?.shipping_city ?? null : null;
-  const ufEntrega = entregaIgualAoCadastro
-    ? cliente?.shipping_state ?? pedido.uf
-    : pedido.uf;
+  const cidadeEntrega =
+    pedido.shipping_city ?? (entregaIgualAoCadastro ? cliente?.shipping_city ?? null : null);
+  const ufEntrega =
+    pedido.shipping_state ??
+    (entregaIgualAoCadastro ? cliente?.shipping_state ?? pedido.uf : pedido.uf);
   const transportadora = pedido.carriers?.requires_name
     ? pedido.carrier_other ?? "Outra"
     : pedido.carriers?.name ?? null;

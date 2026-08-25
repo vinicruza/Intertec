@@ -388,3 +388,46 @@ describe("papel do insumo na embalagem do kit", () => {
     expect(bloco.slice(0, 700)).not.toMatch(/price_without_tax|price_with_tax/);
   });
 });
+
+// A cidade de entrega é dado de expedição: entra e sai pelas mesmas portas que
+// peso e volumes, e nenhuma delas pode passar por cima da imutabilidade do
+// dinheiro. Estes testes existem porque a regra mora em três lugares — o
+// gatilho, a função de gravação e a de duplicar — e esquecer um deles falha
+// calado: o campo aceita o que se digita e o valor não chega ao banco.
+describe("cidade e UF de entrega do pedido", () => {
+  it("o gatilho do pedido fechado deixa passar as duas colunas novas", () => {
+    const gatilho = definicaoVigente("protect_closed_order");
+    expect(gatilho).toMatch(/'shipping_city'/);
+    expect(gatilho).toMatch(/'shipping_state'/);
+    // E continuam registradas na auditoria, como o resto da expedição.
+    expect(gatilho).toMatch(/'shipping_city',\s*old\.shipping_city/);
+    expect(gatilho).toMatch(/'shipping_city',\s*new\.shipping_city/);
+  });
+
+  it("a tela de expedição grava cidade e UF, e a UF sobe para maiúscula", () => {
+    const gravar = definicaoVigente("update_order_shipping");
+    expect(gravar).toMatch(/shipping_city = nullif\(btrim\(p_shipping_city\), ''\)/);
+    expect(gravar).toMatch(/shipping_state = nullif\(upper\(btrim\(p_shipping_state\)\), ''\)/);
+    // A porta continua estreita: nada de dinheiro nesta função.
+    expect(gravar).not.toMatch(/\bfreight\s*=|\bcommission_rate\s*=|\bunit_price\s*=/);
+  });
+
+  it("duplicar o pedido leva o endereço de entrega junto", () => {
+    const copiar = definicaoVigente("copy_order_as_simulation");
+    expect(copiar).toMatch(/v_source\.shipping_city/);
+    expect(copiar).toMatch(/v_source\.shipping_state/);
+  });
+
+  it("a UF de entrega só aceita duas letras maiúsculas, como no cadastro", () => {
+    expect(TODAS).toMatch(
+      /orders_shipping_state_formato[\s\S]{0,120}shipping_state ~ '\^\[A-Z\]\{2\}\$'/
+    );
+  });
+
+  it("a UF fiscal do pedido continua existindo separada da UF de entrega", () => {
+    // orders.uf é a base do DIFAL. Se um dia alguém reaproveitá-la como
+    // endereço de entrega, o imposto passa a seguir a caixa, não a nota.
+    const gravar = definicaoVigente("update_order_shipping");
+    expect(gravar).not.toMatch(/\buf\s*=/);
+  });
+});

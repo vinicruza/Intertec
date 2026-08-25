@@ -31,6 +31,7 @@ import {
   carregarContextoSimulador,
   custosDeEmbalagem,
   montarCatalogoDeKit,
+  salvarCidadeDeEntrega,
   salvarCotacao,
   type ContextoSimulador,
   type FreteCotado,
@@ -48,6 +49,8 @@ import {
   reais,
 } from "../lib/format";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
+import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
+import { consultarCep } from "../lib/db/consultaReceita";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBusca";
 
@@ -148,6 +151,9 @@ export default function SimuladorPage() {
   const [pesoKg, setPesoKg] = useState("");
   const [volumes, setVolumes] = useState("");
   const [cepEntrega, setCepEntrega] = useState("");
+  const [cidadeEntrega, setCidadeEntrega] = useState("");
+  const [ufEntrega, setUfEntrega] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const [modoPagamentoId, setModoPagamentoId] = useState("");
   const [observacao, setObservacao] = useState("");
   const [cotacaoId, setCotacaoId] = useState<string | null>(null);
@@ -202,6 +208,8 @@ export default function SimuladorPage() {
     setPesoKg(textoDeCampo(p.weight_kg));
     setVolumes(textoDeCampo(p.volumes));
     setCepEntrega(textoDeCampo(p.shipping_zip));
+    setCidadeEntrega(textoDeCampo(p.shipping_city));
+    setUfEntrega(textoDeCampo(p.shipping_state));
     setModoPagamentoId(textoDeCampo(p.payment_term_id));
     setObservacao(textoDeCampo(p.order_notes));
 
@@ -451,6 +459,17 @@ export default function SimuladorPage() {
         observacao,
       }, foto);
 
+      // Endereço de entrega vai numa gravação à parte (ver salvarCidadeDeEntrega).
+      // Falhar aqui não pode derrubar a cotação, que já está gravada: a cidade
+      // continua preenchível na tela de expedição.
+      if (cidadeEntrega.trim() !== "" || ufEntrega.trim() !== "") {
+        try {
+          await salvarCidadeDeEntrega(cotacao.id, cidadeEntrega, ufEntrega);
+        } catch {
+          /* silencioso de propósito: a cotação vale, o endereço se completa depois */
+        }
+      }
+
       if (!seloExigeAprovacao(selo)) {
         return { ...cotacao, aprovacao: "aprovado_auto" as const };
       }
@@ -608,6 +627,23 @@ export default function SimuladorPage() {
   function removerFreteCotado(id: string) {
     setFretesCotados((atuais) => atuais.filter((f) => f.id !== id));
     setSalvo(null);
+  }
+
+  // Cidade e UF pelo CEP, pelo mesmo caminho do cadastro do cliente. É
+  // conveniência: falhar a consulta não impede digitar à mão nem salvar.
+  async function buscarCidadePeloCep() {
+    setBuscandoCep(true);
+    setErroSalvar(null);
+    try {
+      const achado = camposDoCep(await consultarCep(cepEntrega));
+      if (achado.city) setCidadeEntrega(achado.city);
+      if (achado.state) setUfEntrega(achado.state);
+      setSalvo(null);
+    } catch (e) {
+      setErroSalvar(mensagemDaConsulta(e, "cep"));
+    } finally {
+      setBuscandoCep(false);
+    }
   }
 
   // Acima de 20% não é comissão, é engano de digitação (o maior canal hoje é
@@ -1139,6 +1175,34 @@ export default function SimuladorPage() {
                 ? "Em branco, vale o do cadastro do cliente."
                 : "O cliente não tem CEP de entrega no cadastro."}
             </p>
+          </div>
+          {/* Cidade e UF da entrega: é o que a ficha imprime em "Cidade/UF
+              entrega". Sem elas, entrega fora do endereço de sempre saía com a
+              UF sozinha. */}
+          <div>
+            <Label>Cidade de entrega</Label>
+            <div className="flex gap-2">
+              <Input
+                value={cidadeEntrega}
+                onChange={(e) => setCidadeEntrega(e.target.value)}
+                placeholder="preenchida pelo CEP"
+              />
+              <Button
+                className="shrink-0 bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
+                disabled={buscandoCep || !cepValido(cepEntrega)}
+                onClick={buscarCidadePeloCep}
+              >
+                {buscandoCep ? "Buscando…" : "Buscar"}
+              </Button>
+            </div>
+          </div>
+          <div>
+            <Label>UF de entrega</Label>
+            <Input
+              value={ufEntrega}
+              onChange={(e) => setUfEntrega(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="BA"
+            />
           </div>
         </div>
       </Card>

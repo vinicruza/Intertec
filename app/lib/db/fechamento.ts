@@ -114,6 +114,8 @@ export type PedidoCompleto = {
   weight_kg: string | null;
   volumes: number | null;
   shipping_zip: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
   payment_term_id: string | null;
   payment_term_days: number | null;
   order_notes: string | null;
@@ -173,7 +175,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -278,6 +280,8 @@ export type DadosExpedicao = {
   pesoKg: string | null;
   volumes: string | null;
   cepEntrega: string | null;
+  cidadeEntrega: string | null;
+  ufEntrega: string | null;
   modoPagamentoId: string | null;
   prazoPagamentoDias: string | null;
   observacao: string | null;
@@ -295,6 +299,8 @@ export async function salvarExpedicao(orderId: string, d: DadosExpedicao): Promi
     p_weight_kg: numero(d.pesoKg),
     p_volumes: numero(d.volumes),
     p_shipping_zip: d.cepEntrega?.replace(/\D/g, "") || null,
+    p_shipping_city: d.cidadeEntrega?.trim() || null,
+    p_shipping_state: d.ufEntrega?.trim().toUpperCase() || null,
     p_payment_term_id: d.modoPagamentoId || null,
     p_payment_term_days: numero(d.prazoPagamentoDias),
     p_order_notes: d.observacao?.trim() || null,

@@ -282,9 +282,11 @@ tinha 6. Entram agora os que não encostam em cálculo:
   caminho direto do navegador como reserva. É conveniência, nunca obrigação: todo campo que ela
   preencheria pode ser digitado, e falha de consulta não impede salvar o cliente nem afeta
   simulador, pedidos ou qualquer cálculo.
-- **Expedição do pedido**: transportadora (lista editável em Cadastros), peso, volumes e CEP de
-  entrega deste pedido — que sobrepõe o do cadastro sem alterá-lo, e sai destacado na ficha
-  quando difere. Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
+- **Expedição do pedido**: transportadora (lista editável em Cadastros), peso, volumes e CEP,
+  cidade e UF de entrega deste pedido — que sobrepõem o do cadastro sem alterá-lo, e saem
+  destacados na ficha quando diferem. Cidade e UF são buscadas pelo CEP, como no cadastro do
+  cliente. A UF de entrega é endereço, não fiscal: a base do DIFAL continua sendo `orders.uf`.
+  Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
 - **Condições**: prazo de pagamento em dias e observação, ambos congelados no fechamento.
 - **Ficha impressa** redesenhada no formato do formulário: cabeçalho do cliente, valor total por
   linha e subtotal, bloco de expedição e rodapé. Campo em branco vira espaço para preencher à mão,

@@ -35,6 +35,8 @@ import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { mensagemDeErro } from "../lib/erros";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
+import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
+import { consultarCep } from "../lib/db/consultaReceita";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 
 const FRETE_COTADO_VAZIO: FreteCotadoPedido = {
@@ -749,6 +751,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
   });
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const [d, setD] = useState<DadosExpedicao>({
     carrierId: pedido.carrier_id ?? "",
     carrierOutra: pedido.carrier_other ?? "",
@@ -756,6 +759,8 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     pesoKg: pedido.weight_kg ?? "",
     volumes: pedido.volumes != null ? String(pedido.volumes) : "",
     cepEntrega: formatarCep(pedido.shipping_zip),
+    cidadeEntrega: pedido.shipping_city ?? "",
+    ufEntrega: pedido.shipping_state ?? "",
     modoPagamentoId: pedido.payment_term_id ?? "",
     prazoPagamentoDias: pedido.payment_term_days != null ? String(pedido.payment_term_days) : "",
     observacao: pedido.order_notes ?? "",
@@ -812,6 +817,27 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
   function removerFreteCotado(id: string) {
     setD((atual) => ({ ...atual, fretesCotados: atual.fretesCotados.filter((f) => f.id !== id) }));
     setSalvo(false);
+  }
+
+  // Cidade e UF vêm do CEP pelo mesmo caminho do cadastro do cliente
+  // (`consulta-receita`, com o caminho direto de reserva). É conveniência, não
+  // obrigação: falhar a consulta não impede digitar nem salvar.
+  async function buscarCidadePeloCep() {
+    setBuscandoCep(true);
+    setErro(null);
+    try {
+      const achado = camposDoCep(await consultarCep(d.cepEntrega ?? ""));
+      setD((atual) => ({
+        ...atual,
+        cidadeEntrega: achado.city || atual.cidadeEntrega,
+        ufEntrega: achado.state || atual.ufEntrega,
+      }));
+      setSalvo(false);
+    } catch (e) {
+      setErro(mensagemDaConsulta(e, "cep"));
+    } finally {
+      setBuscandoCep(false);
+    }
   }
 
   const escolhida = (transportadoras ?? []).find((t) => t.id === d.carrierId) ?? null;
@@ -999,13 +1025,41 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
           </div>
           <div>
             <Label>CEP de entrega</Label>
-            <Input
-              value={d.cepEntrega ?? ""}
-              onChange={(e) => mudar("cepEntrega")(e.target.value)}
-              onBlur={() => mudar("cepEntrega")(formatarCep(d.cepEntrega))}
-              placeholder="00000-000"
-            />
+            <div className="flex gap-2">
+              <Input
+                value={d.cepEntrega ?? ""}
+                onChange={(e) => mudar("cepEntrega")(e.target.value)}
+                onBlur={() => mudar("cepEntrega")(formatarCep(d.cepEntrega))}
+                placeholder="00000-000"
+              />
+              <Button
+                className="shrink-0 bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
+                disabled={buscandoCep || !cepValido(d.cepEntrega)}
+                onClick={buscarCidadePeloCep}
+              >
+                {buscandoCep ? "Buscando…" : "Buscar"}
+              </Button>
+            </div>
             {cepInvalido && <p className="mt-1 text-xs text-red-600">CEP precisa ter 8 dígitos.</p>}
+          </div>
+          {/* Cidade e UF da ENTREGA. Sem elas, a ficha imprimia só a UF quando o
+              pedido ia para um endereço diferente do cadastro — que é
+              justamente o caso que a conferência mais precisa ler por extenso. */}
+          <div>
+            <Label>Cidade de entrega</Label>
+            <Input
+              value={d.cidadeEntrega ?? ""}
+              onChange={(e) => mudar("cidadeEntrega")(e.target.value)}
+              placeholder="preenchida pelo CEP"
+            />
+          </div>
+          <div>
+            <Label>UF de entrega</Label>
+            <Input
+              value={d.ufEntrega ?? ""}
+              onChange={(e) => mudar("ufEntrega")(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="BA"
+            />
           </div>
         </div>
 

@@ -410,6 +410,25 @@ function numeroOuVazio(valor: unknown): string {
   return numeroDigitado(textoOuVazio(valor));
 }
 
+// Cidade e UF de entrega não passam pelo `save_quote_revision`: aquela RPC
+// escreve o que entra em cálculo, e endereço de entrega não entra. Vão pelo
+// mesmo caminho direto que as cotações de frete já usam — o gatilho do pedido
+// fechado libera as duas colunas junto com o resto da expedição.
+export async function salvarCidadeDeEntrega(
+  orderId: string,
+  cidade: string | null,
+  uf: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from("orders")
+    .update({
+      shipping_city: cidade?.trim() || null,
+      shipping_state: uf?.trim().toUpperCase() || null,
+    })
+    .eq("id", orderId);
+  if (error) throw error;
+}
+
 export async function salvarCotacao(
   orderId: string | null,
   d: DadosSimulacao,

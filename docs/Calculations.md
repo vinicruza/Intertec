@@ -676,10 +676,26 @@ o cobrado do cliente, que na prática fica acima da cotação. Antes, trocar de 
 sobrescrevia o campo com o valor cotado e apagava o combinado com o cliente. A cotação continua
 na folha, como referência.
 
-**A cidade de entrega volta a aparecer.** Saía só a UF sempre que o pedido tinha CEP gravado —
-inclusive quando era o mesmo CEP do cadastro, que é o caso comum. Agora, CEP de entrega igual ao
-do cadastro usa a cidade do cadastro. Só a entrega excepcional de verdade fica sem cidade, porque
-`orders` não guarda cidade de entrega; nesse caso quem avisa é a tarja de ATENÇÃO que já existia.
+**A cidade de entrega volta a aparecer**, em três degraus. Saía só a UF sempre que o pedido tinha
+CEP gravado — inclusive quando era o mesmo CEP do cadastro, que é o caso comum. Agora vale, nesta
+ordem: a cidade digitada NESTE pedido; senão, quando o CEP é o mesmo do cadastro, a do cadastro; e
+só então a UF sozinha.
+
+Para o primeiro degrau, `orders` ganhou `shipping_city` e `shipping_state` (migração
+20260825120000), espelhando o que `customers` já tinha. Os campos são preenchidos no simulador e
+na tela de expedição, com busca pelo CEP no mesmo caminho do cadastro do cliente
+(`consulta-receita`, com o caminho direto de reserva).
+
+**`orders.shipping_state` não é `orders.uf`.** A UF fiscal continua sendo `uf` e continua sendo a
+base do DIFAL (§6.3, §12.1). Foi por isso que a UF de entrega ganhou coluna própria em vez de
+reaproveitar aquela: no dia em que a caixa vai para um estado e a nota para outro, o imposto tem de
+seguir a nota. Há teste de migração fixando que `update_order_shipping` não escreve em `uf`.
+
+**Achado ao aplicar.** O banco tinha DUAS versões de `update_order_shipping` convivendo: a
+original de 7 argumentos (20260805001100) e a de 9 (20260807133000). A segunda migração tentou
+remover a primeira, mas escreveu uma assinatura de 8 argumentos que nunca existiu, e o
+`drop function if exists` engoliu o engano em silêncio. A função morta continuava alcançável pelo
+PostgREST. Removida agora.
 
 **A folha para de cortar na impressão.** O container era `max-w-[210mm]` — a largura TOTAL do A4 —
 enquanto o `@page` reserva 10mm de margem de cada lado. Sobrava conteúdo fora da área útil e o
