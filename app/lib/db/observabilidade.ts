@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { versaoEmExecucao } from "../versao";
 
 export type ErroCliente = {
   id: string;
@@ -47,7 +48,10 @@ export async function registrarErroCliente(erro: unknown, contexto: Record<strin
       p_context: {
         ...contexto,
         href: window.location.href,
-        deployRef: import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA ?? import.meta.env.VITE_APP_VERSION ?? null,
+        // Até 25/08/2026 as duas variáveis abaixo nunca foram definidas no
+        // build, e todo erro entrava com `deploy_ref` nulo — impossível saber
+        // de qual versão o erro veio. `versaoEmExecucao()` sempre tem valor.
+        deployRef: versaoEmExecucao(),
       },
     });
   } catch {
