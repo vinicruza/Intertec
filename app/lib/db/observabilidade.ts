@@ -100,3 +100,50 @@ export async function atualizarStatusGrupoErro(
     .eq("id", id);
   if (error) throw error;
 }
+
+// ============================================================
+// Erro que a pessoa VÊ na tela
+// ============================================================
+//
+// `registrarErroCliente` acima cobre o que QUEBRA: tela que caiu, promessa não
+// tratada. Erro tratado — aquele que vira uma frase em vermelho e deixa a
+// pessoa seguir — não passava por lugar nenhum. Foi assim que um erro de SQL
+// cru chegou a uma vendedora em 25/08/2026 e o sistema não soube: a equipe
+// descobriu por print no WhatsApp.
+//
+// A `origem: "tela"` importa: é ela que o `classify_client_error` usa para não
+// carimbar toda recusa de regra de negócio como crítica.
+
+// Quantas vezes o mesmo erro pode ser registrado por sessão. Uma consulta que
+// se repete a cada minuto registraria 60 vezes por hora a mesma linha; o
+// agrupamento do banco aguenta, mas a tela de Monitoramento vira ruído.
+const INTERVALO_MESMO_ERRO_MS = 10 * 60 * 1000;
+const ultimoRegistroPorChave = new Map<string, number>();
+
+// Decisão pura, para ter teste próprio: já registrei este erro agora há pouco?
+export function devoRegistrarErroDeTela(
+  chave: string,
+  agora: number,
+  ultimos: Map<string, number>,
+  intervaloMs: number = INTERVALO_MESMO_ERRO_MS
+): boolean {
+  const anterior = ultimos.get(chave);
+  return anterior === undefined || agora - anterior >= intervaloMs;
+}
+
+export function registrarErroDeTela(erro: unknown, contexto: Record<string, unknown> = {}): void {
+  const mensagem =
+    erro instanceof Error
+      ? erro.message
+      : erro && typeof erro === "object" && "message" in erro && typeof erro.message === "string"
+        ? erro.message
+        : String(erro);
+  if (!mensagem) return;
+
+  const chave = `${window.location.pathname}|${mensagem}`;
+  const agora = Date.now();
+  if (!devoRegistrarErroDeTela(chave, agora, ultimoRegistroPorChave)) return;
+  ultimoRegistroPorChave.set(chave, agora);
+
+  void registrarErroCliente(erro, { ...contexto, origem: "tela" });
+}

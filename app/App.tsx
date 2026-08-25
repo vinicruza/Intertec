@@ -1,11 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense } from "react";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ExigirAcesso, ExigirLogin, ExigirSuperAdmin } from "./auth/guards";
 import { lazyComRetry } from "./lib/recarregarChunk";
 import MonitoramentoRotas from "./MonitoramentoRotas";
 import AtualizacaoAutomatica from "./AtualizacaoAutomatica";
+import { registrarErroDeTela } from "./lib/db/observabilidade";
 const LoginPage = lazyComRetry(() => import("./pages/LoginPage"));
 const ShellLayout = lazyComRetry(() => import("./pages/ShellLayout"));
 const InicioPage = lazyComRetry(() => import("./pages/InicioPage"));
@@ -31,7 +32,23 @@ const ConfiguracoesPage = lazyComRetry(() => import("./pages/ConfiguracoesPage")
 const IntegridadePage = lazyComRetry(() => import("./pages/IntegridadePage"));
 const MonitoramentoPage = lazyComRetry(() => import("./pages/MonitoramentoPage"));
 
-const queryClient = new QueryClient();
+// Todo erro que chega a uma tela passa por aqui — é o cano por onde as telas
+// buscam e gravam dados. Registrar no ponto único evita depender de alguém
+// lembrar de fazê-lo em cada um dos 30 lugares que mostram mensagem de erro,
+// que foi como um erro de SQL cru chegou a uma vendedora em 25/08/2026 sem
+// deixar rastro nenhum no sistema.
+//
+// A gravação é silenciosa e engolida em caso de falha (ver
+// `registrarErroCliente`): observabilidade nunca pode causar um segundo erro
+// na interface. O mesmo erro só volta a ser registrado depois de 10 minutos.
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (erro, query) => registrarErroDeTela(erro, { tipo: "consulta", chave: query.queryHash }),
+  }),
+  mutationCache: new MutationCache({
+    onError: (erro) => registrarErroDeTela(erro, { tipo: "gravacao" }),
+  }),
+});
 
 export default function App() {
   return (
