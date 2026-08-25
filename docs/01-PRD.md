@@ -287,11 +287,17 @@ tinha 6. Entram agora os que não encostam em cálculo:
   quando difere. Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
 - **Condições**: prazo de pagamento em dias e observação, ambos congelados no fechamento.
 - **Ficha impressa** redesenhada no formato do formulário: cabeçalho do cliente, valor total por
-  linha e subtotal, bloco de expedição e rodapé. Campo em branco vira linha para preencher à mão,
+  linha e subtotal, bloco de expedição e rodapé. Campo em branco vira espaço para preencher à mão,
   porque os 13 mil clientes herdados da planilha ainda não têm cadastro completo.
 
-**Fora deste escopo, por dependerem de decisão do cliente:** o bloco fiscal do formulário (ST,
-FCP em linha própria e o TOTAL a cobrar). Ver Calculations.md §12.
+**Revisão da folha em 24/08/2026 (Calculations.md §12.5):** CNPJ e código do cliente sobem para a
+linha do nome; cada CEP fica ao lado da sua cidade; o campo "Data" sai, porque repetia o "Pedido
+gerado em" do cabeçalho; o bloco Pagamento/Obs. perde as linhas pautadas — a Intertech preenche no
+sistema, não à mão; e o cabeçalho ganha o selo de faixa da margem.
+
+**Fora deste escopo, por dependerem de decisão do cliente:** o FCP em linha própria e o TOTAL a
+cobrar. O ST foi encerrado em 24/08/2026 — não se aplica mais (Calculations.md §12.2). Ver
+Calculations.md §12.
 
 ## 11. Fora de escopo da v1
 

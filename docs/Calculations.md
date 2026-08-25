@@ -547,7 +547,7 @@ O formulário de papel da Intertech tem, na coluna da direita, um bloco que o si
 ```
 SUBTOTAL
 FRETE
-ST          ← ainda não existe no sistema (§12.2)
+ST          ← saiu da folha em 24/08/2026: o imposto não se aplica mais (§12.5)
 DIFAL
 FCP         ← já embutido no DIFAL, sem linha própria (§12.1)
 DIFAL+FCP
@@ -596,11 +596,13 @@ mesma migração: a fonte da verdade do DIFAL no fechamento passa a ser `orders.
 Testado contra Postgres real nos dois sentidos (override ligando e desligando) e confirmado que a
 validação continua recusando um DIFAL que não bate com o pedido.
 
-### 12.2 ST — ainda pendente
+### 12.2 ST — ENCERRADA: não se aplica mais (24/08/2026)
 
-Os áudios da Intertech (05/08/2026) definem o termo (substituição tributária) mas não explicam
-como se calcula. Falta saber se é calculado por regra (MVA, alíquota por UF, como as tabelas de
-§7) ou digitado à mão no pedido. **Em confirmação com a Intertech.**
+Os áudios da Intertech (05/08/2026) definiam o termo (substituição tributária) mas não explicavam
+como se calcula, e a pergunta ficou aberta por quase um mês. A resposta veio na revisão da folha
+de 24/08/2026 e não era uma fórmula: **o imposto não se aplica mais**. A linha saiu da folha
+(§12.5). Nada nunca foi calculado para ela, então não há histórico a preservar nem migração a
+fazer.
 
 ### 12.4 A folha passa a MOSTRAR o valor do DIFAL (24/08/2026)
 
@@ -639,6 +641,50 @@ o pedido do print: total 2.010,00, com o DIFAL de 120,60 de fora.
 **Quando o pedido não tem DIFAL** (cliente contribuinte, `applies_difal = false`), a linha sai com
 o valor calculado e o rótulo diz o motivo — "dispensado — cliente contribuinte" —, em vez de um
 traço mudo, que foi exatamente o que gerou este chamado.
+
+### 12.5 Segunda revisão da folha pela Intertech (24/08/2026)
+
+A Intertech revisou a folha impressa item a item. **Nenhuma conta muda** — cascata, base do DIFAL,
+fechamento no banco e golden tests seguem intocados. O que muda é o desenho da folha, mais uma
+regra de preenchimento no simulador.
+
+**O ST some.** Ver §12.2. Era a única linha do bloco fiscal sem valor por pendência; agora não é
+mais pendência, é ausência definitiva.
+
+**Os textos entre parênteses saem das linhas do DIFAL e do FCP.** Eram longos, empurravam o valor
+para fora da coluna da direita e, na impressão, "DIFAL + FCP" chegava a sair sem número nenhum. A
+explicação desceu para a nota do rodapé do bloco, que já existia. Uma informação não podia se
+perder no caminho: quando o pedido é de cliente contribuinte, a folha precisa dizer que o DIFAL foi
+**dispensado**, e não imprimir um traço mudo — que foi exatamente o chamado que originou §12.4.
+Solução: o rótulo da linha passa a ser "DIFAL dispensado" nesse caso. Curto, cabe na coluna, sem
+parênteses.
+
+**A folha ganha o selo de faixa da margem.** A regra de faixa (Vermelha ≤ 40%, Amarela ≤ 50%,
+Verde ≤ 65%, Azul acima disso — `seloMargemComercial`, PRD §5.5) já existia e já aparecia na tela
+do pedido, mas nunca tinha chegado ao papel. A folha é o que vai para a mesa da conferência, e é
+dela que se espera a resposta de "em que situação este pedido foi aprovado". O selo fica no meio
+do cabeçalho, entre o logo e o número do pedido.
+
+O **percentual** ao lado da faixa respeita `hide_margin_numbers_from_sales`: o comercial vê só
+"Verde", quem pode ver número de margem vê "Verde · 51,48%". A cor sai para todos — é ela que
+responde à pergunta. Enquanto os parâmetros não chegam do banco, vale o padrão, que esconde o
+número.
+
+**A cotação do frete deixa de preencher o valor do frete.** Escolher a cotação define POR QUEM a
+mercadoria vai, nunca quanto se cobra: o valor do campo "Frete (R$)" é digitado pela vendedora e é
+o cobrado do cliente, que na prática fica acima da cotação. Antes, trocar de transportadora
+sobrescrevia o campo com o valor cotado e apagava o combinado com o cliente. A cotação continua
+na folha, como referência.
+
+**A cidade de entrega volta a aparecer.** Saía só a UF sempre que o pedido tinha CEP gravado —
+inclusive quando era o mesmo CEP do cadastro, que é o caso comum. Agora, CEP de entrega igual ao
+do cadastro usa a cidade do cadastro. Só a entrega excepcional de verdade fica sem cidade, porque
+`orders` não guarda cidade de entrega; nesse caso quem avisa é a tarja de ATENÇÃO que já existia.
+
+**A folha para de cortar na impressão.** O container era `max-w-[210mm]` — a largura TOTAL do A4 —
+enquanto o `@page` reserva 10mm de margem de cada lado. Sobrava conteúdo fora da área útil e o
+navegador cortava a direita: o último dígito do número do pedido e a ponta das linhas de baixo.
+Agora são 190mm, que é a área realmente imprimível.
 
 ### 12.3 O que foi implementado
 
