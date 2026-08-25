@@ -94,6 +94,9 @@ export type PedidoCompleto = {
   // DIFAL: resolvido no pedido (05/08/2026), override do padrão do canal —
   // ver Calculations.md §12.
   applies_difal: boolean;
+  // Destaque do DIFAL congelado no fechamento; nulo em pedido aberto e nos
+  // fechados antes de 25/08/2026, que caem no destaque vigente da UF.
+  difal_destacado_snapshot: boolean | null;
   channel_id: string | null;
   seller_id: string | null;
   created_at: string;
@@ -175,7 +178,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, difal_destacado_snapshot, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -486,7 +489,15 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
 // `pedido.totals_display` está vazio enquanto aprova. Sem isto, o card de
 // aprovação pedia para "conferir CMV e margem" sem mostrar nenhum dos dois.
 export type CascataVigente =
-  | { ok: true; totals: Record<string, string>; cmvPorItem: Map<string, string>; margemContribuicaoPct: string }
+  | {
+      ok: true;
+      totals: Record<string, string>;
+      cmvPorItem: Map<string, string>;
+      margemContribuicaoPct: string;
+      // Destaque VIGENTE da UF. Pedido fechado não usa este campo: ele lê o
+      // que ficou congelado em `difal_destacado_snapshot` (D7).
+      difalDestacado: boolean;
+    }
   | { ok: false; erro: string };
 
 export async function calcularCascataVigente(orderId: string): Promise<CascataVigente> {
@@ -506,6 +517,7 @@ export async function calcularCascataVigente(orderId: string): Promise<CascataVi
         dec(snap.pedido.contribution_margin_snapshot),
         dec(snap.pedido.net_revenue_snapshot)
       ).toString(),
+      difalDestacado: ctx.difalDestacadoPorUF.get(pedido.uf) ?? false,
     };
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular a cascata." };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import { difalNoBlocoComercial, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
 
 // A ficha impressa do pedido (formulário de papel, 05/08/2026). O que se
 // protege aqui é o subtotal impresso bater com a soma das linhas impressas —
@@ -84,5 +84,35 @@ describe("totalACobrarDoCliente", () => {
 
   it("não arredonda: precisão total até a exibição", () => {
     expect(totalACobrarDoCliente("0.005", "0.005").toString()).toBe("0.01");
+  });
+});
+
+// ============================================================
+// DIFAL destacado e não destacado (regra da Intertech, 25/08/2026)
+// ============================================================
+//
+// A folha do cliente só mostra o DIFAL onde ele está sendo cobrado. Onde não
+// está, some do bloco comercial — mas continua saindo da margem, no bloco de
+// uso interno, que é o que bate com a planilha de Rentabilidade.
+describe("difalNoBlocoComercial", () => {
+  it("UF destacada imprime o valor", () => {
+    const r = difalNoBlocoComercial({ destacado: true, valor: "145.80", calculando: false });
+    expect(r).toEqual({ texto: "145.80", imprimeValor: true });
+  });
+
+  it("UF não destacada não imprime valor nenhum, mesmo havendo DIFAL calculado", () => {
+    const r = difalNoBlocoComercial({ destacado: false, valor: "145.80", calculando: false });
+    expect(r).toEqual({ texto: "não destacado", imprimeValor: false });
+  });
+
+  it("destacada e ainda calculando avisa, em vez de mostrar traço", () => {
+    expect(difalNoBlocoComercial({ destacado: true, valor: null, calculando: true }).texto).toBe("calculando…");
+    expect(difalNoBlocoComercial({ destacado: true, valor: null, calculando: false }).texto).toBe("—");
+  });
+
+  // A trava que importa: destacar ou não NUNCA mexe no que se cobra do cliente.
+  it("o TOTAL do cliente é o mesmo destacado ou não", () => {
+    const total = totalACobrarDoCliente("1015", "200");
+    expect(total.toString()).toBe("1215");
   });
 });

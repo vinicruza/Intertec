@@ -355,40 +355,49 @@ Sem arredondamento por linha (§9.9): arredondar antes de somar daria um subtota
 
 Colunas: Pobreza (FCP) + Alíquota → DIFAL final. **SP não tem linha** (venda interna → SUMIF retorna 0, comportamento correto por acaso). Em 4 UFs o valor final não bate com Pobreza + Alíquota (ver Seção 9, item 5).
 
-#### 7.2.1 Quais UFs cobram — `charges_difal` (21/08/2026, confirmado em 24/08/2026)
+#### 7.2.1 Destaque por UF — `difal_destacado` (regra corrigida em 25/08/2026)
 
-Ter alíquota na tabela e **cobrar** são duas coisas diferentes. Até 21/08 só havia dois jeitos de não
-cobrar: o canal não aplicar (Revendas, Descpro), ou a UF não ter linha — que obriga a APAGAR a
-alíquota pesquisada. A coluna `difal_rates.charges_difal` separou as duas, e virou uma chave por
-estado na tela de Configurações.
+**O DIFAL entra na conta em toda UF que tenha alíquota.** A chave por estado decide apenas se ele
+sai **destacado**, nunca se ele existe:
 
 ```
-DIFAL = (UF cobra) E (pedido aplica) ? alíquota_final(UF) × base : 0
+DIFAL = (pedido aplica) ? alíquota_final(UF) × base : 0
 ```
 
-As duas condições são independentes e ambas precisam ser verdadeiras: `charges_difal` desliga por
-**estado**; `orders.applies_difal` desliga por **pedido** (§12.1).
+Quem desliga o DIFAL é o **pedido** — `orders.applies_difal`, pelo canal (Revendas, Descpro) ou pela
+marcação manual do simulador (§12.1). A UF entra pela alíquota: alíquota zero dá DIFAL zero, que é
+como SP funciona (venda interna).
 
-**Quem cobra hoje — decisão do financeiro, confirmada em 24/08/2026:**
+**A regra, nas palavras da cliente (25/08/2026):** é "quase a mesma situação do frete — destacado e
+não destacado".
 
-| | UFs |
-|---|---|
-| **Cobram** (14) | AM, CE, MG, MS, MT, PB, PE, PI, RN, RO, RR, SC, SE, TO |
-| **Não cobram** (13) | AC, AL, AP, BA, DF, ES, GO, MA, PA, PR, RJ, RS, SP |
+| Estado | Situação | Destaque | Entra na margem? |
+|---|---|---|---|
+| Sinalizado pela Cristi (14) | a Intertech **já paga** hoje | **sim** | sim |
+| Não sinalizado (12 com alíquota) | a cobrança **não está acontecendo agora, mas pode vir a qualquer momento** | não | **sim** |
+| SP | venda interna, alíquota 0 | — | não há o que deduzir |
 
-SP não cobra por definição — venda interna, alíquota 0. Os outros 12 **mantêm a alíquota
-registrada** e não entram na conta: é exatamente para isso que a coluna existe, em vez de apagar a
-linha.
+O raciocínio é de provisão: se a cobrança pode chegar, o pedido tem de ter sido vendido com margem
+que a suporte. Não destacar é sobre a nota; não deduzir seria mentir sobre o resultado.
 
-**O que ainda falta registrar:** o motivo estado a estado. A conferência de 24/08 (docs/17 §3)
-encontrou os 13 desmarcados sem justificativa em documento nenhum e sem rastro no `audit_logs` — a
-tela grava direto. O financeiro confirmou que a escolha é dele; o porquê de cada UF continua não
-escrito, e é o que impede alguém de conferir a lista daqui a seis meses.
+**Como isto estava errado.** Entre 21 e 25/08/2026 a coluna se chamava `charges_difal` e desmarcá-la
+**zerava** o DIFAL. Treze estados foram desmarcados (docs/17 §3), e os pedidos deles passaram a
+exibir margem sem o imposto. O caso que expôs o erro foi o da CLINICA DR LUIZ MADEIRA (aba Isabela,
+PA 12%): o sistema mostrava **60,48%** e a planilha da Intertech, **51,49%** — R$ 145,80 de DIFAL
+fora da conta num pedido de R$ 1.015. A planilha é a base e sempre esteve certa: a fórmula dela
+puxa a alíquota da aba DIFAL sem chave nenhuma de liga/desliga.
 
-**Efeito colateral conhecido:** desligar uma UF não muda nada visível no orçamento — o DIFAL sai
-zero e a margem aparece maior. Três pedidos fechados nasceram assim (docs/17 §3), somando
-R$ 2.335,53 fora da margem. Se a Intertech recolhe o imposto mesmo assim, esse valor sai do caixa
-sem aparecer no resultado.
+Golden test em `tests/calc/difal-por-uf.test.ts` ("golden: PA não destacado deduz DIFAL igual à
+planilha"), que trava os R$ 145,80, a receita líquida de R$ 641,39 e os 51,49%.
+
+**Ainda em aberto:** o **destaque** ainda não muda nada na ficha impressa. Hoje a folha mostra o
+DIFAL pela regra do canal (`applies_difal`), sem olhar o destaque da UF. Falta decidir o que
+"destacado" faz no papel e na nota — e, se a ficha passar a depender disso, o destaque precisará
+ser congelado no snapshot do pedido, como as alíquotas.
+
+**Três pedidos fechados** nasceram com o DIFAL zerado (docs/17 §3), somando R$ 2.335,53 fora da
+margem. Snapshot não se reescreve (D7): eles continuam como estão, e a diferença é de conferência
+com o financeiro, não de recálculo.
 
 ### 7.3 Frete estimado por UF (canal portal/marketplace) — aba `Portal`
 

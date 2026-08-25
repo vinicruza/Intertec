@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { dec, margemPct, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import { dec, difalNoBlocoComercial, margemPct, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
 import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
 import {
   obterParametrosAprovacao,
@@ -91,6 +91,15 @@ export default function PedidoFichaPage() {
   const fechado = pedido.status === "closed";
   const cascata = cascataQuery.data;
   const totaisFinanceiros = fechado ? t : cascata?.ok ? cascata.totals : t;
+  // Destaque do DIFAL (Calculations.md §7.2.1). Pedido fechado usa o que ficou
+  // congelado no fechamento; pedido em cotação usa o destaque vigente da UF.
+  // Fechado ANTES de 25/08/2026 não tem o congelado — cai no vigente, que é o
+  // comportamento que a folha já tinha.
+  const difalDestacado = fechado
+    ? (pedido.difal_destacado_snapshot ?? (cascata?.ok ? cascata.difalDestacado : false))
+    : cascata?.ok
+      ? cascata.difalDestacado
+      : false;
   const cliente = pedido.customers;
   const codigoCliente = cliente?.external_code?.trim();
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
@@ -156,13 +165,23 @@ export default function PedidoFichaPage() {
   // `difal_rates` (§7.2), e o sistema nunca calculou os dois separados. Por isso
   // "DIFAL + FCP" repete o valor do DIFAL, e quem explica onde o FCP está é a
   // nota do rodapé do bloco.
-  const difalCalculado = totaisFinanceiros?.difal;
-  const difalNaFolha =
-    difalCalculado != null
-      ? reais(difalCalculado)
-      : !fechado && cascataQuery.isLoading
-        ? "calculando…"
-        : "—";
+  // ---------- Destacado e não destacado (regra da Intertech, 25/08/2026) ----
+  //
+  // O DIFAL sai da margem em toda UF que tenha alíquota — isso não é opcional e
+  // está no bloco "Margem — uso interno", que é o que bate com a planilha de
+  // Rentabilidade. O que a chave por UF decide é só ESTE bloco, o comercial:
+  //
+  //   destacado     → o número aparece; é imposto que a Intertech já recolhe
+  //   não destacado → não aparece número; a cobrança não está acontecendo
+  //                   agora, e a folha não pode sugerir que está
+  //
+  // Em nenhum dos dois casos o TOTAL muda: DIFAL nunca foi cobrança do cliente
+  // (§12.1), e o TOTAL segue sendo subtotal + frete, travado com teste.
+  const difalNaFolha = difalNoBlocoComercial({
+    destacado: difalDestacado,
+    valor: totaisFinanceiros?.difal != null ? reais(totaisFinanceiros.difal) : null,
+    calculando: !fechado && cascataQuery.isLoading,
+  }).texto;
 
   return (
     // 190mm, não 210mm: a folha é A4 (210mm) MENOS os 10mm de margem de cada
@@ -412,6 +431,14 @@ export default function PedidoFichaPage() {
               Total = subtotal dos itens + frete. Impostos, DIFAL e FCP não entram na cobrança do
               cliente: são deduções da receita da Intertech. O FCP já vem embutido na alíquota do
               DIFAL, por isso não tem valor próprio e “DIFAL + FCP” repete o valor do DIFAL.
+              {!difalDestacado && (
+                <>
+                  {" "}
+                  <strong>Não destacado</strong> nesta UF: o estado não está cobrando o DIFAL neste
+                  momento, então ele não sai destacado na nota — mas continua deduzido da margem no
+                  bloco de uso interno, porque a cobrança pode vir a qualquer momento.
+                </>
+              )}
             </p>
           </section>
         </div>
@@ -460,7 +487,17 @@ export default function PedidoFichaPage() {
                     rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
                     valor={totaisFinanceiros.difal}
                   />
-                  <Linha rotulo="(−) Frete" valor={totaisFinanceiros.frete} />
+                  {/* O frete deduzido, não o cotado: quando o cliente paga o
+                      transporte nada sai da receita, e a linha tem de mostrar
+                      zero para a cascata fechar. */}
+                  <Linha
+                    rotulo={`(−) Frete${pedido.freight_paid_by_customer ? " — por conta do cliente" : ""}`}
+                    valor={totaisFinanceiros.frete_deduzido}
+                  />
+                  {/* O imposto sobre o frete faltava aqui até 25/08/2026: a folha
+                      listava cinco das seis deduções e a receita líquida impressa
+                      não fechava com as linhas acima dela. */}
+                  <Linha rotulo="(−) Imposto sobre o frete" valor={totaisFinanceiros.imposto_frete} />
                   <Linha rotulo="(−) Comissão" valor={totaisFinanceiros.comissao} />
                   <Linha rotulo="= Receita líquida" valor={totaisFinanceiros.receita_liquida} negrito />
                   <Linha rotulo="(−) CMV" valor={totaisFinanceiros.cmv} />

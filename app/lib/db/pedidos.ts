@@ -72,6 +72,10 @@ export type ContextoSimulador = {
   }>;
   ufs: string[]; // UFs com alíquota ICSM cadastrada
   tabelaPorUF: Map<string, TabelasUF>;
+  // Somente exibição: diz se o DIFAL da UF sai destacado na ficha. Fica FORA
+  // de `tabelaPorUF` de propósito — aquilo é o que o motor consome, e o
+  // destaque não entra em conta nenhuma (Calculations.md §7.2.1).
+  difalDestacadoPorUF: Map<string, boolean>;
   itens: ItemVendavel[];
   regrasMargem: RegraMargem[];
   // Para montar kit dentro do pedido (reunião 16/07/2026):
@@ -99,7 +103,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // antes de o pedido chegar à conferência com o cabeçalho vazio.
     supabase.from("customers").select("id, external_code, name, uf, tax_id, billing_zip, shipping_zip, contact_name, phone, email").eq("active", true).order("name"),
     supabase.from("icsm_rates").select("uf, icms_rate, pis_cofins_rate"),
-    supabase.from("difal_rates").select("uf, final_rate, charges_difal"),
+    supabase.from("difal_rates").select("uf, final_rate, difal_destacado"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
     supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
@@ -208,15 +212,19 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     }));
 
   const tabelaPorUF = new Map<string, TabelasUF>();
-  // UF que não cobra DIFAL entra como zero, e não some da tabela: a alíquota
-  // continua registrada em Configurações para quando voltar a valer. A regra é
-  // E lógico com o pedido — a UF precisa cobrar E o pedido precisa aplicar
-  // (canal Revendas/Descpro, ou a marcação manual do simulador).
+  // A alíquota da UF entra INTEIRA, sempre. `difal_destacado` não aparece aqui
+  // de propósito: ele decide se o DIFAL sai destacado na nota, não se ele entra
+  // na conta (regra da Intertech, 25/08/2026 — Calculations.md §7.2.1).
+  //
+  // Até 25/08 esta linha zerava a alíquota das UFs desmarcadas, e a margem dos
+  // pedidos desses 12 estados aparecia até 9 pontos maior do que a real. Quem
+  // desliga o DIFAL do pedido continua sendo o canal (Revendas/Descpro) ou a
+  // marcação manual do simulador — `orders.applies_difal`.
   const difalPorUF = new Map(
-    (difal.data ?? []).map((d) => [
-      d.uf as string,
-      (d.charges_difal as boolean | null) === false ? "0" : (d.final_rate as string),
-    ])
+    (difal.data ?? []).map((d) => [d.uf as string, d.final_rate as string])
+  );
+  const difalDestacadoPorUF = new Map(
+    (difal.data ?? []).map((d) => [d.uf as string, (d.difal_destacado as boolean | null) ?? false])
   );
   const portalPorUF = new Map((portal.data ?? []).map((p) => [p.uf as string, p.freight_percent as string]));
   for (const r of icsm.data ?? []) {
@@ -257,6 +265,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     clientes: (cli.data ?? []) as ContextoSimulador["clientes"],
     ufs: [...tabelaPorUF.keys()].sort(),
     tabelaPorUF,
+    difalDestacadoPorUF,
     itens: [...itensProdutos, ...itensKits],
     regrasMargem: (regras.data ?? []) as RegraMargem[],
     produtos: (prods.data ?? []).map((p) => ({

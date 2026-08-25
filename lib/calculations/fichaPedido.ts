@@ -71,3 +71,27 @@ export function totalACobrarDoCliente(
 ): Decimal {
   return dec(subtotal).plus(dec(frete));
 }
+
+// ---------- DIFAL no bloco comercial: destacado ou não ----------
+//
+// Regra ditada pela Intertech em 25/08/2026. O DIFAL sai da margem em TODA UF
+// que tenha alíquota — isso não é opcional e é o que faz a folha bater com a
+// planilha de Rentabilidade. O que a chave por UF decide é apenas se ele sai
+// DESTACADO no bloco comercial da ficha:
+//
+//   destacado     → imprime o valor; é imposto que a Intertech já recolhe
+//   não destacado → não imprime valor; o estado não está cobrando neste
+//                   momento, e a folha não pode sugerir que está
+//
+// Mora aqui, e não na tela, porque é regra de negócio com consequência no
+// papel que vai para o cliente. O TOTAL não muda em nenhum dos dois casos:
+// DIFAL nunca foi cobrança do cliente (§12.1) — ver `totalACobrarDoCliente`.
+export function difalNoBlocoComercial(entrada: {
+  destacado: boolean;
+  valor: string | null | undefined;
+  calculando: boolean;
+}): { texto: string; imprimeValor: boolean } {
+  if (!entrada.destacado) return { texto: "não destacado", imprimeValor: false };
+  if (entrada.valor != null) return { texto: entrada.valor, imprimeValor: true };
+  return { texto: entrada.calculando ? "calculando…" : "—", imprimeValor: false };
+}

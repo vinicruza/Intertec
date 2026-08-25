@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   atualizarCanal,
-  atualizarCobraDifal,
+  atualizarDifalDestacado,
   atualizarDifal,
   atualizarIcsm,
   atualizarPortal,
@@ -489,8 +489,8 @@ function LinhaIcsm({ linha, onSalvar }: { linha: IcsmLinha; onSalvar: (icms: str
 function AbaDifal() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["difal"], queryFn: listarDifal });
-  const cobrar = useMutation({
-    mutationFn: (v: { id: string; cobra: boolean }) => atualizarCobraDifal(v.id, v.cobra),
+  const destacar = useMutation({
+    mutationFn: (v: { id: string; destacado: boolean }) => atualizarDifalDestacado(v.id, v.destacado),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["difal"] }),
   });
   const salvar = useMutation({
@@ -500,14 +500,14 @@ function AbaDifal() {
 
   if (isLoading) return <Carregando />;
   return (
-    <TabelaUF titulo="Migrado da planilha como está (Decisão D5). UFs sinalizadas: valor final não bate com Pobreza + Alíquota — confirmar com o contador.">
+    <TabelaUF titulo="Migrado da planilha como está (Decisão D5). UFs sinalizadas: valor final não bate com Pobreza + Alíquota — confirmar com o contador. O destaque não muda a margem: o DIFAL é deduzido em toda UF com alíquota, destacado ou não.">
       <thead>
         <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
           <th className="px-4 py-3 font-medium">UF</th>
           <th className="px-4 py-3 font-medium">Pobreza (FCP)</th>
           <th className="px-4 py-3 font-medium">Alíquota base</th>
           <th className="px-4 py-3 font-medium">DIFAL final</th>
-          <th className="px-4 py-3 font-medium">Cobra DIFAL</th>
+          <th className="px-4 py-3 font-medium">Sai destacado</th>
         </tr>
       </thead>
       <tbody>
@@ -516,7 +516,7 @@ function AbaDifal() {
             key={r.id}
             linha={r}
             onSalvar={(final) => salvar.mutate({ id: r.id, final })}
-            onCobrar={(cobra) => cobrar.mutate({ id: r.id, cobra })}
+            onDestacar={(destacado) => destacar.mutate({ id: r.id, destacado })}
           />
         ))}
       </tbody>
@@ -527,11 +527,11 @@ function AbaDifal() {
 function LinhaDifal({
   linha,
   onSalvar,
-  onCobrar,
+  onDestacar,
 }: {
   linha: DifalLinha;
   onSalvar: (final: string) => void;
-  onCobrar: (cobra: boolean) => void;
+  onDestacar: (destacado: boolean) => void;
 }) {
   const [final, setFinal] = useState(linha.final_rate);
   const alterado = final !== linha.final_rate;
@@ -548,20 +548,22 @@ function LinhaDifal({
           className="w-24"
           value={final}
           onChange={(e) => setFinal(e.target.value)}
-          disabled={!linha.charges_difal}
         />
         {alterado && <Button className="ml-2 px-2 py-1 text-xs" onClick={() => onSalvar(final)}>Salvar</Button>}
       </td>
-      {/* Desmarcar não apaga a alíquota: ela fica registrada, só não entra na
-          conta. Assim dá para religar depois sem pesquisar o número de novo. */}
+      {/* Destaque, não cobrança (regra da Intertech, 25/08/2026). Marcado, o
+          DIFAL desta UF sai destacado na nota — é o que a Intertech já paga
+          hoje. Desmarcado, ele continua saindo da margem: a cobrança pode
+          chegar a qualquer momento, e quem provisionou não é pego de surpresa.
+          Em nenhum dos dois casos a alíquota deixa de entrar na conta. */}
       <td className="px-4 py-3">
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={linha.charges_difal}
-            onChange={(e) => onCobrar(e.target.checked)}
+            checked={linha.difal_destacado}
+            onChange={(e) => onDestacar(e.target.checked)}
           />
-          {linha.charges_difal ? "Cobra" : "Não cobra"}
+          {linha.difal_destacado ? "Destacado" : "Não destacado"}
         </label>
       </td>
     </tr>
