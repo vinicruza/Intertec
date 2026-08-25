@@ -431,3 +431,51 @@ describe("cidade e UF de entrega do pedido", () => {
     expect(gravar).not.toMatch(/\buf\s*=/);
   });
 });
+
+// ============================================================
+// Composição dos volumes (25/08/2026)
+// ============================================================
+//
+// Nasceu de uma vendedora escrever "2 cx6+1cx3 = 3" no campo Volumes, que é
+// inteiro. A informação é legítima e de quem embala; o campo é que faltava.
+//
+// Mesma armadilha da cidade de entrega: uma coluna nova precisa passar pelo
+// gatilho E pelas DUAS funções que gravam. Esquecer uma falha calado — o campo
+// aceita o que se digita e o valor não chega ao banco.
+describe("composição dos volumes", () => {
+  it("o gatilho do pedido fechado deixa passar a coluna nova", () => {
+    const gatilho = definicaoVigente("protect_closed_order");
+    expect(gatilho).toMatch(/'volumes_composition'/);
+    // Quem embala descobre a composição DEPOIS de o pedido ser ganho, então
+    // ela tem de ser editável no pedido fechado — e ficar na auditoria.
+    expect(gatilho).toMatch(/'volumes_composition',\s*old\.volumes_composition/);
+    expect(gatilho).toMatch(/'volumes_composition',\s*new\.volumes_composition/);
+  });
+
+  it("a tela de expedição grava a composição", () => {
+    const gravar = definicaoVigente("update_order_shipping");
+    expect(gravar).toMatch(/volumes_composition = nullif\(btrim\(p_volumes_composition\), ''\)/);
+  });
+
+  it("o simulador grava a composição ao salvar a cotação", () => {
+    const gravar = definicaoVigente("save_quote_revision");
+    expect(gravar).toMatch(/v_volumes_composition text := nullif\(btrim\(p_order->>'volumes_composition'\), ''\)/);
+    // Nos dois caminhos: cotação nova e edição de cotação existente.
+    expect(gravar).toMatch(/volumes, volumes_composition, shipping_zip/);
+    expect(gravar).toMatch(/volumes_composition = v_volumes_composition/);
+  });
+
+  it("duplicar o pedido NÃO leva a composição, como já não leva os volumes", () => {
+    // Composição e quantidade descrevem a caixa daquele embarque. Copiar para
+    // um pedido novo seria afirmar uma embalagem que ninguém montou ainda.
+    const copiar = definicaoVigente("copy_order_as_simulation");
+    expect(copiar).not.toMatch(/v_source\.volumes/);
+  });
+
+  it("é texto livre: a forma de escrever é de quem embala, não do sistema", () => {
+    expect(TODAS).toMatch(/add column if not exists volumes_composition text/);
+    // Sem trava de formato — o erro que originou tudo foi justamente uma
+    // coluna estreita demais para o que a pessoa precisava registrar.
+    expect(TODAS).not.toMatch(/volumes_composition[\s\S]{0,80}check\s*\(/);
+  });
+});

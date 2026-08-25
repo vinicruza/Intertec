@@ -790,6 +790,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     fretesCotados: (pedido.freight_quotes ?? []).map((f) => ({ ...FRETE_COTADO_VAZIO, ...f, id: f.id || novoFreteCotado().id })),
     pesoKg: pedido.weight_kg ?? "",
     volumes: pedido.volumes != null ? String(pedido.volumes) : "",
+    composicaoVolumes: pedido.volumes_composition ?? "",
     cepEntrega: formatarCep(pedido.shipping_zip),
     cidadeEntrega: pedido.shipping_city ?? "",
     ufEntrega: pedido.shipping_state ?? "",
@@ -1061,6 +1062,14 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
             <Label>Volumes</Label>
             <Input value={d.volumes ?? ""} onChange={(e) => mudar("volumes")(e.target.value)} placeholder="ex.: 3" />
             {problemaVolumes && <p className="mt-1 text-xs text-red-600">{problemaVolumes}</p>}
+          </div>
+          <div>
+            <Label>Composição dos volumes</Label>
+            <Input
+              value={d.composicaoVolumes ?? ""}
+              onChange={(e) => mudar("composicaoVolumes")(e.target.value)}
+              placeholder="ex.: 2 cx6 + 1 cx3"
+            />
           </div>
           <div>
             <Label>CEP de entrega</Label>

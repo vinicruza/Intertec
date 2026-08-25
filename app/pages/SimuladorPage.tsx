@@ -152,6 +152,7 @@ export default function SimuladorPage() {
   const [fretesCotados, setFretesCotados] = useState<FreteCotado[]>([]);
   const [pesoKg, setPesoKg] = useState("");
   const [volumes, setVolumes] = useState("");
+  const [composicaoVolumes, setComposicaoVolumes] = useState("");
   const [cepEntrega, setCepEntrega] = useState("");
   const [cidadeEntrega, setCidadeEntrega] = useState("");
   const [ufEntrega, setUfEntrega] = useState("");
@@ -209,6 +210,7 @@ export default function SimuladorPage() {
     setFretesCotados((p.freight_quotes ?? []).map((f) => ({ ...FRETE_COTADO_VAZIO, ...f, id: f.id || novoFreteCotado().id })));
     setPesoKg(textoDeCampo(p.weight_kg));
     setVolumes(textoDeCampo(p.volumes));
+    setComposicaoVolumes(textoDeCampo(p.volumes_composition));
     setCepEntrega(textoDeCampo(p.shipping_zip));
     setCidadeEntrega(textoDeCampo(p.shipping_city));
     setUfEntrega(textoDeCampo(p.shipping_state));
@@ -465,6 +467,7 @@ export default function SimuladorPage() {
         fretesCotados,
         pesoKg,
         volumes,
+        composicaoVolumes,
         cepEntrega: cepDigitos === "" ? null : cepDigitos,
         modoPagamentoId: modoPagamentoId || null,
         prazoPagamentoDias: null,
@@ -1162,6 +1165,20 @@ export default function SimuladorPage() {
             <Label>Volumes</Label>
             <Input value={volumes} onChange={(e) => setVolumes(e.target.value)} placeholder="ex.: 3" />
             {problemaVolumes && <p className="mt-1 text-xs text-red-600">{problemaVolumes}</p>}
+          </div>
+          {/* Como os volumes foram montados. Nasceu de uma vendedora escrever
+              "2 cx6+1cx3 = 3" no campo do número (25/08/2026): a informação é
+              real e de quem embala, mas não cabia em coluna de inteiro. */}
+          <div>
+            <Label>Composição dos volumes</Label>
+            <Input
+              value={composicaoVolumes}
+              onChange={(e) => setComposicaoVolumes(e.target.value)}
+              placeholder="ex.: 2 cx6 + 1 cx3"
+            />
+            <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+              Opcional. Quem confere a carga lê isto ao lado da quantidade.
+            </p>
           </div>
           <div>
             <Label>CEP de entrega</Label>

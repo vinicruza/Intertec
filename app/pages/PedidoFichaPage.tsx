@@ -396,6 +396,11 @@ export default function PedidoFichaPage() {
             <div className="mt-2 grid grid-cols-3 gap-2">
               <Caixinha rotulo="Peso (kg)" valor={pedido.weight_kg ? String(pedido.weight_kg) : null} />
               <Caixinha rotulo="Volumes" valor={pedido.volumes != null ? String(pedido.volumes) : null} />
+              {/* Só ocupa espaço na folha quando alguém escreveu: pedido sem
+                  composição não ganha uma caixinha vazia. */}
+              {pedido.volumes_composition && (
+                <Caixinha rotulo="Composição" valor={pedido.volumes_composition} />
+              )}
               <Caixinha rotulo="CEP de entrega" valor={formatarCep(cepEntrega) || null} />
             </div>
           </section>

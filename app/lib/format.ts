@@ -154,7 +154,8 @@ export function normalizarFreteCotado(f: FreteCotado): FreteCotado {
 //
 // Ela não estava errada em querer registrar isso; errado era o campo aceitar a
 // digitação e só reclamar depois da viagem, em outra língua. Aqui o problema é
-// pego antes de sair da tela, e a frase diz onde a informação cabe.
+// pego antes de sair da tela, e a frase aponta o campo "Composição dos
+// volumes", logo abaixo, que existe justamente para essa informação.
 export function problemaNoCampoNumerico(
   valor: ValorNumerico,
   opcoes: { inteiro: boolean; rotulo: string }
@@ -165,7 +166,7 @@ export function problemaNoCampoNumerico(
   const normalizado = numeroDigitado(limpo);
   if (!/^-?\d+(\.\d+)?$/.test(normalizado)) {
     return opcoes.inteiro
-      ? `${opcoes.rotulo} aceita só o número de volumes — por exemplo 3. Para descrever como eles foram montados, use o campo de observações.`
+      ? `${opcoes.rotulo} aceita só o número de volumes — por exemplo 3. Como eles foram montados vai no campo "Composição dos volumes", logo abaixo.`
       : `${opcoes.rotulo} aceita só número — por exemplo 12,5.`;
   }
 

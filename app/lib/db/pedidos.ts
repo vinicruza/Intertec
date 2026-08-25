@@ -392,6 +392,7 @@ export type DadosSimulacao = {
   fretesCotados: FreteCotado[];
   pesoKg: string | null;
   volumes: string | null;
+  composicaoVolumes: string | null;
   cepEntrega: string | null;
   modoPagamentoId: string | null;
   prazoPagamentoDias: string | null;
@@ -460,6 +461,7 @@ export async function salvarCotacao(
       carrier_other: d.transportadoraOutra,
       weight_kg: numeroOuVazio(d.pesoKg),
       volumes: numeroOuVazio(d.volumes),
+      volumes_composition: textoOuVazio(d.composicaoVolumes).trim() || null,
       shipping_zip: d.cepEntrega,
       payment_term_id: d.modoPagamentoId,
       payment_term_days: numeroOuVazio(d.prazoPagamentoDias),

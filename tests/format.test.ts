@@ -66,10 +66,10 @@ describe("problemaNoCampoNumerico", () => {
   const volumes = (v: string) => problemaNoCampoNumerico(v, { inteiro: true, rotulo: "Volumes" });
   const peso = (v: string) => problemaNoCampoNumerico(v, { inteiro: false, rotulo: "O peso" });
 
-  it("pega o caso relatado e diz onde a informação cabe", () => {
+  it("pega o caso relatado e aponta o campo certo", () => {
     const p = volumes("2 cx6+1cx3 = 3");
     expect(p).toContain("aceita só o número de volumes");
-    expect(p).toContain("observações");
+    expect(p).toContain("Composição dos volumes");
   });
 
   it("aceita o que é válido", () => {
