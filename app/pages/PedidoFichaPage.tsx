@@ -1,11 +1,17 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import { dec, margemPct, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
 import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
-import { podeVerCascataOperacional } from "../lib/db/aprovacao";
+import {
+  obterParametrosAprovacao,
+  podeVerCascataOperacional,
+  podeVerNumerosDeMargem,
+} from "../lib/db/aprovacao";
+import { PARAMETROS_APROVACAO_PADRAO } from "../lib/sim/aprovacao";
+import { seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, reais } from "../lib/format";
+import { dataCurta, percentual, reais } from "../lib/format";
 import { formatarCep, formatarCnpjCpf, formatarTelefone } from "../../lib/cadastro/documentos";
 import { Button } from "@components/ui/primitives";
 import { IntertechLogo } from "@components/brand/IntertechLogo";
@@ -24,10 +30,14 @@ import { IntertechLogo } from "@components/brand/IntertechLogo";
 // O bloco fiscal do formulário já sai com valor no DIFAL (24/08/2026, §12.4):
 // quem monta o pedido precisa enxergar o imposto que o estado de destino cobra.
 // Continua sendo dedução da receita da Intertech, nunca cobrança do cliente
-// (§12.1) — o rótulo diz isso em letras, e o TOTAL não soma o DIFAL, para
-// ninguém ler a folha como fatura. Sem valor seguem só o ST, que não existe no
-// sistema (§12.2), e o FCP, que não tem número próprio: já vem embutido na
-// alíquota final do DIFAL (§7.2).
+// (§12.1) — quem diz isso é a nota do rodapé do bloco, e o TOTAL não soma o
+// DIFAL, para ninguém ler a folha como fatura. Sem valor segue só o FCP, que
+// não tem número próprio: já vem embutido na alíquota final do DIFAL (§7.2).
+// O ST saiu da folha em 24/08/2026 — o imposto não se aplica mais (§12.2).
+//
+// A folha também é onde sai o selo de faixa da margem (§12.5): é ela que vai
+// para a mesa da conferência e responde "em que situação este pedido foi
+// aprovado".
 
 type ComposicaoKit = Array<{ nome: string; quantidade: string }>;
 
@@ -52,6 +62,18 @@ export default function PedidoFichaPage() {
     enabled: Boolean(pedido) && pedido?.status === "simulation" && pedido.itens.length > 0,
   });
   const verNumeros = podeVerCascataOperacional(perfil?.perfil);
+  // O selo de faixa sai para todo mundo — é a informação que o pedido da
+  // Intertech (24/08/2026) pediu na folha. O PERCENTUAL é que respeita a
+  // configuração que esconde número de margem do comercial: enquanto os
+  // parâmetros não chegam, vale o padrão, que esconde.
+  const { data: parametrosAprovacao } = useQuery({
+    queryKey: ["parametrosAprovacao"],
+    queryFn: obterParametrosAprovacao,
+  });
+  const verPercentualDaMargem = podeVerNumerosDeMargem(
+    perfil?.perfil,
+    parametrosAprovacao ?? PARAMETROS_APROVACAO_PADRAO
+  );
 
   // Totais por linha e subtotal saem do motor de cálculo, nunca da tela.
   const totais = useMemo(
@@ -74,8 +96,17 @@ export default function PedidoFichaPage() {
   // CEP de entrega: o do pedido manda quando existe (entrega excepcional);
   // senão vale o do cadastro. É a única regra de precedência da folha.
   const cepEntrega = pedido.shipping_zip ?? cliente?.shipping_zip ?? null;
-  const cidadeEntrega = pedido.shipping_zip ? null : cliente?.shipping_city ?? null;
-  const ufEntrega = pedido.shipping_zip ? pedido.uf : cliente?.shipping_state ?? pedido.uf;
+  // A cidade de entrega vinha vazia SEMPRE que o pedido tinha CEP gravado —
+  // inclusive quando era o mesmo CEP do cadastro, que é o caso comum. A folha
+  // saía com "BA" no lugar de "Salvador / BA". Só a entrega excepcional de
+  // verdade (CEP diferente do cadastro) fica sem cidade, porque `orders` não
+  // guarda cidade de entrega: aí quem avisa é a tarja de ATENÇÃO logo abaixo.
+  const entregaIgualAoCadastro =
+    !pedido.shipping_zip || pedido.shipping_zip === cliente?.shipping_zip;
+  const cidadeEntrega = entregaIgualAoCadastro ? cliente?.shipping_city ?? null : null;
+  const ufEntrega = entregaIgualAoCadastro
+    ? cliente?.shipping_state ?? pedido.uf
+    : pedido.uf;
   const transportadora = pedido.carriers?.requires_name
     ? pedido.carrier_other ?? "Outra"
     : pedido.carriers?.name ?? null;
@@ -89,6 +120,21 @@ export default function PedidoFichaPage() {
     ? `ORÇAMENTO ${pedido.quote_number ?? "—"}`
     : pedido.quote_number ?? "—";
   const totalACobrar = totalACobrarDoCliente(totais.subtotal, pedido.freight ?? "0");
+
+  // ---------- Selo da faixa de margem (pedido da Intertech, 24/08/2026) ----------
+  //
+  // A folha vai para a mesa da conferência e é ela que responde "em que
+  // situação este pedido foi aprovado". A regra de faixa já existia
+  // (`seloMargemComercial`, PRD §5.5) e já aparecia na tela do pedido; só nunca
+  // tinha chegado ao papel. Mesma classificação, mesmo cálculo — nada de
+  // margem muda aqui.
+  const margemDoPedido = totaisFinanceiros?.margem_contribuicao;
+  const receitaLiquidaDoPedido = totaisFinanceiros?.receita_liquida;
+  const pctMargem =
+    margemDoPedido && receitaLiquidaDoPedido
+      ? margemPct(dec(margemDoPedido), dec(receitaLiquidaDoPedido))
+      : null;
+  const selo = pctMargem ? seloMargemComercial(pctMargem) : null;
 
   // ---------- DIFAL na folha (pedido da vendedora, 24/08/2026) ----------
   //
@@ -105,8 +151,8 @@ export default function PedidoFichaPage() {
   //
   // FCP não ganha número próprio: já vem embutido na alíquota final da tabela
   // `difal_rates` (§7.2), e o sistema nunca calculou os dois separados. Por isso
-  // "DIFAL + FCP" repete o valor do DIFAL, e a linha do FCP diz onde ele está em
-  // vez de inventar um valor. ST segue sem valor: não existe no sistema (§12.2).
+  // "DIFAL + FCP" repete o valor do DIFAL, e quem explica onde o FCP está é a
+  // nota do rodapé do bloco.
   const difalCalculado = totaisFinanceiros?.difal;
   const difalNaFolha =
     difalCalculado != null
@@ -116,7 +162,11 @@ export default function PedidoFichaPage() {
         : "—";
 
   return (
-    <div className="mx-auto max-w-[210mm] space-y-4">
+    // 190mm, não 210mm: a folha é A4 (210mm) MENOS os 10mm de margem de cada
+    // lado do `@page` (app/index.css). Com 210mm o navegador tinha de encolher
+    // ou cortar, e cortava — o último dígito do número do pedido e a ponta
+    // direita das linhas de baixo sumiam na impressão.
+    <div className="mx-auto max-w-[190mm] space-y-4">
       {/* Barra de ações — não sai na impressão. */}
       <div className="flex items-center justify-between print:hidden">
         <Button
@@ -130,8 +180,21 @@ export default function PedidoFichaPage() {
 
       <div className="ficha-pedido space-y-4 rounded-xl border border-[var(--cor-borda)] bg-white p-8 text-[11px] leading-snug text-black shadow-[var(--sombra-cartao)] print:rounded-none print:border-0 print:p-0 print:shadow-none">
         {/* ---------- Cabeçalho ---------- */}
-        <div className="flex items-start justify-between gap-6">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
           <IntertechLogo size="lg" className="h-16 [&_img]:h-16" />
+          {/* Selo da faixa no meio da faixa superior: é o primeiro dado que
+              quem confere procura na folha. */}
+          <div className="justify-self-center">
+            {selo && (
+              <span
+                className={`inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-bold ${CORES_DO_SELO[selo.color]}`}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-current" />
+                {selo.label}
+                {verPercentualDaMargem && pctMargem && ` · ${percentual(pctMargem.toString())}`}
+              </span>
+            )}
+          </div>
           <div className="text-right">
             <p className="text-2xl font-extrabold leading-none tracking-tight text-[var(--cor-primaria)]">
               {titulo}
@@ -148,19 +211,32 @@ export default function PedidoFichaPage() {
         {/* ---------- Dados da empresa / cliente ---------- */}
         <section className="ficha-bloco">
           <Secao titulo="Dados da empresa / cliente" icone={<IconePessoa />} />
-          <div className="grid grid-cols-2 gap-x-8 rounded-xl border border-[var(--cor-borda)] px-4 py-2">
-            <Campo rotulo="Empresa" valor={cliente?.name} />
-            <Campo rotulo="CEP ent." valor={formatarCep(cepEntrega) || null} />
-            <Campo rotulo="Cód. cliente" valor={codigoCliente ?? null} />
-            <Campo rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} />
-            <Campo rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} />
-            <Campo rotulo="Contato" valor={cliente?.contact_name} />
-            <Campo rotulo="Data" valor={dataCurta(pedido.created_at)} />
-            <Campo rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} />
-            <Campo rotulo="CEP fat." valor={formatarCep(cliente?.billing_zip) || null} />
-            <Campo rotulo="E-mail" valor={cliente?.email} />
-            <Campo rotulo="Cidade/UF faturamento" valor={cidadeUf(cliente?.billing_city, cliente?.billing_state)} />
-            <Campo rotulo="Vendedor" valor={pedido.sellers?.name} ultimo />
+          {/* Uma linha por assunto, e não duas colunas independentes: o CNPJ e
+              o código do cliente sobem para a linha do nome (são identificação
+              da mesma empresa), e cada CEP fica ao lado da sua cidade. O campo
+              "Data" saiu — repetia o "Pedido gerado em" do cabeçalho. */}
+          <div className="rounded-xl border border-[var(--cor-borda)] px-4 py-2">
+            <LinhaDeDados>
+              <Par rotulo="Empresa" valor={cliente?.name} className="min-w-0 flex-1" />
+              <Par rotulo="Cód. cliente" valor={codigoCliente ?? null} className="w-32 shrink-0" />
+              <Par rotulo="CNPJ/CPF" valor={formatarCnpjCpf(cliente?.tax_id) || null} className="w-44 shrink-0" />
+            </LinhaDeDados>
+            <LinhaDeDados>
+              <Par rotulo="CEP fat." valor={formatarCep(cliente?.billing_zip) || null} className="w-1/2" larguraRotulo="w-28" />
+              <Par rotulo="Cidade/UF fat." valor={cidadeUf(cliente?.billing_city, cliente?.billing_state)} className="w-1/2" larguraRotulo="w-32" />
+            </LinhaDeDados>
+            <LinhaDeDados>
+              <Par rotulo="CEP entrega" valor={formatarCep(cepEntrega) || null} className="w-1/2" larguraRotulo="w-28" />
+              <Par rotulo="Cidade/UF entrega" valor={cidadeUf(cidadeEntrega, ufEntrega)} className="w-1/2" larguraRotulo="w-32" />
+            </LinhaDeDados>
+            <LinhaDeDados>
+              <Par rotulo="Contato" valor={cliente?.contact_name} className="w-1/2" larguraRotulo="w-28" />
+              <Par rotulo="Telefone" valor={formatarTelefone(cliente?.phone) || null} className="w-1/2" larguraRotulo="w-32" />
+            </LinhaDeDados>
+            <LinhaDeDados ultima>
+              <Par rotulo="E-mail" valor={cliente?.email} className="w-1/2" larguraRotulo="w-28" />
+              <Par rotulo="Vendedor" valor={pedido.sellers?.name} className="w-1/2" larguraRotulo="w-32" />
+            </LinhaDeDados>
           </div>
           {/* Endereço de entrega diferente do de sempre precisa saltar aos
               olhos: é o erro de expedição mais caro que existe. */}
@@ -309,19 +385,16 @@ export default function PedidoFichaPage() {
                 <tbody>
                   <LinhaResumo rotulo="Subtotal" valor={reais(totais.subtotal.toString())} />
                   <LinhaResumo rotulo="Frete" valor={reais(pedido.freight)} />
-                  {/* Valor à vista, mas fora do TOTAL: nenhum dos três é
-                      acrescentado à cobrança do cliente (§12.1). */}
-                  <LinhaResumo rotulo="ST" valor="—" detalhe="não calculado pelo sistema" />
+                  {/* Valor à vista, mas fora do TOTAL: nenhum deles é
+                      acrescentado à cobrança do cliente (§12.1). O que explica
+                      isso é a nota do rodapé do bloco, não texto no meio da
+                      linha: o texto entre parênteses empurrava o valor para
+                      fora da coluna e deixava "DIFAL + FCP" sem número. */}
                   <LinhaResumo
-                    rotulo="DIFAL"
+                    rotulo={pedido.applies_difal ? "DIFAL" : "DIFAL dispensado"}
                     valor={difalNaFolha}
-                    detalhe={
-                      pedido.applies_difal
-                        ? "recolhido pela Intertech — não cobrado do cliente"
-                        : "dispensado — cliente contribuinte"
-                    }
                   />
-                  <LinhaResumo rotulo="FCP" valor="—" detalhe="já embutido na alíquota do DIFAL" />
+                  <LinhaResumo rotulo="FCP" valor="—" />
                   <LinhaResumo rotulo="DIFAL + FCP" valor={difalNaFolha} />
                   <tr className="bg-[var(--cor-primaria-clara)]">
                     <td className="px-4 py-2 text-base font-bold text-[var(--cor-primaria)]">TOTAL:</td>
@@ -334,9 +407,8 @@ export default function PedidoFichaPage() {
             </div>
             <p className="mt-1 text-[9px] leading-tight text-black/55">
               Total = subtotal dos itens + frete. Impostos, DIFAL e FCP não entram na cobrança do
-              cliente: são deduções da receita da Intertech. O DIFAL aparece pelo valor para
-              conferência com o contador; o FCP já vem embutido na alíquota do DIFAL, por isso
-              “DIFAL + FCP” repete o mesmo valor.
+              cliente: são deduções da receita da Intertech. O FCP já vem embutido na alíquota do
+              DIFAL, por isso não tem valor próprio e “DIFAL + FCP” repete o valor do DIFAL.
             </p>
           </section>
         </div>
@@ -359,14 +431,6 @@ export default function PedidoFichaPage() {
               )}
             </span>
           </p>
-          {/* Linhas para completar à mão o que não estava no sistema na hora. */}
-          {!pedido.order_notes && (
-            <div className="mt-1">
-              <div className="h-5 border-b border-black/20" />
-              <div className="h-5 border-b border-black/20" />
-              <div className="h-5 border-b border-black/20" />
-            </div>
-          )}
         </section>
 
         {/* ---------- Margem (só para quem pode ver) ---------- */}
@@ -418,6 +482,48 @@ export default function PedidoFichaPage() {
 }
 
 // ---------- Peças do desenho da ficha ----------
+
+// Cores do selo de faixa, as mesmas da tela do pedido — quem confere o papel e
+// quem olha a tela precisam ver o mesmo verde.
+const CORES_DO_SELO: Record<string, string> = {
+  blue: "border-blue-300 bg-blue-100 text-blue-800",
+  green: "border-green-300 bg-green-100 text-green-800",
+  yellow: "border-yellow-300 bg-yellow-100 text-yellow-800",
+  red: "border-red-300 bg-red-100 text-red-800",
+};
+
+// Uma linha do cartão de cliente, com um ou mais pares rótulo/valor.
+function LinhaDeDados({ children, ultima }: { children: React.ReactNode; ultima?: boolean }) {
+  return (
+    <div className={`flex gap-x-4 py-1.5 ${ultima ? "" : "border-b border-[var(--cor-borda)]"}`}>
+      {children}
+    </div>
+  );
+}
+
+// Par rótulo/valor. Vazio vira espaço para preencher à mão — a folha continua
+// utilizável enquanto o cadastro não estiver completo, que é a situação dos 13
+// mil clientes herdados da planilha.
+function Par({
+  rotulo,
+  valor,
+  className,
+  larguraRotulo,
+}: {
+  rotulo: string;
+  valor: string | null | undefined;
+  className?: string;
+  larguraRotulo?: string;
+}) {
+  return (
+    <div className={`flex gap-3 ${className ?? ""}`}>
+      <span className={`shrink-0 font-semibold text-[var(--cor-primaria)] ${larguraRotulo ?? ""}`}>
+        {rotulo}:
+      </span>
+      <span className="min-w-0 flex-1 break-words">{valor || " "}</span>
+    </div>
+  );
+}
 
 // Cabeçalho de seção: selo azul arredondado + título em caixa alta.
 function Secao({ titulo, icone }: { titulo: string; icone: React.ReactNode }) {
@@ -476,23 +582,10 @@ function Selecao({ marcada }: { marcada: boolean }) {
   );
 }
 
-function LinhaResumo({
-  rotulo,
-  valor,
-  detalhe,
-}: {
-  rotulo: string;
-  valor: string;
-  detalhe?: string;
-}) {
+function LinhaResumo({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <tr className="border-b border-[var(--cor-borda)]">
-      <td className="px-4 py-1.5 font-semibold text-[var(--cor-primaria)]">
-        {rotulo}:
-        {detalhe && (
-          <span className="ml-1 text-[9px] font-normal text-black/55">({detalhe})</span>
-        )}
-      </td>
+      <td className="px-4 py-1.5 font-semibold text-[var(--cor-primaria)]">{rotulo}:</td>
       <td className="px-4 py-1.5 text-right">{valor}</td>
     </tr>
   );
