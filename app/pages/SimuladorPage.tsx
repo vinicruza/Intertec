@@ -589,16 +589,19 @@ export default function SimuladorPage() {
     if (selecionadaAtualizada) {
       setTransportadoraId(selecionadaAtualizada.carrierId ?? "");
       setTransportadoraOutra(selecionadaAtualizada.carrierOther ?? "");
-      if (selecionadaAtualizada.amount) setFrete(selecionadaAtualizada.amount);
     }
     setSalvo(null);
   }
 
+  // Escolher a cotação define POR QUEM a mercadoria vai — nunca quanto se
+  // cobra. Quem digita o "Frete (R$)" é a vendedora, com o valor cobrado do
+  // cliente, que na prática é maior que a cotação (pedido da Intertech,
+  // 24/08/2026). Antes a cotação sobrescrevia o campo e apagava o valor
+  // combinado com o cliente na primeira troca de transportadora.
   function selecionarFreteCotado(freteCotado: FreteCotado) {
     setFretesCotados((atuais) => atuais.map((f) => ({ ...f, selected: f.id === freteCotado.id })));
     setTransportadoraId(freteCotado.carrierId ?? "");
     setTransportadoraOutra(freteCotado.carrierOther ?? "");
-    if (freteCotado.amount) setFrete(freteCotado.amount);
     setSalvo(null);
   }
 
@@ -979,7 +982,13 @@ export default function SimuladorPage() {
                 {simulacao.estado === "ok" ? reais(simulacao.freteUsado.toString()) : "—"} (automático: % da receita por UF)
               </p>
             ) : (
-              <Input value={frete} onChange={(e) => setFrete(e.target.value)} />
+              <>
+                <Input value={frete} onChange={(e) => setFrete(e.target.value)} />
+                <p className="mt-1 text-xs text-[var(--cor-texto-suave)]">
+                  Valor cobrado do cliente. As cotações abaixo são referência e não preenchem este
+                  campo.
+                </p>
+              </>
             )}
           </div>
           <label className="flex items-end gap-2 pb-2 text-sm">
