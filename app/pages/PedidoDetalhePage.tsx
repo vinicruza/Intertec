@@ -315,7 +315,21 @@ export default function PedidoDetalhePage() {
           {verNumeros && <table className="w-full text-sm">
             <tbody>
               <Linha rotulo="Receita bruta" valor={t.receita_bruta} />
-              <Linha rotulo="(−) Impostos + DIFAL" valor={`${t.impostos} + ${t.difal}`} />
+              {/* Uma linha por dedução, na ordem do motor (order.ts §6):
+                  receita − frete − imposto do frete − imposto − DIFAL − comissão.
+                  Até 25/08/2026 a tela mostrava só imposto e DIFAL, então a soma
+                  visível não chegava na receita líquida impressa logo abaixo e
+                  ninguém conseguia conferir o número. O rótulo antigo ainda
+                  juntava imposto e DIFAL num texto só ("164.94 + 0.00"), que
+                  `reais()` não consegue converter e imprimia "—". */}
+              <LinhaOpcional
+                rotulo={`(−) Frete${pedido.freight_paid_by_customer ? " — por conta do cliente" : ""}`}
+                valor={t.frete_deduzido}
+              />
+              <LinhaOpcional rotulo="(−) Imposto sobre o frete" valor={t.imposto_frete} />
+              <Linha rotulo="(−) Impostos sobre venda" valor={t.impostos} />
+              <Linha rotulo="(−) DIFAL" valor={t.difal} />
+              <LinhaOpcional rotulo="(−) Comissão" valor={t.comissao} />
               <Linha rotulo="= Receita líquida" valor={t.receita_liquida} destaque />
               <Linha rotulo="(−) CMV" valor={t.cmv} />
               <Linha rotulo="= MARGEM DE CONTRIBUIÇÃO" valor={t.margem_contribuicao} destaque />
@@ -354,11 +368,21 @@ export default function PedidoDetalhePage() {
             <table className="w-full text-sm">
               <tbody>
                 <Linha rotulo="Receita bruta" valor={cascata.totals.receita_bruta} />
+                {/* Ver a nota da cascata congelada acima: as seis deduções do
+                    motor aparecem uma a uma, para o total fechar na frente de
+                    quem lê. O frete sai zerado quando é o cliente que paga, e o
+                    rótulo diz isso — senão um zero sem explicação parece erro. */}
+                <Linha
+                  rotulo={`(−) Frete${pedido.freight_paid_by_customer ? " — por conta do cliente" : ""}`}
+                  valor={cascata.totals.frete_deduzido}
+                />
+                <Linha rotulo="(−) Imposto sobre o frete" valor={cascata.totals.imposto_frete} />
                 <Linha rotulo="(−) Impostos sobre venda" valor={cascata.totals.impostos} />
                 <Linha
                   rotulo={`(−) DIFAL${pedido.applies_difal ? "" : " — dispensado (cliente contribuinte)"}`}
                   valor={cascata.totals.difal}
                 />
+                <Linha rotulo="(−) Comissão" valor={cascata.totals.comissao} />
                 <Linha rotulo="= Receita líquida" valor={cascata.totals.receita_liquida} destaque />
                 <Linha rotulo="(−) CMV" valor={cascata.totals.cmv} />
                 <Linha rotulo="= MARGEM DE CONTRIBUIÇÃO" valor={cascata.totals.margem_contribuicao} destaque />
@@ -718,6 +742,14 @@ function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
   if (!pedido.payment_term_id && pedido.payment_term_days == null) pendencias.push("modo de pagamento");
   if (!pedido.shipping_zip && !pedido.customers?.shipping_zip) pendencias.push("CEP de entrega");
   return pendencias;
+}
+
+// Snapshot de pedido fechado nunca é reescrito, e os mais antigos foram
+// gravados sem frete, imposto do frete e comissão. Nesses casos a linha some,
+// em vez de imprimir um "—" que se leria como "dedução de nada".
+function LinhaOpcional({ rotulo, valor }: { rotulo: string; valor: string | undefined }) {
+  if (valor === undefined || valor === null || valor === "") return null;
+  return <Linha rotulo={rotulo} valor={valor} />;
 }
 
 function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {

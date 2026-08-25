@@ -91,7 +91,15 @@ export function montarSnapshot(
         base_difal: toMoney(r.baseDifal),
         comissao: toMoney(r.comissao),
         base_comissao: toMoney(r.baseComissao),
+        // Dois números diferentes, e a cascata precisa do segundo:
+        // `frete` é o transporte cotado (base do DIFAL e da comissão, mesmo
+        // quando o cliente paga); `frete_deduzido` é o que de fato sai da
+        // receita — zero quando o frete é por conta do cliente (order.ts §6).
+        // Até 25/08/2026 só o primeiro era gravado, e a tela o exibia como se
+        // fosse dedução: a linha mostrava R$ 1.000 saindo de uma conta em que
+        // nada tinha saído.
         frete: toMoney(simulacao.freteUsado),
+        frete_deduzido: toMoney(r.frete),
         receita_liquida: toMoney(r.receitaLiquida),
         cmv: toMoney(r.cmvTotal),
         despesa_alocada: toMoney(r.despesaTotal),

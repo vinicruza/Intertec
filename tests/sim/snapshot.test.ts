@@ -77,3 +77,52 @@ describe("snapshot de fechamento — fixture Patricia", () => {
     expect(snap2.itens[1].freight_share_snapshot).toBe("150"); // 75% de 200
   });
 });
+
+// A tela do pedido (PedidoDetalhePage) e a ficha impressa (PedidoFichaPage)
+// listam as deduções uma a uma e imprimem a receita líquida logo abaixo. Se
+// alguma linha não for exibida, o leitor não consegue fechar a conta — foi o
+// que aconteceu até 25/08/2026, quando a tela mostrava só imposto e DIFAL e
+// R$ 62,88 de imposto do frete + comissão sumiam sem explicação.
+//
+// Este teste guarda o contrato que a exibição usa: as SEIS deduções gravadas
+// em totals_display somam exatamente a receita bruta menos a líquida.
+describe("totals_display fecha a cascata", () => {
+  const casos = [
+    { nome: "frete pago pela Intertech", fretePorContaCliente: false },
+    { nome: "frete por conta do cliente", fretePorContaCliente: true },
+  ];
+
+  for (const caso of casos) {
+    it(`as seis deduções reconciliam com a receita líquida — ${caso.nome}`, () => {
+      const s = simular({
+        itens: [
+          { nome: "Avental TNT NE", precoVenda: "4.20", quantidade: "4000", cmvUnitario: "1.537605", despesaUnitaria: "0.778783" },
+        ],
+        freteManual: "1000",
+        fretePorContaCliente: caso.fretePorContaCliente,
+        comissao: null,
+        canal: { aplicaDifal: true, comissaoPadrao: "0.025", modeloFrete: "manual" },
+        uf: { aliquotaIcsm: "0.1625", difalFinal: "0.135", fretePortalPct: null },
+      });
+      const t = montarSnapshot(s, "0.1625", [
+        {
+          orderItemId: "item-1",
+          precoVenda: "4.20",
+          quantidade: "4000",
+          cmvUnitario: "1.537605",
+          despesaUnitaria: "0.778783",
+          composicaoKit: [],
+        },
+      ]).pedido.totals_display;
+
+      const num = (v: string) => Number(v);
+      // Frete DEDUZIDO: o cotado (t.frete) continua na base do DIFAL e da
+      // comissão, mas não sai da receita quando quem paga é o cliente.
+      const deducoes = num(t.frete_deduzido) + num(t.imposto_frete) + num(t.impostos) + num(t.difal) + num(t.comissao);
+
+      expect(num(t.receita_bruta) - deducoes).toBeCloseTo(num(t.receita_liquida), 2);
+      // E a margem é a líquida menos o CMV, que é a última linha da cascata.
+      expect(num(t.receita_liquida) - num(t.cmv)).toBeCloseTo(num(t.margem_contribuicao), 2);
+    });
+  }
+});
