@@ -173,10 +173,59 @@ export function statusMargem(pct: Decimal, regras: RegraMargem[]): RegraMargem |
   return null;
 }
 
-export function seloMargemComercial(pct: Decimal): SeloMargemComercial {
-  if (pct.lte("0.40")) return { label: "Vermelha", color: "red" };
-  if (pct.lte("0.50")) return { label: "Amarela", color: "yellow" };
-  if (pct.lte("0.65")) return { label: "Verde", color: "green" };
+// ---------- Faixas do selo comercial, por canal e por vendedor ----------
+//
+// Pedido da Intertech em 26/08/2026: Marketplace vende com estrutura de custo
+// diferente do Interno e precisa de régua própria — até 29,99 vermelho, 30 a
+// 39,99 amarelo, 40 verde, acima de 50 azul.
+//
+// Em vez de gravar o caso da Mari no código, a régua virou dado. A próxima vez
+// que isso mudar não deve exigir programador.
+export type FaixaMargemComercial = {
+  channel_id: string | null;
+  seller_id: string | null;
+  red_max: string;
+  yellow_max: string;
+  green_max: string;
+};
+
+// O que valia antes de as faixas existirem. Continua sendo a rede de segurança
+// para quando a tabela não responde: sem ela, uma falha de leitura mudaria a
+// régua de aprovação de todo mundo em silêncio.
+export const FAIXA_MARGEM_PADRAO = { red_max: "0.40", yellow_max: "0.50", green_max: "0.65" };
+
+export type TetosDaFaixa = { red_max: string; yellow_max: string; green_max: string };
+
+// Do mais específico para o mais geral: a faixa do VENDEDOR manda sobre a do
+// canal, que manda sobre a da casa. É o que permite abrir exceção para uma
+// pessoa sem mexer no canal inteiro.
+export function faixaDoPedido(
+  faixas: FaixaMargemComercial[],
+  escopo: { channelId?: string | null; sellerId?: string | null }
+): TetosDaFaixa {
+  const doVendedor =
+    escopo.sellerId != null ? faixas.find((f) => f.seller_id === escopo.sellerId) : undefined;
+  if (doVendedor) return doVendedor;
+
+  const doCanal =
+    escopo.channelId != null
+      ? faixas.find((f) => f.seller_id === null && f.channel_id === escopo.channelId)
+      : undefined;
+  if (doCanal) return doCanal;
+
+  const daCasa = faixas.find((f) => f.seller_id === null && f.channel_id === null);
+  return daCasa ?? FAIXA_MARGEM_PADRAO;
+}
+
+// Teto inclusivo, como sempre foi: `pct <= teto` cai na cor. É o que faz
+// "até 29,99" ser vermelho e 30,00 já ser amarelo.
+export function seloMargemComercial(
+  pct: Decimal,
+  faixa: TetosDaFaixa = FAIXA_MARGEM_PADRAO
+): SeloMargemComercial {
+  if (pct.lte(faixa.red_max)) return { label: "Vermelha", color: "red" };
+  if (pct.lte(faixa.yellow_max)) return { label: "Amarela", color: "yellow" };
+  if (pct.lte(faixa.green_max)) return { label: "Verde", color: "green" };
   return { label: "Azul", color: "blue" };
 }
 

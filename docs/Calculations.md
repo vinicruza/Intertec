@@ -718,3 +718,83 @@ e-mail), expedição do pedido (transportadora, peso, volumes, CEP de entrega do
 (prazo de pagamento, observação), a ficha impressa redesenhada no formato do formulário, e o
 override de DIFAL por pedido (§12.1) e o valor do DIFAL impresso na folha (§12.4). Fora o DIFAL — que já era cálculo e continua sendo, só que
 mais preciso —, nenhum desses campos entra na cascata de margem.
+
+---
+
+## 14. Selo comercial: faixas por canal e por vendedor (26/08/2026)
+
+O selo do pedido — Vermelha, Amarela, Verde, Azul — decide se o pedido **segue sozinho ou para
+numa fila de aprovação**. Vermelha e Amarela exigem aprovação; Verde e Azul seguem.
+
+Até 26/08/2026 os limites eram os mesmos para a empresa inteira, escritos no código. A Intertech
+pediu régua própria para o Marketplace, e a resposta foi além do pedido de propósito: as faixas
+viraram **dado editável por canal e por vendedor**, em `commercial_margin_bands`. Marketplace vende
+com estrutura de custo diferente do Interno, e a próxima vez que isso mudar não deve exigir
+programador.
+
+### 14.1 Como se lê
+
+Três tetos, **inclusivos** — a mesma semântica que o código já usava:
+
+```
+pct <= red_max     → Vermelha   (para na aprovação)
+pct <= yellow_max  → Amarela    (para na aprovação)
+pct <= green_max   → Verde      (segue sozinho)
+acima disso        → Azul       (segue sozinho)
+```
+
+O teto inclusivo é o que faz "vermelha até 29,99%" significar que **30,00% já é amarela**.
+
+### 14.2 Quem manda sobre quem
+
+Do mais específico para o mais geral: **vendedor → canal → padrão da casa**. É o que permite abrir
+exceção para uma pessoa sem mexer no canal inteiro. Sem nenhuma linha cadastrada, vale o padrão
+embutido no código (40 / 50 / 65) — rede de segurança para que uma falha de leitura não mude a
+régua de aprovação de todo mundo em silêncio.
+
+### 14.3 O que está cadastrado
+
+| Vale para | Vermelha até | Amarela até | Verde até |
+|---|---|---|---|
+| Padrão da casa | 40% | 50% | 65% |
+| Marketplace (Mari, Temporária Patricia) | 29,99% | 39,99% | 50% |
+
+O padrão da casa é exatamente o que estava no código antes desta mudança: ninguém mudou de faixa
+quando ela foi aplicada.
+
+### 14.4 A régua vive em dois lugares, e os dois foram corrigidos
+
+O fechamento no banco aprova sozinho o pedido de margem boa. Esse limite estava escrito à mão como
+`v_margin_pct > 0.50` — o mesmo número do selo, copiado.
+
+Com faixa por canal esse número deixou de ser único. Um pedido de Marketplace com 45% é **Verde**
+pela régua nova (segue sozinho), mas seria recusado no fechamento por não passar de 0,50, com a
+mensagem "Pedido precisa estar aprovado antes do fechamento" e nenhuma pista do motivo. A Mari
+bateria nisso no primeiro pedido.
+
+`public.teto_amarelo_do_pedido()` resolve a mesma precedência do `faixaDoPedido` do navegador, e o
+fechamento passou a lê-la. Testes em `tests/calc/faixa-margem.test.ts` (bordas de 30, 40 e 50) e em
+`tests/pedidos/regras-do-banco.test.ts` (os dois lados não se separarem de novo).
+
+## 15. Cotação de frete obrigatória para prosseguir (26/08/2026)
+
+Pedido da Intertech: sem ao menos uma cotação de transportadora, o pedido não prossegue. É o frete
+cotado que sustenta a margem apresentada e o que a expedição usa para fechar com a transportadora.
+
+**O que conta como cotação:** transportadora (do cadastro ou digitada em "Outra") **e** valor maior
+que zero. Linha com transportadora escolhida e valor em branco é linha começada e abandonada;
+aceitá-la seria pior do que não ter regra, porque daria a impressão de que alguém cotou.
+
+**Trava o prosseguir, nunca o salvar.** Cotar frete é etapa posterior a montar o pedido; impedir de
+salvar obrigaria a vendedora a segurar tudo na tela até a transportadora responder.
+
+Os dois pontos de saída ficam guardados:
+
+| Caminho | Onde |
+|---|---|
+| Enviar para aprovação | `submit_order_for_approval` |
+| Ganhar o pedido | gatilho `protect_closed_order`, na passagem para `closed` |
+
+O segundo importa mais do que parece: **pedido de margem boa é aprovado sozinho e nunca passa pela
+primeira porta**. Por isso a trava do fechamento mora no gatilho, e não na tela — ali ela vale venha
+o pedido de qual caminho vier.

@@ -217,9 +217,35 @@ describe("ciclo da cotação", () => {
   it("só vermelho e amarelo dependem de aprovação; verde e azul fecham direto pelo selo", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
     expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ abs\(v_net\) end/i);
-    expect(fechar).toMatch(/v_margin_pct > 0\.50/i);
     expect(fechar).toMatch(/v_role in \('admin', 'comercial'\)/i);
     expect(fechar).toMatch(/approval_status=case when v_self_approved_by_margin then 'aprovado'::approval_status/i);
+  });
+
+  // Até 26/08/2026 o limite da auto-aprovação era `v_margin_pct > 0.50`,
+  // escrito à mão dos dois lados. Com faixa por canal esse número deixou de
+  // ser único: um pedido de Marketplace com 45% é VERDE pela régua nova e
+  // seria recusado por não passar de 0,50, com uma mensagem que ninguém
+  // entenderia. A Mari bateria nisso no primeiro pedido.
+  it("a auto-aprovação lê a régua do canal, e não um número fixo", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    expect(fechar).toContain("v_margin_pct > public.teto_amarelo_do_pedido(p_order_id)");
+    expect(fechar).not.toContain("v_margin_pct > 0.50");
+  });
+
+  it("a régua do banco tem a mesma precedência da do navegador", () => {
+    // vendedor > canal > padrão da casa, e 0,50 como último recurso quando
+    // não há linha nenhuma — igual ao `faixaDoPedido` do TypeScript.
+    const teto = definicaoVigente("teto_amarelo_do_pedido");
+    expect(teto).toContain("b.seller_id = o.seller_id");
+    expect(teto).toContain("b.seller_id is null and b.channel_id = o.channel_id");
+    expect(teto).toContain("b.seller_id is null and b.channel_id is null");
+    expect(teto).toContain("order by (b.seller_id is not null) desc, (b.channel_id is not null) desc");
+    expect(teto).toContain("0.50");
+  });
+
+  it("a faixa por canal recusa régua incoerente e escopo repetido", () => {
+    expect(TODAS).toContain("check (red_max < yellow_max and yellow_max < green_max)");
+    expect(TODAS).toContain("unique nulls not distinct (tenant_id, channel_id, seller_id)");
   });
 
   // A validação de fechamento REFAZ a cascata no banco e recusa o pedido se

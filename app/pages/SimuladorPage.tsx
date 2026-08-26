@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante } from "@calc";
-import { aplicarFreteDestacadoAosItens, seloExigeAprovacao, seloMargemComercial, simular } from "../lib/sim/params";
+import {
+  aplicarFreteDestacadoAosItens,
+  faixaDoPedido,
+  seloExigeAprovacao,
+  seloMargemComercial,
+  simular,
+} from "../lib/sim/params";
 import {
   chaveDaEmbalagem,
   escolhaDasLinhas,
@@ -279,6 +285,13 @@ export default function SimuladorPage() {
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
   const canalIdEfetivo = canalId || vendedor?.channel_id || "";
   const canal = ctx?.canais.find((c) => c.id === canalIdEfetivo) ?? null;
+  // Régua do selo comercial deste pedido (Intertech, 26/08/2026): Marketplace
+  // tem faixa própria, e um vendedor pode ter a dele. Resolvida uma vez aqui
+  // para a tela e a gravação nunca discordarem.
+  const faixaMargem = faixaDoPedido(ctx?.faixasMargem ?? [], {
+    channelId: canal?.id ?? null,
+    sellerId: vendedor?.id ?? null,
+  });
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
   useEffect(() => {
@@ -449,7 +462,7 @@ export default function SimuladorPage() {
         margem_contribuicao_pct: simulacao.resultado.margemContribuicaoPct.toString(),
       };
 
-      const selo = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
+      const selo = seloMargemComercial(simulacao.resultado.margemContribuicaoPct, faixaMargem);
       const cotacao = await salvarCotacao(cotacaoId, {
         clienteId: clienteId || null,
         clienteNovoCodigo: clienteId ? null : clienteNovoCodigo,
@@ -1269,7 +1282,7 @@ export default function SimuladorPage() {
           <div className={`flex items-center ${verNumeros ? "justify-between" : "justify-center"}`}>
             {verNumeros && <h2 className="text-lg font-semibold">Cascata do pedido</h2>}
             {(() => {
-              const st = seloMargemComercial(simulacao.resultado.margemContribuicaoPct);
+              const st = seloMargemComercial(simulacao.resultado.margemContribuicaoPct, faixaMargem);
               return (
                 <span className={`rounded-full px-6 py-3 text-xl font-semibold shadow-sm ${CORES[st.color]}`}>
                   {st.label}

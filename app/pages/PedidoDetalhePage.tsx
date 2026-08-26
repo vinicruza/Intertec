@@ -30,7 +30,8 @@ import {
   podeAprovar,
   podeVerCascataOperacional,
 } from "../lib/db/aprovacao";
-import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
+import { faixaDoPedido, seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
+import { listarFaixasMargemComercial } from "../lib/db/configuracoes";
 import { useAuth } from "../auth/AuthProvider";
 import {
   AVISO_SEM_COTACAO_DE_FRETE,
@@ -95,6 +96,13 @@ export default function PedidoDetalhePage() {
   // nenhum (Decisão D7: só o fechamento congela o snapshot). Sem isto, quem
   // aprova veria só o preço de venda — exatamente o que o papel na pasta já
   // mostrava, e a aprovação não teria como julgar nada.
+  // Réguas do selo comercial. Consulta própria e compartilhada pelo cache: a
+  // régua é a mesma para todas as telas, e recarregá-la por tela faria o mesmo
+  // pedido aparecer com cores diferentes enquanto uma respondia antes da outra.
+  const faixasQuery = useQuery({
+    queryKey: ["faixasMargemComercial"],
+    queryFn: listarFaixasMargemComercial,
+  });
   const cascataQuery = useQuery({
     queryKey: ["cascataVigente", id],
     queryFn: () => calcularCascataVigente(id!),
@@ -172,7 +180,14 @@ export default function PedidoDetalhePage() {
   const cancelado = Boolean(pedido.cancelled_at);
   const t = pedido.totals_display;
   const cascata = cascataQuery.data;
-  const seloDaCascata = cascata?.ok ? seloMargemComercial(dec(cascata.margemContribuicaoPct)) : null;
+  // Régua deste pedido: Marketplace tem faixa própria (Intertech, 26/08/2026).
+  const faixaMargem = faixaDoPedido(faixasQuery.data ?? [], {
+    channelId: pedido.channel_id,
+    sellerId: pedido.seller_id,
+  });
+  const seloDaCascata = cascata?.ok
+    ? seloMargemComercial(dec(cascata.margemContribuicaoPct), faixaMargem)
+    : null;
   const exigeAprovacaoPeloSelo = seloDaCascata ? seloExigeAprovacao(seloDaCascata) : true;
   const podeFecharDiretoPeloSelo = Boolean(
     seloDaCascata &&
@@ -613,7 +628,7 @@ export default function PedidoDetalhePage() {
               const foto = v.snapshot as Record<string, string | undefined>;
               const usuario = Array.isArray(v.profiles) ? v.profiles[0]?.full_name : v.profiles?.full_name;
               const margemPctVersao = margemPctDaVersao(foto);
-              const seloVersao = margemPctVersao ? seloMargemComercial(dec(margemPctVersao)) : null;
+              const seloVersao = margemPctVersao ? seloMargemComercial(dec(margemPctVersao), faixaMargem) : null;
               return (
                 <tr key={v.version} className="border-t border-[var(--cor-borda)]">
                   <td className="py-1">v{v.version}</td>

@@ -9,7 +9,8 @@ import {
   podeVerNumerosDeMargem,
 } from "../lib/db/aprovacao";
 import { PARAMETROS_APROVACAO_PADRAO } from "../lib/sim/aprovacao";
-import { seloMargemComercial } from "../lib/sim/params";
+import { faixaDoPedido, seloMargemComercial } from "../lib/sim/params";
+import { listarFaixasMargemComercial } from "../lib/db/configuracoes";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { formatarCep, formatarCnpjCpf, formatarTelefone } from "../../lib/cadastro/documentos";
@@ -55,6 +56,13 @@ export default function PedidoFichaPage() {
     queryKey: ["nomeUsuario", pedido?.approved_by],
     queryFn: () => nomeDoUsuario(pedido?.approved_by ?? null),
     enabled: Boolean(pedido?.approved_by),
+  });
+  // Réguas do selo comercial. Consulta própria e compartilhada pelo cache: a
+  // régua é a mesma para todas as telas, e recarregá-la por tela faria o mesmo
+  // pedido aparecer com cores diferentes enquanto uma respondia antes da outra.
+  const faixasQuery = useQuery({
+    queryKey: ["faixasMargemComercial"],
+    queryFn: listarFaixasMargemComercial,
   });
   const cascataQuery = useQuery({
     queryKey: ["cascataVigente", id],
@@ -146,7 +154,15 @@ export default function PedidoFichaPage() {
     margemDoPedido && receitaLiquidaDoPedido
       ? margemPct(dec(margemDoPedido), dec(receitaLiquidaDoPedido))
       : null;
-  const selo = pctMargem ? seloMargemComercial(pctMargem) : null;
+  const selo = pctMargem
+    ? seloMargemComercial(
+        pctMargem,
+        faixaDoPedido(faixasQuery.data ?? [], {
+          channelId: pedido.channel_id,
+          sellerId: pedido.seller_id,
+        })
+      )
+    : null;
 
   // ---------- DIFAL na folha (pedido da vendedora, 24/08/2026) ----------
   //

@@ -1,7 +1,7 @@
 import { dec, margemPct, type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
 import { AVISO_SEM_COTACAO_DE_FRETE, temCotacaoDeFrete } from "../format";
-import { seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
+import { faixaDoPedido, seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
 import { carregarContextoSimulador, custosDeEmbalagem, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
@@ -471,7 +471,12 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
 
   const ctx = await carregarContextoSimulador();
   const { sim, snap } = await simularPedidoComCustosVigentes(pedido, ctx);
-  const precisaAprovacao = seloExigeAprovacao(seloMargemComercial(sim.resultado.margemContribuicaoPct));
+  const precisaAprovacao = seloExigeAprovacao(
+    seloMargemComercial(
+      sim.resultado.margemContribuicaoPct,
+      faixaDoPedido(ctx.faixasMargem, { channelId: pedido.channel_id, sellerId: pedido.seller_id })
+    )
+  );
   if (precisaAprovacao || pedido.approval_status === "aprovado") {
     const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
     if (erroAprovacao) throw erroAprovacao;

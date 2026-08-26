@@ -148,3 +148,66 @@ export async function gerarCodigosErp(): Promise<number> {
   if (error) throw error;
   return Number(data ?? 0);
 }
+
+// ---------- Faixas do selo comercial, por canal e por vendedor ----------
+//
+// Pedido da Intertech em 26/08/2026 (Calculations.md §5.5). Não confundir com
+// `margin_rules` acima: aquilo são as faixas de STATUS do painel; estas são as
+// que decidem se o pedido segue sozinho ou vai para aprovação.
+export type FaixaMargemLinha = {
+  id: string;
+  channel_id: string | null;
+  seller_id: string | null;
+  red_max: string;
+  yellow_max: string;
+  green_max: string;
+  channels: { name: string } | null;
+  sellers: { name: string } | null;
+};
+
+export async function listarFaixasMargemComercial(): Promise<FaixaMargemLinha[]> {
+  const { data, error } = await supabase
+    .from("commercial_margin_bands")
+    .select("id, channel_id, seller_id, red_max, yellow_max, green_max, channels(name), sellers(name)");
+  if (error) throw error;
+  // Padrão da casa primeiro, depois canal, depois vendedor: é a ordem em que a
+  // régua vai ficando mais específica, e a que faz a tela ser lida de cima
+  // para baixo sem explicação.
+  const linhas: FaixaMargemLinha[] = (data ?? []).map((d) => {
+    const bruto = d as unknown as Omit<FaixaMargemLinha, "channels" | "sellers"> & {
+      channels: { name: string } | { name: string }[] | null;
+      sellers: { name: string } | { name: string }[] | null;
+    };
+    const um = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+    return { ...bruto, channels: um(bruto.channels), sellers: um(bruto.sellers) };
+  });
+  return linhas.sort((a, b) => {
+    const peso = (f: FaixaMargemLinha) => (f.seller_id ? 2 : f.channel_id ? 1 : 0);
+    if (peso(a) !== peso(b)) return peso(a) - peso(b);
+    return (a.channels?.name ?? "").localeCompare(b.channels?.name ?? "");
+  });
+}
+
+export async function atualizarFaixaMargem(
+  id: string,
+  campos: Pick<FaixaMargemLinha, "red_max" | "yellow_max" | "green_max">
+): Promise<void> {
+  const { error } = await supabase.from("commercial_margin_bands").update(campos).eq("id", id);
+  if (error) throw error;
+}
+
+export async function criarFaixaMargem(campos: {
+  channel_id: string | null;
+  seller_id: string | null;
+  red_max: string;
+  yellow_max: string;
+  green_max: string;
+}): Promise<void> {
+  const { error } = await supabase.from("commercial_margin_bands").insert(campos);
+  if (error) throw error;
+}
+
+export async function removerFaixaMargem(id: string): Promise<void> {
+  const { error } = await supabase.from("commercial_margin_bands").delete().eq("id", id);
+  if (error) throw error;
+}

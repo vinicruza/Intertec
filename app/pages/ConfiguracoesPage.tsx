@@ -6,12 +6,15 @@ import {
   atualizarDifal,
   atualizarIcsm,
   atualizarPortal,
+  atualizarFaixaMargem,
   atualizarRegraMargem,
   listarCanais,
   listarDifal,
   listarIcsm,
   listarPortal,
+  listarFaixasMargemComercial,
   listarRegrasMargem,
+  removerFaixaMargem,
   gerarCodigosErp,
   obterParametrosCodigoErp,
   salvarParametrosCodigoErp,
@@ -20,8 +23,10 @@ import {
   type DifalLinha,
   type IcsmLinha,
   type PortalLinha,
+  type FaixaMargemLinha,
   type RegraMargemLinha,
 } from "../lib/db/configuracoes";
+import { fracaoParaPercentual, percentualParaFracao } from "../lib/format";
 import {
   obterParametrosAprovacao,
   salvarParametrosAprovacao,
@@ -31,11 +36,12 @@ import type { Perfil } from "../lib/roles";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
 import { mensagemDeErro } from "../lib/erros";
 
-type Aba = "canais" | "margem" | "aprovacao" | "codigoErp" | "icsm" | "difal" | "portal";
+type Aba = "canais" | "margem" | "selo" | "aprovacao" | "codigoErp" | "icsm" | "difal" | "portal";
 
 const ABAS: Array<{ id: Aba; rotulo: string }> = [
   { id: "canais", rotulo: "Canais" },
   { id: "margem", rotulo: "Faixas de margem" },
+  { id: "selo", rotulo: "Selo por canal" },
   { id: "aprovacao", rotulo: "Aprovação de pedidos" },
   { id: "codigoErp", rotulo: "Código para o ERP" },
   { id: "icsm", rotulo: "ICSM por UF" },
@@ -72,6 +78,7 @@ export default function ConfiguracoesPage() {
 
       {aba === "canais" && <AbaCanais />}
       {aba === "margem" && <AbaMargem />}
+      {aba === "selo" && <AbaSeloPorCanal />}
       {aba === "aprovacao" && <AbaAprovacao />}
       {aba === "codigoErp" && <AbaCodigoErp />}
       {aba === "icsm" && <AbaIcsm />}
@@ -379,6 +386,148 @@ function AbaCodigoErp() {
 }
 
 // ---------- Faixas de margem ----------
+
+// ---------- Selo comercial por canal e por vendedor ----------
+//
+// Pedido da Intertech em 26/08/2026. Marketplace vende com estrutura de custo
+// diferente do Interno e precisa de régua própria; em vez de gravar aquele caso
+// no código, a régua virou dado editável.
+//
+// Os tetos são INCLUSIVOS: "vermelha até 29,99%" significa que 29,99 é vermelha
+// e 30,00 já é amarela. É assim que a Intertech descreveu a faixa, e é assim
+// que a tela pergunta.
+function AbaSeloPorCanal() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["faixasMargemComercial"],
+    queryFn: listarFaixasMargemComercial,
+  });
+  const [erro, setErro] = useState<string | null>(null);
+  const invalidar = async () => {
+    // A régua é lida por várias telas; todas precisam saber ao mesmo tempo.
+    await queryClient.invalidateQueries({ queryKey: ["faixasMargemComercial"] });
+    await queryClient.invalidateQueries({ queryKey: ["contextoSimulador"] });
+  };
+  const salvar = useMutation({
+    mutationFn: (v: { id: string; campos: Parameters<typeof atualizarFaixaMargem>[1] }) =>
+      atualizarFaixaMargem(v.id, v.campos),
+    onSuccess: invalidar,
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Não foi possível salvar a faixa.")),
+  });
+  const remover = useMutation({
+    mutationFn: (id: string) => removerFaixaMargem(id),
+    onSuccess: invalidar,
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Não foi possível remover a faixa.")),
+  });
+
+  if (isLoading) return <Carregando />;
+  return (
+    <Card className="overflow-x-auto p-0">
+      <p className="px-4 pt-4 text-xs text-[var(--cor-texto-suave)]">
+        Régua do selo do pedido: Vermelha e Amarela param na aprovação, Verde e Azul seguem sozinhas.
+        Os tetos são inclusivos — vermelha até 29,99% quer dizer que 30,00% já é amarela. A faixa do
+        vendedor manda sobre a do canal, e a do canal sobre o padrão da casa.
+      </p>
+      {erro && <p className="px-4 pt-2 text-sm text-red-600">{erro}</p>}
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
+            <th className="px-4 py-3 font-medium">Vale para</th>
+            <th className="px-4 py-3 font-medium">Vermelha até</th>
+            <th className="px-4 py-3 font-medium">Amarela até</th>
+            <th className="px-4 py-3 font-medium">Verde até</th>
+            <th className="px-4 py-3 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {(data ?? []).map((f: FaixaMargemLinha) => (
+            <LinhaSelo
+              key={f.id}
+              faixa={f}
+              onSalvar={(campos) => { setErro(null); salvar.mutate({ id: f.id, campos }); }}
+              onRemover={() => { setErro(null); remover.mutate(f.id); }}
+            />
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function LinhaSelo({
+  faixa,
+  onSalvar,
+  onRemover,
+}: {
+  faixa: FaixaMargemLinha;
+  onSalvar: (campos: Pick<FaixaMargemLinha, "red_max" | "yellow_max" | "green_max">) => void;
+  onRemover: () => void;
+}) {
+  const [red, setRed] = useState(fracaoParaPercentual(faixa.red_max));
+  const [yellow, setYellow] = useState(fracaoParaPercentual(faixa.yellow_max));
+  const [green, setGreen] = useState(fracaoParaPercentual(faixa.green_max));
+  const original = [
+    fracaoParaPercentual(faixa.red_max),
+    fracaoParaPercentual(faixa.yellow_max),
+    fracaoParaPercentual(faixa.green_max),
+  ];
+  const alterado = red !== original[0] || yellow !== original[1] || green !== original[2];
+  // Padrão da casa não se apaga: sem ele, quem não tem faixa própria ficaria
+  // sem régua nenhuma.
+  const ehPadrao = faixa.channel_id === null && faixa.seller_id === null;
+
+  const escopo = faixa.sellers?.name
+    ? `Vendedor: ${faixa.sellers.name}`
+    : faixa.channels?.name
+      ? `Canal: ${faixa.channels.name}`
+      : "Padrão da casa";
+
+  return (
+    <tr className="border-b border-[var(--cor-borda)] last:border-0">
+      <td className="px-4 py-3 font-medium">{escopo}</td>
+      <td className="px-4 py-3"><CampoPct valor={red} onChange={setRed} /></td>
+      <td className="px-4 py-3"><CampoPct valor={yellow} onChange={setYellow} /></td>
+      <td className="px-4 py-3"><CampoPct valor={green} onChange={setGreen} /></td>
+      <td className="px-4 py-3 text-right">
+        {alterado && (
+          <Button
+            className="px-2 py-1 text-xs"
+            onClick={() => {
+              const fracao = (v: string) => percentualParaFracao(v);
+              const r = fracao(red), y = fracao(yellow), g = fracao(green);
+              if (r === null || y === null || g === null) return;
+              onSalvar({ red_max: r, yellow_max: y, green_max: g });
+            }}
+          >
+            Salvar
+          </Button>
+        )}
+        {!ehPadrao && !alterado && (
+          <button
+            type="button"
+            className="text-xs text-[var(--cor-texto-suave)] underline"
+            onClick={() => {
+              if (window.confirm(`Remover a régua de "${escopo}"? Passa a valer a do canal ou a padrão.`)) {
+                onRemover();
+              }
+            }}
+          >
+            remover
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function CampoPct({ valor, onChange }: { valor: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Input className="w-24" value={valor} onChange={(e) => onChange(e.target.value)} />
+      <span className="text-[var(--cor-texto-suave)]">%</span>
+    </div>
+  );
+}
 
 function AbaMargem() {
   const queryClient = useQueryClient();

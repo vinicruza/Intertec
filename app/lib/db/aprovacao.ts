@@ -1,7 +1,7 @@
 import { dec, margemPct } from "@calc";
 import { supabase } from "../supabase";
 import { PARAMETROS_APROVACAO_PADRAO, type ParametrosAprovacao } from "../sim/aprovacao";
-import { seloMargemComercial, type SeloMargemComercial } from "../sim/params";
+import { faixaDoPedido, seloMargemComercial, type SeloMargemComercial } from "../sim/params";
 import { obterPedidoCompleto, simularPedidoComCustosVigentes } from "./fechamento";
 import { carregarContextoSimulador } from "./pedidos";
 
@@ -136,7 +136,11 @@ export async function avaliarMargensPendentes(ids: string[]): Promise<Map<string
         const receitaLiquida = dec(snap.pedido.net_revenue_snapshot);
         const margem = dec(snap.pedido.contribution_margin_snapshot);
         const pct = margemPct(margem, receitaLiquida);
-        resultados.set(id, { ok: true, pct: pct.toString(), regra: seloMargemComercial(pct) });
+        const faixa = faixaDoPedido(ctx.faixasMargem, {
+          channelId: pedido.channel_id,
+          sellerId: pedido.seller_id,
+        });
+        resultados.set(id, { ok: true, pct: pct.toString(), regra: seloMargemComercial(pct, faixa) });
       } catch (e) {
         resultados.set(id, { ok: false, erro: e instanceof Error ? e.message : "Não foi possível calcular." });
       }

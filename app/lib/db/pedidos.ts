@@ -2,7 +2,7 @@ import { Decimal, type CustoProdutoKit } from "@calc";
 import { supabase } from "../supabase";
 import { chaveDaEmbalagem, type CatalogoParaKit, type EmbalagemDoKit, type PapelNoKit } from "../sim/kitNoPedido";
 import type { KitParaCopiar } from "../sim/itensDoPedido";
-import type { CanalRegras, RegraMargem, TabelasUF } from "../sim/params";
+import type { CanalRegras, FaixaMargemComercial, RegraMargem, TabelasUF } from "../sim/params";
 import { normalizarFreteCotado, numeroDigitado, type FreteCotado } from "../format";
 
 // ---------- Contexto do simulador (tudo que a tela precisa) ----------
@@ -78,6 +78,9 @@ export type ContextoSimulador = {
   difalDestacadoPorUF: Map<string, boolean>;
   itens: ItemVendavel[];
   regrasMargem: RegraMargem[];
+  // Réguas do selo comercial por canal/vendedor. Lista vazia é segura: o motor
+  // cai no padrão da casa (ver `faixaDoPedido`).
+  faixasMargem: FaixaMargemComercial[];
   // Para montar kit dentro do pedido (reunião 16/07/2026):
   produtos: Array<{ id: string; nome: string; codigo: string; cmv: string | null }>;
   insumosEmbalagem: InsumoEmbalagem[];
@@ -95,7 +98,7 @@ export type ContextoSimulador = {
 };
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
-  const [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento] = await Promise.all([
+  const [vend, canais, cli, icsm, difal, portal, regras, faixas, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento] = await Promise.all([
     supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
     supabase.from("channels").select("id, name, applies_difal, default_commission_rate, freight_model").order("name"),
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
@@ -106,6 +109,9 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     supabase.from("difal_rates").select("uf, final_rate, difal_destacado"),
     supabase.from("portal_freight_rates").select("uf, freight_percent"),
     supabase.from("margin_rules").select("label, min_rate, max_rate, color, sort_order"),
+    // Faixas do SELO comercial (Intertech, 26/08/2026) — não confundir com
+    // `margin_rules` acima, que são as faixas de status do painel.
+    supabase.from("commercial_margin_bands").select("channel_id, seller_id, red_max, yellow_max, green_max"),
     supabase.from("products").select("id, code, name").eq("status", "active").order("name"),
     supabase.from("product_costs").select("product_id, cmv, cmv_without_labor"),
     // Sem filtro de status: o kit INATIVO não pode ser vendido (ele não entra
@@ -268,6 +274,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     difalDestacadoPorUF,
     itens: [...itensProdutos, ...itensKits],
     regrasMargem: (regras.data ?? []) as RegraMargem[],
+    faixasMargem: (faixas.data ?? []) as FaixaMargemComercial[],
     produtos: (prods.data ?? []).map((p) => ({
       id: p.id as string,
       nome: p.name as string,
