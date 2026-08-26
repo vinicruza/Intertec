@@ -32,7 +32,15 @@ import {
 } from "../lib/db/aprovacao";
 import { seloExigeAprovacao, seloMargemComercial } from "../lib/sim/params";
 import { useAuth } from "../auth/AuthProvider";
-import { dataCurta, percentual, problemaNaCidade, problemaNoCampoNumerico, reais } from "../lib/format";
+import {
+  AVISO_SEM_COTACAO_DE_FRETE,
+  dataCurta,
+  percentual,
+  problemaNaCidade,
+  problemaNoCampoNumerico,
+  reais,
+  temCotacaoDeFrete,
+} from "../lib/format";
 import { mensagemDeErro } from "../lib/erros";
 import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
@@ -440,6 +448,12 @@ export default function PedidoDetalhePage() {
             disabled={fechar.isPending}
             onClick={() => {
               setErro(null);
+              // Mesma exigência do envio para aprovação: pedido de margem boa é
+              // aprovado sozinho e chega aqui sem passar por aquela porta.
+              if (!temCotacaoDeFrete(pedido.freight_quotes)) {
+                setErro(AVISO_SEM_COTACAO_DE_FRETE);
+                return;
+              }
               if (window.confirm("Gerar pedido? Os custos serão congelados e esta versão não mudará mais.")) {
                 fechar.mutate();
               }
@@ -737,6 +751,10 @@ function margemPctDaVersao(foto: Record<string, unknown>): string | null {
 
 function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
   const pendencias: string[] = [];
+  // Pedido da Intertech em 26/08/2026: pelo menos uma cotação de frete, com
+  // transportadora E valor. É ela que sustenta a margem apresentada e o que a
+  // expedição usa para fechar com a transportadora.
+  if (!temCotacaoDeFrete(pedido.freight_quotes)) pendencias.push("cotação de frete");
   if (!pedido.carrier_id) pendencias.push("transportadora");
   if (pedido.carriers?.requires_name && !pedido.carrier_other?.trim()) pendencias.push("nome da transportadora");
   if (!pedido.payment_term_id && pedido.payment_term_days == null) pendencias.push("modo de pagamento");

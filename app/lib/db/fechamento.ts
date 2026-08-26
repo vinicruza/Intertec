@@ -1,5 +1,6 @@
 import { dec, margemPct, type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
+import { AVISO_SEM_COTACAO_DE_FRETE, temCotacaoDeFrete } from "../format";
 import { seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
@@ -447,6 +448,10 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
   if (pedidoAntes.status === "closed") throw new Error("Pedido já está fechado.");
   if (pedidoAntes.status === "lost") throw new Error("Cotação marcada como perdida — reabra antes de fechar.");
   if (pedidoAntes.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
+  // Intertech, 26/08/2026. Fica aqui além da tela porque "Gerar Pedido" não é
+  // o único caminho até o fechamento, e a regra não pode depender de qual
+  // botão a pessoa apertou.
+  if (!temCotacaoDeFrete(pedidoAntes.freight_quotes)) throw new Error(AVISO_SEM_COTACAO_DE_FRETE);
 
   // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o

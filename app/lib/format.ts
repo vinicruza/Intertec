@@ -193,3 +193,35 @@ export function problemaNaCidade(valor: ValorNumerico): string | null {
   }
   return null;
 }
+
+// ---------- Pelo menos uma transportadora cotada ----------
+//
+// Pedido da Intertech em 26/08/2026: sem ao menos uma cotação de frete
+// registrada, o pedido não prossegue. O motivo é de negócio — o frete cotado é
+// o que sustenta a margem apresentada e o que a expedição usa para fechar com a
+// transportadora; seguir sem ele é decidir no escuro.
+//
+// Trava o PROSSEGUIR (enviar para aprovação e ganhar o pedido), nunca o salvar:
+// cotar frete é etapa posterior a montar o pedido, e impedir de salvar
+// obrigaria a pessoa a segurar tudo na tela até a transportadora responder.
+export function cotacaoDeFreteValida(f: FreteCotado): boolean {
+  const temTransportadora =
+    (f.carrierId ?? "").trim() !== "" || (f.carrierOther ?? "").trim() !== "";
+  if (!temTransportadora) return false;
+  // Valor é o que diferencia cotação de linha começada e abandonada. Zero não
+  // conta: frete de graça não é cotação, é campo esquecido.
+  const bruto = numeroDigitado(f.amount ?? "").trim();
+  if (bruto === "") return false;
+  try {
+    return dec(bruto).gt(0);
+  } catch {
+    return false;
+  }
+}
+
+export function temCotacaoDeFrete(fretes: FreteCotado[] | null | undefined): boolean {
+  return (fretes ?? []).some(cotacaoDeFreteValida);
+}
+
+export const AVISO_SEM_COTACAO_DE_FRETE =
+  "Registre ao menos uma cotação de frete, com transportadora e valor, antes de prosseguir.";
