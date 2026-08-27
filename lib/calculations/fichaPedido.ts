@@ -95,3 +95,23 @@ export function difalNoBlocoComercial(entrada: {
   if (entrada.valor != null) return { texto: entrada.valor, imprimeValor: true };
   return { texto: entrada.calculando ? "calculando…" : "—", imprimeValor: false };
 }
+
+// ---------- Frete no bloco comercial: destacado ou não ----------
+//
+// Relatado pela Intertech em 27/08/2026, no pedido 05270826 (Mari,
+// Marketplace, IPEPO): a ficha somava R$ 280,80 de frete ao TOTAL do cliente
+// num pedido cujo frete estava "não destacado".
+//
+// "Não destacado" quer dizer que a Intertech paga o transporte — o frete sai da
+// MARGEM, como custo, e por isso mesmo não pode ser cobrado do cliente. Cobrar
+// nos dois lugares seria absorver o custo e faturá-lo ao mesmo tempo.
+//
+// É a mesma distinção do DIFAL (§12.4): o que muda é COMO o valor aparece na
+// folha, nunca se ele existe. O frete continua na cascata de margem dos dois
+// jeitos; o que este trecho decide é o que vai para a coluna do cliente.
+export function freteCobradoDoCliente(
+  frete: EntradaDecimal,
+  destacado: boolean
+): Decimal {
+  return destacado ? dec(frete) : new Decimal(0);
+}

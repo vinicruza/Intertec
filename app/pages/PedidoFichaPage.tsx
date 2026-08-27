@@ -1,7 +1,14 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { dec, difalNoBlocoComercial, margemPct, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import {
+  dec,
+  difalNoBlocoComercial,
+  freteCobradoDoCliente,
+  margemPct,
+  totaisDaFichaDoPedido,
+  totalACobrarDoCliente,
+} from "@calc";
 import { calcularCascataVigente, nomeDoUsuario, obterPedidoCompleto } from "../lib/db/fechamento";
 import {
   obterParametrosAprovacao,
@@ -139,7 +146,13 @@ export default function PedidoFichaPage() {
   const subtitulo = pedido.order_number
     ? `ORÇAMENTO ${pedido.quote_number ?? "—"}`
     : pedido.quote_number ?? "—";
-  const totalACobrar = totalACobrarDoCliente(totais.subtotal, pedido.freight ?? "0");
+  // "Frete destacado" MARCADO = o cliente paga o transporte, e só então ele
+  // entra na cobrança. Desmarcado, quem paga é a Intertech: o frete sai da
+  // MARGEM como custo e não pode aparecer também na conta do cliente.
+  // Relatado em 27/08/2026 no pedido 05270826.
+  const freteDestacado = pedido.freight_paid_by_customer;
+  const freteCobrado = freteCobradoDoCliente(pedido.freight ?? "0", freteDestacado);
+  const totalACobrar = totalACobrarDoCliente(totais.subtotal, freteCobrado);
 
   // ---------- Selo da faixa de margem (pedido da Intertech, 24/08/2026) ----------
   //
@@ -427,7 +440,10 @@ export default function PedidoFichaPage() {
               <table className="w-full">
                 <tbody>
                   <LinhaResumo rotulo="Subtotal" valor={reais(totais.subtotal.toString())} />
-                  <LinhaResumo rotulo="Frete" valor={reais(pedido.freight)} />
+                  <LinhaResumo
+                    rotulo="Frete"
+                    valor={freteDestacado ? reais(pedido.freight) : "não destacado"}
+                  />
                   {/* Valor à vista, mas fora do TOTAL: nenhum deles é
                       acrescentado à cobrança do cliente (§12.1). O que explica
                       isso é a nota do rodapé do bloco, não texto no meio da

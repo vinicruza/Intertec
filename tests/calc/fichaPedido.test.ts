@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { difalNoBlocoComercial, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import { difalNoBlocoComercial, freteCobradoDoCliente, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
 
 // A ficha impressa do pedido (formulário de papel, 05/08/2026). O que se
 // protege aqui é o subtotal impresso bater com a soma das linhas impressas —
@@ -114,5 +114,41 @@ describe("difalNoBlocoComercial", () => {
   it("o TOTAL do cliente é o mesmo destacado ou não", () => {
     const total = totalACobrarDoCliente("1015", "200");
     expect(total.toString()).toBe("1215");
+  });
+});
+
+// ============================================================
+// Frete destacado e não destacado (Intertech, 27/08/2026)
+// ============================================================
+//
+// Pedido 05270826 (Mari, Marketplace, IPEPO): a ficha somava R$ 280,80 de
+// frete ao TOTAL do cliente num pedido cujo frete estava "não destacado".
+//
+// "Não destacado" quer dizer que a Intertech paga o transporte: o frete sai da
+// MARGEM, como custo. Cobrá-lo também do cliente seria absorver o custo e
+// faturá-lo ao mesmo tempo.
+describe("freteCobradoDoCliente", () => {
+  it("destacado: o cliente paga, e o frete entra na cobrança", () => {
+    expect(freteCobradoDoCliente("280.80", true).toString()).toBe("280.8");
+  });
+
+  it("não destacado: a Intertech paga, e nada vai para a conta do cliente", () => {
+    expect(freteCobradoDoCliente("280.80", false).toString()).toBe("0");
+  });
+
+  it("o pedido 05270826 fecha em 7.800, e não em 8.080,80", () => {
+    // 1.050 × 6,00 + 500 × 3,00
+    const itens = totaisDaFichaDoPedido([
+      { quantidade: "1050", precoUnitario: "6.00" },
+      { quantidade: "500", precoUnitario: "3.00" },
+    ]);
+    expect(itens.subtotal.toString()).toBe("7800");
+
+    const naoDestacado = totalACobrarDoCliente(itens.subtotal, freteCobradoDoCliente("280.80", false));
+    expect(naoDestacado.toString()).toBe("7800");
+
+    // E o mesmo pedido COM frete destacado continua somando, como sempre.
+    const destacado = totalACobrarDoCliente(itens.subtotal, freteCobradoDoCliente("280.80", true));
+    expect(destacado.toString()).toBe("8080.8");
   });
 });
