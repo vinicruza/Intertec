@@ -825,3 +825,42 @@ A regra é uma função pura, `freteDestacadoPadrao(modeloFrete)`, com teste em
 `tests/calc/frete-destacado.test.ts`. É só o valor INICIAL da caixa: em qualquer canal quem monta o
 pedido marca e desmarca à vontade, e pedido já gravado sempre abre com o que foi gravado.
 
+### 16.2 A assinatura da aprovação desce para o rodapé da folha
+
+A linha "Aprovado por X em dd/mm/aaaa" já existia (item 5 da lista de 21/08/2026), mas vinha logo
+depois do último bloco e parava no meio do papel, com meia folha em branco embaixo. Quem confere
+procura a assinatura no pé da folha, como em qualquer formulário.
+
+Mudança de impressão apenas (`app/index.css`): a ficha vira uma coluna com a altura da página e a
+assinatura ganha `margin-top: auto`. São **270mm**, e não os 277mm da área útil do A4 (297mm menos
+10mm de margem em cima e embaixo): a folga de 7mm é para o navegador que ainda imprime o próprio
+cabeçalho/rodapé (o "1/1" da página) sem empurrar a assinatura para uma segunda folha. Na tela nada
+muda.
+
+### 16.3 "Por que aparece PEDIDO e ORÇAMENTO?" — a folha se contradizia
+
+Pergunta da Cris, na folha do ORC-2026-0101: o canto superior direito dizia **PEDIDO 06270826** e,
+três linhas abaixo, **Orçamento em aberto**.
+
+A resposta: o pedido não tinha sido gerado. O número diário (`orders.order_number`, sequência do dia
++ ddmmaa) é atribuído por **gatilho do banco no INSERT** — toda cotação nasce com um, muito antes de
+existir pedido. A folha imprimia esse número como título e chamava o documento de PEDIDO, enquanto a
+linha de situação, essa correta, dizia que era um orçamento em aberto.
+
+A regra passou a ser uma só, e é a mesma do resto do sistema: **é pedido quando o pedido foi
+gerado** (`status = 'closed'`).
+
+| Situação | Título | Subtítulo | Linha de situação |
+|---|---|---|---|
+| Orçamento em aberto | `ORÇAMENTO` | `ORC-2026-0101` | Orçamento em aberto |
+| Pedido gerado | `PEDIDO 06270826` | `ORÇAMENTO ORC-2026-0101` | Pedido gerado em 27/08/2026 |
+
+Mora em `identificacaoDaFolha` (`lib/calculations/fichaPedido.ts`), com teste que fixa que a palavra
+"PEDIDO" e o número diário **não saem** na folha de um orçamento em aberto. Na TELA do pedido o
+número continua à vista — é por ele que se procura o pedido na lista —, com o aviso de que está
+reservado e passa a valer quando o pedido for gerado.
+
+**Fica em aberto, para o cliente decidir:** o número diário carrega a data em que a COTAÇÃO foi
+criada, não a do dia em que o pedido foi gerado. Uma cotação criada dia 27 e fechada dia 30 vira
+"pedido do dia 27". Corrigir isso é mover a numeração para o fechamento (`close_order_with_snapshots`),
+o que é mudança de banco e de sprint própria — não foi feito aqui.

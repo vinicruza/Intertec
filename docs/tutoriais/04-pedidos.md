@@ -101,9 +101,16 @@ que hoje vai para a mesa de conferência. Ela traz cabeçalho com o número do o
 (ganho ou em cotação), dados do cliente/UF/vendedor, a lista de itens com **o kit descrito item
 por item** (é dessa lista que sai o lançamento no sistema de faturamento) e, para quem tem acesso
 aos números, o resumo financeiro completo (receita bruta, impostos, receita líquida, CMV, margem
-de contribuição). No rodapé há linhas para assinatura de "Conferido por" e "Aprovado por" (ou a
-data da aprovação, se já aprovado no sistema). Use o botão **Imprimir** no topo da tela (ele não
+de contribuição). A assinatura "Aprovado por" (com o nome de quem aprovou e a data, quando já
+aprovado no sistema) fica no **pé da folha**. Use o botão **Imprimir** no topo da tela (ele não
 aparece na impressão).
+
+**Orçamento ou pedido?** O cabeçalho diz o que a folha é. Enquanto o pedido não foi gerado, ela sai
+como **ORÇAMENTO**, com o número `ORC-...` e a linha "Orçamento em aberto". Depois de gerado, o
+título passa a ser **PEDIDO** com o número do dia (ex.: `06270826`), o orçamento vira subtítulo e a
+linha embaixo mostra a data em que o pedido foi gerado. O número do pedido existe desde a criação
+da cotação — a tela do pedido o mostra como *número reservado* —, mas ele só sai na folha quando o
+pedido de fato existe, para o papel nunca anunciar um pedido que ninguém gerou.
 
 Cada item aparece com **os dois nomes**: em cima o nome do catálogo, que é como a conferência
 reconhece o produto na prateleira (com gramatura, TNT etc.), e embaixo, marcado **NF:**, o nome

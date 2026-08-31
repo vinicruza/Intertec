@@ -115,3 +115,56 @@ export function freteCobradoDoCliente(
 ): Decimal {
   return destacado ? dec(frete) : new Decimal(0);
 }
+
+// ============================================================
+// Identificação da folha: ORÇAMENTO ou PEDIDO (31/08/2026)
+// ============================================================
+//
+// Pergunta da Cris, na folha do orçamento ORC-2026-0101: "por que aparece
+// PEDIDO e ORÇAMENTO no canto, e logo abaixo 'Orçamento em aberto', se o
+// pedido já foi gerado?"
+//
+// Não tinha sido gerado. O número diário do pedido (`orders.order_number`,
+// ex.: 06270826) é atribuído por gatilho do banco no INSERT — ou seja, toda
+// cotação nasce com um, antes de existir pedido nenhum. A folha imprimia esse
+// número como título e dizia "PEDIDO", enquanto a linha de situação, essa
+// correta, dizia "Orçamento em aberto". A folha se contradizia.
+//
+// A regra é uma só, e é a mesma do resto do sistema: **é pedido quando o
+// pedido foi gerado** (`status = 'closed'`). Antes disso a folha é um
+// orçamento, e o número diário não aparece — imprimi-lo seria continuar
+// prometendo um pedido que ninguém gerou.
+//
+// Mora aqui, e não na tela, porque é o que a folha impressa AFIRMA sobre o
+// documento que está na mesa: quem confere decide se separa a mercadoria
+// olhando para este título.
+export type IdentificacaoDaFolha = {
+  titulo: string;
+  subtitulo: string;
+  situacao: string;
+};
+
+export function identificacaoDaFolha(entrada: {
+  numeroDoPedido: string | null | undefined;
+  numeroDoOrcamento: string | null | undefined;
+  pedidoGerado: boolean;
+  // Já formatada pela tela (dd/mm/aaaa): aqui não se formata data.
+  geradoEm?: string | null;
+}): IdentificacaoDaFolha {
+  const orcamento = entrada.numeroDoOrcamento?.trim() || "—";
+
+  if (!entrada.pedidoGerado) {
+    return {
+      titulo: "ORÇAMENTO",
+      subtitulo: orcamento,
+      situacao: "Orçamento em aberto",
+    };
+  }
+
+  const pedido = entrada.numeroDoPedido?.trim() || "—";
+  return {
+    titulo: `PEDIDO ${pedido}`,
+    subtitulo: `ORÇAMENTO ${orcamento}`,
+    situacao: entrada.geradoEm ? `Pedido gerado em ${entrada.geradoEm}` : "Pedido gerado",
+  };
+}

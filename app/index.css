@@ -64,5 +64,19 @@ thead { background: #fafafd; }
   }
   /* Uma folha por pedido: os blocos não podem quebrar no meio. */
   .ficha-bloco { break-inside: avoid; }
+
+  /* Assinatura da aprovação no PÉ da folha (Intertech, 31/08/2026).
+     A ficha vira uma coluna que ocupa a altura da página e a assinatura
+     ganha `margin-top: auto`, então ela desce até o rodapé em vez de parar
+     no meio do papel logo abaixo do último bloco.
+
+     270mm, e não os 277mm da área útil (A4 297mm − 10mm de margem em cima e
+     embaixo): a sobra de 7mm é a folga para o navegador que ainda imprime o
+     próprio cabeçalho/rodapé (o "1/1" da página) sem empurrar a assinatura
+     para uma segunda folha. O `!important` vence o espaçamento entre blocos,
+     que também é margem de cima. */
+  .ficha-pedido { display: flex; flex-direction: column; min-height: 270mm; }
+  .ficha-pedido > .ficha-assinatura { margin-top: auto !important; }
+
   @page { size: A4; margin: 10mm; }
 }

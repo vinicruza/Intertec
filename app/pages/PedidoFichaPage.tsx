@@ -5,6 +5,7 @@ import {
   dec,
   difalNoBlocoComercial,
   freteCobradoDoCliente,
+  identificacaoDaFolha,
   margemPct,
   totaisDaFichaDoPedido,
   totalACobrarDoCliente,
@@ -142,10 +143,16 @@ export default function PedidoFichaPage() {
     (pedido.payment_term_days != null ? `${pedido.payment_term_days} dias` : null);
   const impressoEm = formatarDataHora(new Date());
 
-  const titulo = pedido.order_number ? `PEDIDO ${pedido.order_number}` : "ORÇAMENTO";
-  const subtitulo = pedido.order_number
-    ? `ORÇAMENTO ${pedido.quote_number ?? "—"}`
-    : pedido.quote_number ?? "—";
+  // Título, subtítulo e situação da folha saem juntos de uma regra só
+  // (`identificacaoDaFolha`), para nunca mais a folha dizer "PEDIDO" no canto
+  // e "Orçamento em aberto" três linhas abaixo — que foi a pergunta da Cris em
+  // 31/08/2026. É pedido quando o pedido foi gerado, e só então.
+  const folha = identificacaoDaFolha({
+    numeroDoPedido: pedido.order_number,
+    numeroDoOrcamento: pedido.quote_number,
+    pedidoGerado: fechado,
+    geradoEm: fechado ? dataCurta(pedido.closed_at) : null,
+  });
   // "Frete destacado" MARCADO = o cliente paga o transporte, e só então ele
   // entra na cobrança. Desmarcado, quem paga é a Intertech: o frete sai da
   // MARGEM como custo e não pode aparecer também na conta do cliente.
@@ -248,12 +255,10 @@ export default function PedidoFichaPage() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-extrabold leading-none tracking-tight text-[var(--cor-primaria)]">
-              {titulo}
+              {folha.titulo}
             </p>
-            <p className="mt-1 text-sm font-semibold text-[var(--cor-primaria)]">{subtitulo}</p>
-            <p className="mt-2 text-[10px] text-black/60">
-              {fechado ? `Pedido gerado em ${dataCurta(pedido.closed_at)}` : "Orçamento em aberto"}
-            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--cor-primaria)]">{folha.subtitulo}</p>
+            <p className="mt-2 text-[10px] text-black/60">{folha.situacao}</p>
             <p className="text-[10px] text-black/60">Impresso em {impressoEm}</p>
           </div>
         </div>
@@ -532,7 +537,13 @@ export default function PedidoFichaPage() {
           </section>
         )}
 
-        <div className="grid grid-cols-2 gap-10 pt-6 text-[10px]">
+        {/* Assinatura da aprovação, no RODAPÉ da folha (pedido da Intertech,
+            31/08/2026). Antes ela vinha logo depois do último bloco e parava
+            no meio da página, com meia folha em branco embaixo. Quem confere
+            procura a assinatura no pé do papel, como em qualquer formulário:
+            a classe `ficha-assinatura` é o que a impressão empurra para lá
+            (app/index.css). Na tela nada muda. */}
+        <div className="ficha-assinatura grid grid-cols-2 gap-10 pt-6 text-[10px]">
           <div />
           <div className="border-t border-black/40 pt-1 text-center">
             {pedido.approval_status === "aprovado"

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { difalNoBlocoComercial, freteCobradoDoCliente, totaisDaFichaDoPedido, totalACobrarDoCliente } from "@calc";
+import {
+  difalNoBlocoComercial,
+  freteCobradoDoCliente,
+  identificacaoDaFolha,
+  totaisDaFichaDoPedido,
+  totalACobrarDoCliente,
+} from "@calc";
 
 // A ficha impressa do pedido (formulário de papel, 05/08/2026). O que se
 // protege aqui é o subtotal impresso bater com a soma das linhas impressas —
@@ -150,5 +156,69 @@ describe("freteCobradoDoCliente", () => {
     // E o mesmo pedido COM frete destacado continua somando, como sempre.
     const destacado = totalACobrarDoCliente(itens.subtotal, freteCobradoDoCliente("280.80", true));
     expect(destacado.toString()).toBe("8080.8");
+  });
+});
+
+// ---------- Identificação da folha: ORÇAMENTO ou PEDIDO ----------
+//
+// Pergunta da Cris em 31/08/2026, na folha do ORC-2026-0101: o canto superior
+// direito dizia "PEDIDO 06270826" e, três linhas abaixo, "Orçamento em
+// aberto". Os dois no mesmo papel. O número diário nasce com a cotação (é
+// gatilho do banco no INSERT), então ele existia muito antes de existir
+// pedido.
+describe("identificacaoDaFolha", () => {
+  it("orçamento em aberto não se anuncia como pedido, mesmo já tendo número diário", () => {
+    const folha = identificacaoDaFolha({
+      numeroDoPedido: "06270826",
+      numeroDoOrcamento: "ORC-2026-0101",
+      pedidoGerado: false,
+    });
+    expect(folha.titulo).toBe("ORÇAMENTO");
+    expect(folha.subtitulo).toBe("ORC-2026-0101");
+    expect(folha.situacao).toBe("Orçamento em aberto");
+    // A regra que resolve o chamado: a palavra "PEDIDO" não aparece na folha
+    // de um orçamento em aberto, e o número diário também não.
+    expect(`${folha.titulo} ${folha.subtitulo} ${folha.situacao}`).not.toContain("PEDIDO");
+    expect(`${folha.titulo} ${folha.subtitulo} ${folha.situacao}`).not.toContain("06270826");
+  });
+
+  it("pedido gerado traz o número do pedido, o do orçamento e a data", () => {
+    const folha = identificacaoDaFolha({
+      numeroDoPedido: "06270826",
+      numeroDoOrcamento: "ORC-2026-0101",
+      pedidoGerado: true,
+      geradoEm: "27/08/2026",
+    });
+    expect(folha.titulo).toBe("PEDIDO 06270826");
+    expect(folha.subtitulo).toBe("ORÇAMENTO ORC-2026-0101");
+    expect(folha.situacao).toBe("Pedido gerado em 27/08/2026");
+  });
+
+  it("pedido gerado sem data não inventa uma", () => {
+    const folha = identificacaoDaFolha({
+      numeroDoPedido: "06270826",
+      numeroDoOrcamento: "ORC-2026-0101",
+      pedidoGerado: true,
+      geradoEm: null,
+    });
+    expect(folha.situacao).toBe("Pedido gerado");
+  });
+
+  it("número faltando vira traço, e a folha continua imprimível", () => {
+    const aberto = identificacaoDaFolha({
+      numeroDoPedido: null,
+      numeroDoOrcamento: "  ",
+      pedidoGerado: false,
+    });
+    expect(aberto.subtitulo).toBe("—");
+
+    const gerado = identificacaoDaFolha({
+      numeroDoPedido: undefined,
+      numeroDoOrcamento: undefined,
+      pedidoGerado: true,
+      geradoEm: "27/08/2026",
+    });
+    expect(gerado.titulo).toBe("PEDIDO —");
+    expect(gerado.subtitulo).toBe("ORÇAMENTO —");
   });
 });
