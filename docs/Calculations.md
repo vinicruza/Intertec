@@ -798,3 +798,30 @@ Os dois pontos de saída ficam guardados:
 O segundo importa mais do que parece: **pedido de margem boa é aprovado sozinho e nunca passa pela
 primeira porta**. Por isso a trava do fechamento mora no gatilho, e não na tela — ali ela vale venha
 o pedido de qual caminho vier.
+
+## 16. Três pedidos da Intertech na folha e no simulador (31/08/2026)
+
+Três recados da cliente, em áudio, sobre o dia a dia de quem monta o pedido. **Nenhuma conta muda**
+— cascata, base do DIFAL, fechamento e golden tests seguem intocados. O que muda é o valor inicial
+de um campo e o que a folha impressa AFIRMA sobre si mesma.
+
+### 16.1 "Frete destacado" já vem marcado
+
+Nas palavras da cliente: *"não dá para a gente fazer ao contrário, deixando ele sempre destacado?
+Quando não for, elas teriam que desmarcar. Teoricamente, todo pedido já entraria com o frete como
+destacado."*
+
+Destacar é a regra na venda direta — o transporte vai na nota e o cliente paga. Não destacar é a
+exceção. A caixa nascia em branco e obrigava a marcar em quase todo pedido; esquecer de marcar
+tirava da conta um frete que o cliente estava pagando.
+
+**A exceção é o canal de frete automático (`uf_percent`, o Marketplace)**, que a própria cliente
+tirou da conversa (*"esquece o marketplace"*). Lá o frete não é digitado: é a ESTIMATIVA de % da
+receita por UF (§7.3), que a Intertech paga e que por isso sai da margem, sem ir para a conta do
+cliente. Marcá-lo por padrão traria de volta exatamente o erro relatado em 27/08/2026 no pedido
+05270826 (Mari), quando R$ 280,80 de frete estimado apareceram somados ao TOTAL do cliente.
+
+A regra é uma função pura, `freteDestacadoPadrao(modeloFrete)`, com teste em
+`tests/calc/frete-destacado.test.ts`. É só o valor INICIAL da caixa: em qualquer canal quem monta o
+pedido marca e desmarca à vontade, e pedido já gravado sempre abre com o que foi gravado.
+

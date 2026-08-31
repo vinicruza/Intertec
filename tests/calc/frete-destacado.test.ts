@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dec, toMoney, toPercent } from "@calc";
-import { simular } from "../../app/lib/sim/params";
+import { freteDestacadoPadrao, simular } from "../../app/lib/sim/params";
 
 // ============================================================
 // A caixa "Frete destacado" — regra do Bryan (áudio de 19/08/2026)
@@ -181,5 +181,33 @@ describe("ORC-2026-0041 — Oclusor 700 un a R$ 3,60, BA, frete R$ 82,00 em bran
     expect(r.receitaLiquida.minus(receitaLiquidaDaPlanilha).toString()).toBe(
       dec("0.1625").times("82").toString()
     );
+  });
+});
+
+// ============================================================
+// A caixa já nasce marcada (pedido da Intertech, 31/08/2026)
+// ============================================================
+//
+// Nas palavras da cliente: "não dá para a gente fazer ao contrário, deixando
+// ele sempre destacado? Quando não for, elas teriam que desmarcar." Destacar é
+// a regra na venda direta; não destacar é a exceção.
+//
+// A exceção da exceção é o canal de frete automático (Marketplace), que a
+// própria cliente tirou da conversa ("esquece o marketplace"): lá o frete não
+// é digitado, é uma ESTIMATIVA de % da receita por UF que a Intertech paga.
+// Marcá-lo por padrão jogaria esse valor estimado na conta do cliente — que é
+// exatamente o erro relatado no pedido 05270826 e corrigido em 27/08/2026.
+describe("padrão da caixa Frete destacado", () => {
+  it("canal de frete digitado nasce com o frete destacado", () => {
+    expect(freteDestacadoPadrao("manual")).toBe(true);
+  });
+
+  it("canal de frete automático (Marketplace) nasce sem destaque", () => {
+    expect(freteDestacadoPadrao("uf_percent")).toBe(false);
+  });
+
+  it("sem canal escolhido ainda, vale a regra da venda direta", () => {
+    expect(freteDestacadoPadrao(null)).toBe(true);
+    expect(freteDestacadoPadrao(undefined)).toBe(true);
   });
 });

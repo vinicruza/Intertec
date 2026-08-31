@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErroCalculoBloqueante } from "@calc";
 import {
   aplicarFreteDestacadoAosItens,
   faixaDoPedido,
+  freteDestacadoPadrao,
   seloExigeAprovacao,
   seloMargemComercial,
   simular,
@@ -142,7 +143,15 @@ export default function SimuladorPage() {
   // null = ninguém está digitando; mostra a fração formatada.
   const [comissaoTexto, setComissaoTexto] = useState<string | null>(null);
   const [frete, setFrete] = useState("0");
-  const [freteCliente, setFreteCliente] = useState(false);
+  // "Frete destacado" nasce MARCADO (Intertech, 31/08/2026): destacar é a
+  // regra na venda direta, e não destacar é a exceção. Quem monta o pedido
+  // desmarca quando for o caso. A exceção é o canal de frete automático, que
+  // nasce em branco — a regra inteira está em `freteDestacadoPadrao`.
+  const [freteCliente, setFreteCliente] = useState(true);
+  // Ref, e não estado: precisa ser lido no mesmo instante em que muda. Assim o
+  // padrão do canal nunca passa por cima do que a pessoa escolheu na mão, nem
+  // do que já estava gravado num pedido aberto para edição.
+  const freteClienteEscolhido = useRef(false);
   // DIFAL (05/08/2026): padrão do canal, com override por pedido — o mesmo
   // vendedor vende tanto para contribuinte (sem DIFAL) quanto para não
   // contribuinte (com DIFAL), então precisa poder trocar pedido a pedido.
@@ -210,6 +219,7 @@ export default function SimuladorPage() {
     setComissaoTexto(null);
     setFrete(textoDeCampo(p.freight, "0"));
     setFreteCliente(p.freight_paid_by_customer);
+    freteClienteEscolhido.current = true; // o que está gravado manda sobre o padrão
     setAplicaDifalOverride(p.applies_difal);
     setTransportadoraId(textoDeCampo(p.carrier_id));
     setTransportadoraOutra(textoDeCampo(p.carrier_other));
@@ -292,6 +302,16 @@ export default function SimuladorPage() {
     channelId: canal?.id ?? null,
     sellerId: vendedor?.id ?? null,
   });
+
+  // O padrão de "Frete destacado" segue o canal enquanto ninguém tiver mexido
+  // na caixa: marcado na venda direta, em branco no canal de frete automático
+  // (Marketplace), onde o frete é estimativa que a Intertech paga. Depois do
+  // primeiro clique — ou num pedido aberto para edição — a escolha manda, e
+  // trocar de vendedor não desfaz o que a pessoa marcou.
+  useEffect(() => {
+    if (idParaEditar || freteClienteEscolhido.current) return;
+    setFreteCliente(freteDestacadoPadrao(canal?.regras.modeloFrete));
+  }, [idParaEditar, canal]);
 
   // Com um vendedor só na lista, escolher é burocracia: já vem selecionado.
   useEffect(() => {
@@ -1061,6 +1081,7 @@ export default function SimuladorPage() {
               checked={freteCliente}
               onChange={(e) => {
                 setFreteCliente(e.target.checked);
+                freteClienteEscolhido.current = true;
               }}
             />
             Frete destacado

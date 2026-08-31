@@ -232,3 +232,31 @@ export function seloMargemComercial(
 export function seloExigeAprovacao(selo: SeloMargemComercial): boolean {
   return selo.color === "red" || selo.color === "yellow";
 }
+
+// ---------- "Frete destacado" já vem marcado (Intertech, 31/08/2026) ----------
+//
+// Pedido da cliente, em áudio: "não dá para a gente fazer ao contrário,
+// deixando ele sempre destacado? Quando não for, elas teriam que desmarcar.
+// Teoricamente, todo pedido já entraria com o frete como destacado."
+//
+// Frete destacado é a regra na venda direta: o transporte vai na nota e o
+// cliente paga. Não destacado é a exceção. A caixa nascia em branco e obrigava
+// a marcar em quase todo pedido — e esquecer de marcar tirava da conta um
+// frete que o cliente estava pagando.
+//
+// A EXCEÇÃO é o canal de frete automático (`uf_percent`, o Marketplace) — a
+// própria cliente disse "esquece o marketplace". Lá o frete não é digitado: é
+// uma ESTIMATIVA de % da receita por UF, que a Intertech paga e que por isso
+// sai da margem, sem ir para a conta do cliente. Foi exatamente esse o erro
+// relatado em 27/08/2026 no pedido 05270826 (Mari), quando R$ 280,80 de frete
+// estimado apareceram somados ao TOTAL do cliente na folha. Marcá-lo por
+// padrão traria o mesmo problema de volta.
+//
+// Isto é só o valor INICIAL da caixa: em qualquer canal quem monta o pedido
+// marca e desmarca à vontade, e pedido já gravado sempre abre com o que foi
+// gravado.
+export function freteDestacadoPadrao(
+  modeloFrete: CanalRegras["modeloFrete"] | null | undefined
+): boolean {
+  return modeloFrete !== "uf_percent";
+}

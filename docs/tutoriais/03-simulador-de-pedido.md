@@ -29,8 +29,12 @@ No topo da tela, preencha:
 5. **Frete** — se o canal do vendedor usa o modelo "% da receita por UF" (ex.: Marketplace), o
    campo fica automático e mostra o valor calculado. Nos demais canais, digite o valor do frete em
    R$ manualmente.
-6. **Frete por conta do cliente** — marque esta caixa quando o frete não sai do resultado da
-   Intertech.
+6. **Frete destacado** — a caixa **já vem marcada**: destacar o frete é a regra na venda direta
+   (o transporte vai na nota e o cliente paga). **Desmarque** nos pedidos em que quem paga o
+   transporte é a Intertech — aí o frete sai da margem, como custo, e não entra na conta do
+   cliente. Nos canais de frete automático (% da receita por UF, ex.: Marketplace) a caixa vem em
+   branco, porque ali o frete é uma estimativa que a Intertech paga. Ao reabrir um pedido já
+   salvo, vale sempre o que foi gravado nele.
 
 ## Passo 2 — Adicionar itens
 
