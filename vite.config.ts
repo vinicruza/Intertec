@@ -55,5 +55,22 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     environment: "node",
+    // Endereço e chave de FACHADA, só para os testes (01/09/2026).
+    //
+    // `app/lib/supabase.ts` recusa-se a subir sem as duas variáveis — é a
+    // trava que impede o app de ir ao ar apontando para lugar nenhum. Só que
+    // um teste de função pura (`devoRegistrarErroDeTela`) importa o módulo que
+    // importa esse cliente, e a trava disparava: `npm test` quebrava em
+    // qualquer máquina sem `.env` e quebrava no CI, onde o passo dos testes
+    // não recebe segredo nenhum. A suíte ficou vermelha por isso, sem nenhum
+    // teste de verdade estar falhando.
+    //
+    // Os valores abaixo não vão a lugar nenhum (`.invalid` não existe como
+    // domínio) e nenhum teste faz chamada de rede: eles só satisfazem a trava.
+    // Teste que precise de banco de verdade é E2E, e esse tem os segredos.
+    env: {
+      VITE_SUPABASE_URL: "https://testes.supabase.invalid",
+      VITE_SUPABASE_ANON_KEY: "chave-de-fachada-para-testes",
+    },
   },
 });
