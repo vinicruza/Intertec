@@ -547,3 +547,34 @@ describe("aprovação automática usa o selo comercial", () => {
     expect(gatilho).not.toContain("'yellow'");
   });
 });
+
+// O alarme que faltava. A correção da regra impede ESTE erro; esta contagem
+// é sobre o próximo — ela não depende de qual regra quebrou, compara o que
+// foi aprovado sozinho com o selo vigente.
+describe("integridade acusa aprovação automática abaixo do selo", () => {
+  it("a contagem existe e usa o selo comercial", () => {
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("auto_approved_below_seal");
+    expect(resumo).toContain("public.selo_comercial_do_pedido(o.id, o.contribution_margin_snapshot/o.net_revenue_snapshot)");
+    expect(resumo).toContain("in ('red','yellow')");
+  });
+
+  it("aprovação manual de margem baixa não entra na conta", () => {
+    // Um humano pode aprovar o que quiser — é para isso que a fila existe.
+    // Só conta o que o sistema aprovou sozinho.
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("o.approval_notes ilike 'Aprovado automaticamente pela margem%'");
+  });
+
+  it("pedido ratificado por um administrador sai da conta, e a ratificação fica registrada", () => {
+    // Pedido fechado é imutável: não dá para corrigir a aprovação dele. Um
+    // alarme que nunca zera deixa de ser lido, então a saída é alguém com
+    // autoridade assumir a decisão — com motivo obrigatório e nome no log.
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("a.action='ratifica_aprovacao_automatica'");
+    const rat = definicaoVigente("ratificar_aprovacao_automatica");
+    expect(rat).toContain("public.current_user_role() <> 'admin'");
+    expect(rat).toContain("Escreva o motivo da ratificação");
+    expect(rat).toContain("insert into public.audit_logs");
+  });
+});

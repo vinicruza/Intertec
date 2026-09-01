@@ -17,6 +17,11 @@ const ITENS = [
   // Trava a pessoa sem explicar: sem vendedor não há canal, e a simulação
   // nunca fecha. O nome do acesso precisa bater com o do vendedor cadastrado.
   ["commercial_users_without_seller", "Usuários do comercial sem vendedor vinculado"],
+  // Nunca deve passar de zero. Em 01/09/2026 passou 21 vezes sem ninguém ver:
+  // a aprovação automática lia as faixas do painel em vez do selo do pedido, e
+  // as duas usam a palavra "verde" para faixas diferentes. Aprovação MANUAL de
+  // margem baixa não conta aqui — para isso a fila existe.
+  ["auto_approved_below_seal", "Pedidos aprovados sozinhos com margem que exige aprovação"],
 ] as const;
 
 export default function IntegridadePage() {
