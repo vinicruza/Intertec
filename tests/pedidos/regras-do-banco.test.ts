@@ -505,3 +505,45 @@ describe("composição dos volumes", () => {
     expect(TODAS).not.toMatch(/volumes_composition[\s\S]{0,80}check\s*\(/);
   });
 });
+
+// ============================================================
+// Aprovação automática (relatado em 01/09/2026)
+// ============================================================
+//
+// "A Isabela conseguiu aprovar um pedido com margem baixa, não deveria."
+//
+// O sistema tem DUAS tabelas de faixa, e elas não querem dizer a mesma
+// coisa. `margin_rules` são as faixas de STATUS do painel, onde "Boa"
+// começa em 40% e a cor dela é 'green'. `commercial_margin_bands` é o SELO
+// do pedido, onde 40% ainda é AMARELA e verde só começa acima de 50%.
+//
+// O gatilho da aprovação automática lia a primeira. Como as duas usam a
+// palavra "green" para coisas diferentes, o erro passou despercebido: entre
+// 40% e 50% a tela dizia amarela e o banco aprovava como verde. 21
+// orçamentos entraram assim, de 41,12% a 49,95%.
+describe("aprovação automática usa o selo comercial", () => {
+  it("o gatilho não lê mais as faixas de status do painel", () => {
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    expect(gatilho).toContain("public.selo_comercial_do_pedido(new.order_id, v_margem_pct)");
+    expect(gatilho).not.toContain("from public.margin_rules");
+  });
+
+  it("o selo do banco tem os mesmos tetos e a mesma precedência do navegador", () => {
+    const selo = definicaoVigente("selo_comercial_do_pedido");
+    // Tetos inclusivos, na mesma ordem do `seloMargemComercial`.
+    expect(selo).toContain("p_pct <= (select red_max from tetos) then 'red'");
+    expect(selo).toContain("p_pct <= (select yellow_max from tetos) then 'yellow'");
+    expect(selo).toContain("p_pct <= (select green_max from tetos) then 'green'");
+    // vendedor > canal > padrão da casa, e o mesmo fallback do TypeScript.
+    expect(selo).toContain("order by (b.seller_id is not null) desc, (b.channel_id is not null) desc");
+    expect(selo).toContain("0.40");
+    expect(selo).toContain("0.50");
+    expect(selo).toContain("0.65");
+  });
+
+  it("só verde e azul entram sozinhos — amarelo e vermelho nunca", () => {
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    expect(gatilho).toContain("v_color in ('blue', 'green') and status = 'simulation'");
+    expect(gatilho).not.toContain("'yellow'");
+  });
+});
