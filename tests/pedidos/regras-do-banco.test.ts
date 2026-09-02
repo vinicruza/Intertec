@@ -578,3 +578,36 @@ describe("integridade acusa aprovação automática abaixo do selo", () => {
     expect(rat).toContain("insert into public.audit_logs");
   });
 });
+
+// ============================================================
+// Causa raiz: duas tabelas, a mesma palavra
+// ============================================================
+//
+// `margin_rules` (status do painel) e `commercial_margin_bands` (o selo que
+// decide aprovação) guardavam ambas a palavra "green" — significando faixas
+// diferentes. O gatilho leu uma achando que era a outra, e nada reclamou:
+// nem o Postgres, nem o TypeScript, nem os testes.
+//
+// Consertar quem lê qual resolveu aquele erro. Isto trava a família dele.
+describe("as duas tabelas de faixa não compartilham vocabulário", () => {
+  it("o banco recusa a cor do selo nas faixas do painel", () => {
+    expect(TODAS).toContain("margin_rules_nao_usa_cores_do_selo");
+    expect(TODAS).toContain("not in ('green','yellow','orange','red','blue')");
+  });
+
+  it("as faixas do painel foram renomeadas para rótulos de status", () => {
+    expect(TODAS).toContain("then 'status_boa'");
+    expect(TODAS).toContain("then 'status_negativa'");
+  });
+
+  it("nenhuma função do banco decide aprovação LENDO margin_rules", () => {
+    // O que não pode voltar é a CONSULTA. Citar a tabela em comentário é
+    // desejável: é o registro de por que a regra é como é.
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    for (const fn of [gatilho, fechar]) {
+      expect(fn).not.toContain("from public.margin_rules");
+      expect(fn).not.toContain("join public.margin_rules");
+    }
+  });
+});
