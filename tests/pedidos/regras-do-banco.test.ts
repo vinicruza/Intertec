@@ -611,3 +611,36 @@ describe("as duas tabelas de faixa não compartilham vocabulário", () => {
     }
   });
 });
+
+// A quarta camada, e a única que não depende de alguém olhar: o banco recusa
+// o estado ruim na gravação. Conferido em produção em 01/09/2026 — a
+// tentativa de aprovar sozinho um pedido amarelo foi rejeitada, e a
+// aprovação humana do mesmo pedido passou.
+describe("o banco recusa aprovação automática abaixo do selo", () => {
+  it("a trava existe e roda em toda gravação de pedido", () => {
+    expect(TODAS).toContain("trg_orders_aprovacao_automatica_valida");
+    expect(TODAS).toContain("before update on public.orders");
+  });
+
+  it("recusa só a aprovação AUTOMÁTICA, e só em faixa que exige aprovação", () => {
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("not ilike 'Aprovado automaticamente pela margem%'");
+    expect(t).toContain("v_selo in ('red','yellow')");
+    expect(t).toContain("public.selo_comercial_do_pedido(new.id, v_pct)");
+  });
+
+  it("aprovação humana de margem baixa continua permitida", () => {
+    // Travar isso seria trocar um erro por outro: a fila existe justamente
+    // para alguém poder aprovar uma margem baixa com conhecimento de causa.
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("return new");
+    expect(t).toContain("new.approval_status <> 'aprovado' then return new");
+  });
+
+  it("pedido que já estava nesse estado não é bloqueado", () => {
+    // Senão editar a expedição de um pedido antigo pararia por causa de um
+    // erro que já aconteceu.
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("old.approval_status = 'aprovado'");
+  });
+});
