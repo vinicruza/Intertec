@@ -184,3 +184,55 @@ describe("erro de conversão de tipo do Postgres", () => {
     expect(msg).toContain("número inteiro");
   });
 });
+
+// ============================================================
+// Cadastro repetido de cliente (relatado em 02/09/2026)
+// ============================================================
+//
+// A Patrícia tentou completar o CNPJ de um cliente e leu "Já existe um registro
+// com estes dados. Confira se não está cadastrando algo repetido." — sem dizer
+// QUAL campo nem QUAL cliente.
+//
+// O documento estava num cadastro duplicado com o nome digitado errado
+// ("IAGARAPAVA" no lugar de "IGARAPAVA"). Procurar pelo nome certo não achava o
+// errado: a mensagem mandava conferir algo que ela não tinha como encontrar.
+describe("travas de cadastro repetido de cliente", () => {
+  it("CNPJ repetido diz que é o documento, e não um 'registro' qualquer", () => {
+    const msg = traduzErroDoBanco({
+      code: "23505",
+      message:
+        'duplicate key value violates unique constraint "customers_tax_id_unico"',
+    });
+    expect(msg).toContain("CNPJ/CPF já está cadastrado");
+    expect(msg).toContain("cadastro repetido");
+  });
+
+  it("código do ERP repetido aponta o cadastro em dobro", () => {
+    const msg = traduzErroDoBanco({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "customers_external_code_unique"',
+    });
+    expect(msg).toContain("código do ERP");
+  });
+
+  it("código do cliente repetido tem frase própria", () => {
+    const msg = traduzErroDoBanco({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "customers_code_unique"',
+    });
+    expect(msg).toBe("Já existe um cliente com este código.");
+  });
+
+  it("nenhuma delas cai mais no genérico de duplicidade", () => {
+    // O genérico não diz o campo, e foi ele que a Patrícia leu.
+    for (const trava of ["customers_tax_id_unico", "customers_code_unique", "customers_external_code_unique"]) {
+      const msg = traduzErroDoBanco({
+        code: "23505",
+        message: `duplicate key value violates unique constraint "${trava}"`,
+      });
+      expect(msg).not.toBe(
+        "Já existe um registro com estes dados. Confira se não está cadastrando algo repetido."
+      );
+    }
+  });
+});
