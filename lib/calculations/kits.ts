@@ -272,3 +272,118 @@ export function custoKitCompleto(
     linhasEmbalagem,
   };
 }
+
+// ============================================================
+// As duas parcelas do CMV de um kit já vendido
+// ============================================================
+//
+// Calculations.md §4.1: "A parcela de embalagem deve ser exibida DESTACADA,
+// não diluída no total — pedido explícito na reunião."
+//
+// Num pedido, o CMV do kit chega como um número só (`cmv_unit_snapshot`), com
+// a composição expandida ao lado — produto, quantidade e o CMV de cada um no
+// momento da venda. As duas parcelas saem daí:
+//
+//     produtos  = Σ (cmvUnitario × quantidade)   ← a composição congelada
+//     embalagem = CMV do kit − produtos          ← envelope, caixa, esterilização
+//
+// Não é uma reconstrução do cálculo: é a mesma conta de `custoKitCompleto`
+// lida ao contrário, sobre os números que ficaram gravados. Por isso serve
+// para pedido fechado sem violar a imutabilidade (D7) — nada é recalculado,
+// só separado.
+//
+// Nasceu de 02/09/2026: um pedido com CMV R$ 15,38 maior que o da planilha, e
+// a diferença inteira estava na embalagem do kit (envelope 30x50 contra 30x40,
+// caixa e esterilização rateadas por 20 contra 30). Na tela, o CMV era um
+// número só — não havia como ver isso sem abrir o banco.
+export type ComponenteDoKitVendido = {
+  quantidade: EntradaDecimal;
+  // Snapshots antigos foram gravados sem o CMV de cada componente. Sem ele a
+  // parcela não é derivável, e inventar um número seria pior do que não mostrar.
+  cmvUnitario?: EntradaDecimal | null;
+};
+
+export type ParcelasDoCmvDoKit = { produtos: Decimal; embalagem: Decimal };
+
+export function parcelasDoCmvDoKit(
+  cmvUnitarioDoKit: EntradaDecimal | null | undefined,
+  composicao: ComponenteDoKitVendido[] | null | undefined
+): ParcelasDoCmvDoKit | null {
+  if (cmvUnitarioDoKit == null || composicao == null || composicao.length === 0) return null;
+
+  let produtos = new Decimal(0);
+  for (const c of composicao) {
+    if (c.cmvUnitario == null || c.cmvUnitario === "") return null;
+    try {
+      produtos = produtos.plus(dec(c.cmvUnitario).times(dec(c.quantidade)));
+    } catch {
+      return null;
+    }
+  }
+
+  let total: Decimal;
+  try {
+    total = dec(cmvUnitarioDoKit);
+  } catch {
+    return null;
+  }
+
+  const embalagem = total.minus(produtos);
+  // Embalagem negativa significa que o CMV gravado e a composição gravada vêm
+  // de momentos diferentes — a conta não fecha, e a tela não deve fingir que
+  // fecha. Some, em vez de exibir uma parcela impossível.
+  if (embalagem.isNegative()) return null;
+  return { produtos, embalagem };
+}
+
+// As mesmas duas parcelas, agora do PEDIDO inteiro — é o que a folha imprime
+// embaixo da linha do CMV. Item que não é kit entra inteiro em "produtos": a
+// embalagem de um produto avulso já está dentro da ficha técnica dele, e não é
+// consumida uma vez por kit.
+export type ItemComCmvDoPedido = {
+  quantidade: EntradaDecimal;
+  cmvUnitario: EntradaDecimal | null | undefined;
+  // null/vazio = não é kit.
+  composicaoKit?: ComponenteDoKitVendido[] | null;
+};
+
+export function parcelasDoCmvDoPedido(
+  itens: ItemComCmvDoPedido[] | null | undefined
+): ParcelasDoCmvDoKit | null {
+  if (itens == null || itens.length === 0) return null;
+
+  let produtos = new Decimal(0);
+  let embalagem = new Decimal(0);
+  let temKit = false;
+
+  for (const item of itens) {
+    if (item.cmvUnitario == null || item.cmvUnitario === "") return null;
+    let qtd: Decimal;
+    let cmv: Decimal;
+    try {
+      qtd = dec(item.quantidade);
+      cmv = dec(item.cmvUnitario);
+    } catch {
+      return null;
+    }
+
+    const ehKit = item.composicaoKit != null && item.composicaoKit.length > 0;
+    if (!ehKit) {
+      produtos = produtos.plus(cmv.times(qtd));
+      continue;
+    }
+
+    const parcelas = parcelasDoCmvDoKit(cmv, item.composicaoKit);
+    // Um kit que não se deixa separar (snapshot antigo, sem o CMV dos
+    // componentes) invalida o total: metade separada e metade não seria um
+    // número que não quer dizer nada.
+    if (parcelas === null) return null;
+    temKit = true;
+    produtos = produtos.plus(parcelas.produtos.times(qtd));
+    embalagem = embalagem.plus(parcelas.embalagem.times(qtd));
+  }
+
+  // Pedido sem kit nenhum não tem parcela de embalagem para destacar.
+  if (!temKit) return null;
+  return { produtos, embalagem };
+}

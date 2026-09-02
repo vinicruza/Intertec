@@ -1,4 +1,4 @@
-import { dec, margemPct, type ItemPedido } from "@calc";
+import { dec, margemPct, type ComponenteDoKitVendido, type ItemPedido } from "@calc";
 import { supabase } from "../supabase";
 import { AVISO_SEM_COTACAO_DE_FRETE, temCotacaoDeFrete } from "../format";
 import { faixaDoPedido, seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
@@ -519,6 +519,10 @@ export type CascataVigente =
       ok: true;
       totals: Record<string, string>;
       cmvPorItem: Map<string, string>;
+      // Composição do kit com o CMV de cada componente VIGENTE agora — é dela
+      // que sai a parcela de embalagem destacada na tela (Calculations.md
+      // §4.1). Para pedido fechado a mesma lista vem congelada no item.
+      composicaoPorItem: Map<string, ComponenteDoKitVendido[]>;
       margemContribuicaoPct: string;
       // Destaque VIGENTE da UF. Pedido fechado não usa este campo: ele lê o
       // que ficou congelado em `difal_destacado_snapshot` (D7).
@@ -539,6 +543,11 @@ export async function calcularCascataVigente(orderId: string): Promise<CascataVi
       ok: true,
       totals: snap.pedido.totals_display,
       cmvPorItem: new Map(snap.itens.map((i) => [i.orderItemId, i.cmv_unit_snapshot])),
+      composicaoPorItem: new Map(
+        snap.itens
+          .filter((i) => Array.isArray(i.kit_composition_snapshot))
+          .map((i) => [i.orderItemId, i.kit_composition_snapshot as ComponenteDoKitVendido[]])
+      ),
       margemContribuicaoPct: margemPct(
         dec(snap.pedido.contribution_margin_snapshot),
         dec(snap.pedido.net_revenue_snapshot)

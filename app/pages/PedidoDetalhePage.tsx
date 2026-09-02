@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { dec } from "@calc";
+import { dec, parcelasDoCmvDoKit } from "@calc";
 import {
   calcularCascataVigente,
   cancelarPedido,
@@ -309,9 +309,26 @@ export default function PedidoDetalhePage() {
           <tbody>
             {pedido.itens.map((i) => {
               const composicaoKit =
-                (i.kit_composition_snapshot as Array<{ nome: string; quantidade: string }> | null) ??
+                (i.kit_composition_snapshot as Array<{ nome: string; quantidade: string; cmvUnitario?: string }> | null) ??
                 i.ad_hoc_kit_composicao ??
                 null;
+              // CMV do kit: um número só na coluna, e as duas parcelas embaixo.
+              // A embalagem (envelope, caixa, esterilização) é consumida uma vez
+              // por kit e pode responder sozinha por uma diferença de margem —
+              // Calculations.md §4.1 pede que ela apareça destacada, e foi a
+              // pergunta da Intertech em 02/09/2026. Pedido fechado usa a
+              // composição CONGELADA; em aberto, a vigente da cascata.
+              const cmvDoItem = fechado
+                ? i.cmv_unit_snapshot
+                : cascata?.ok
+                  ? cascata.cmvPorItem.get(i.id) ?? null
+                  : null;
+              const composicaoParaParcelas = fechado
+                ? (i.kit_composition_snapshot as Array<{ quantidade: string; cmvUnitario?: string }> | null)
+                : cascata?.ok
+                  ? cascata.composicaoPorItem.get(i.id) ?? null
+                  : null;
+              const parcelas = parcelasDoCmvDoKit(cmvDoItem, composicaoParaParcelas);
               return (
                 <tr key={i.id} className="border-b border-[var(--cor-borda)] last:border-0">
                   <td className="px-4 py-3 font-medium">
@@ -346,7 +363,13 @@ export default function PedidoDetalhePage() {
                   <td className="px-4 py-3">{reais(i.unit_price)}</td>
                   {verNumeros && (
                     <td className="px-4 py-3">
-                      {reais(fechado ? i.cmv_unit_snapshot : (cascata?.ok ? cascata.cmvPorItem.get(i.id) ?? null : null))}
+                      {reais(cmvDoItem)}
+                      {parcelas && (
+                        <div className="mt-0.5 text-xs font-normal text-[var(--cor-texto-suave)]">
+                          produtos {reais(parcelas.produtos.toString())} + embalagem{" "}
+                          {reais(parcelas.embalagem.toString())}
+                        </div>
+                      )}
                     </td>
                   )}
                 </tr>

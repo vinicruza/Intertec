@@ -7,6 +7,7 @@ import {
   freteCobradoDoCliente,
   identificacaoDaFolha,
   margemPct,
+  parcelasDoCmvDoPedido,
   totaisDaFichaDoPedido,
   totalACobrarDoCliente,
 } from "@calc";
@@ -107,6 +108,27 @@ export default function PedidoFichaPage() {
   const fechado = pedido.status === "closed";
   const cascata = cascataQuery.data;
   const totaisFinanceiros = fechado ? t : cascata?.ok ? cascata.totals : t;
+  // As duas parcelas do CMV — produtos e embalagem/esterilização dos kits.
+  // Calculations.md §4.1 pede a embalagem DESTACADA, e ela é consumida uma vez
+  // por kit: sozinha, ela explica diferenças de margem que na linha única do
+  // CMV não aparecem (Intertech, 02/09/2026). Nada é recalculado: a conta é a
+  // do fechamento lida ao contrário, sobre o que ficou congelado. Pedido em
+  // aberto usa a composição vigente da cascata.
+  const parcelasDoCmv = parcelasDoCmvDoPedido(
+    pedido.itens.map((i) => ({
+      quantidade: i.quantity,
+      cmvUnitario: fechado
+        ? i.cmv_unit_snapshot
+        : cascata?.ok
+          ? cascata.cmvPorItem.get(i.id) ?? null
+          : i.cmv_unit_snapshot,
+      composicaoKit: fechado
+        ? (i.kit_composition_snapshot as Array<{ quantidade: string; cmvUnitario?: string }> | null)
+        : cascata?.ok
+          ? cascata.composicaoPorItem.get(i.id) ?? null
+          : null,
+    }))
+  );
   // Destaque do DIFAL (Calculations.md §7.2.1). Pedido fechado usa o que ficou
   // congelado no fechamento; pedido em cotação usa o destaque vigente da UF.
   // Fechado ANTES de 25/08/2026 não tem o congelado — cai no vigente, que é o
@@ -530,6 +552,18 @@ export default function PedidoFichaPage() {
                   <Linha rotulo="(−) Comissão" valor={totaisFinanceiros.comissao} />
                   <Linha rotulo="= Receita líquida" valor={totaisFinanceiros.receita_liquida} negrito />
                   <Linha rotulo="(−) CMV" valor={totaisFinanceiros.cmv} />
+                  {/* A embalagem do kit (envelope, caixa, esterilização) é
+                      consumida uma vez por kit e some dentro do CMV. Destacada
+                      aqui, ela responde por si a pergunta "por que o CMV deu
+                      isso" — que em 02/09/2026 só se respondeu abrindo o banco. */}
+                  {parcelasDoCmv && parcelasDoCmv.embalagem.isPositive() && (
+                    <tr className="text-[9px] text-black/60">
+                      <td className="pb-1" colSpan={2}>
+                        dos quais produtos {reais(parcelasDoCmv.produtos.toString())} + embalagem e
+                        esterilização dos kits {reais(parcelasDoCmv.embalagem.toString())}
+                      </td>
+                    </tr>
+                  )}
                   <Linha rotulo="= Margem de contribuição" valor={totaisFinanceiros.margem_contribuicao} negrito />
                 </tbody>
               </table>

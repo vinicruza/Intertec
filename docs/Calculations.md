@@ -107,6 +107,16 @@ CMV_kit = Σ (CMV_produto × qtd)  +  Σ (preco_sem_imposto_insumo × qtd_por_ki
 
 A parcela de embalagem deve ser exibida **destacada**, não diluída no total — pedido explícito na reunião.
 
+> **Onde ela aparece (02/09/2026).** Na tela do pedido, embaixo do CMV de cada kit
+> (`produtos R$ X + embalagem R$ Y`), e na folha, embaixo da linha do CMV, somando o pedido
+> inteiro. As parcelas são **derivadas do que já está gravado** — `produtos = Σ (cmvUnitario ×
+> quantidade)` da composição congelada, `embalagem = CMV do kit − produtos` —, nunca
+> recalculadas: pedido fechado continua imutável (D7). Quando a composição gravada não traz o CMV
+> de cada componente (snapshots antigos) ou a subtração dá negativo, a linha **some** em vez de
+> exibir um número que não fecha. Nasceu de um pedido em que o CMV do sistema ficou R$ 15,38 acima
+> do da planilha e a diferença inteira era a embalagem do kit (envelope 30x50 contra 30x40, caixa
+> e esterilização rateadas por 20 contra 30) — invisível enquanto o CMV era um número só.
+
 **Os dois modos de consumo (retorno da Intertech em 29/07/2026).** Envelope e caixa não se comportam igual:
 
 | Modo | Fórmula | Caso |
