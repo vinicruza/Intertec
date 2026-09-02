@@ -662,6 +662,12 @@ export default function SimuladorPage() {
           const carrier = ctx.transportadoras.find((t) => t.id === muda.carrierId);
           proximo.carrierName = carrier?.nome ?? null;
           if (!carrier?.pedeNome) proximo.carrierOther = null;
+          // Retirada: o cliente busca, não há frete a cotar. O valor vai a
+          // zero e o campo se fecha; ao trocar de volta para uma
+          // transportadora, o zero sai da frente para a pessoa digitar o que
+          // foi cotado (Intertech, 02/09/2026).
+          if (carrier?.retirada) proximo.amount = "0";
+          else if (f.amount === "0") proximo.amount = null;
         }
         return proximo;
       })
@@ -1187,9 +1193,10 @@ export default function SimuladorPage() {
                           </td>
                           <td className="px-3 py-2">
                             <Input
-                              value={opcao.amount ?? ""}
+                              value={carrierDaOpcao?.retirada ? "0,00" : opcao.amount ?? ""}
+                              disabled={carrierDaOpcao?.retirada ?? false}
                               onChange={(e) => atualizarFreteCotado(opcao.id, { amount: e.target.value })}
-                              placeholder="R$"
+                              placeholder={carrierDaOpcao?.retirada ? "sem frete" : "R$"}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -1217,6 +1224,13 @@ export default function SimuladorPage() {
             ) : (
               <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
                 Nenhuma opção cotada registrada.
+              </p>
+            )}
+            {ctx.transportadoras.some((t) => t.retirada) && (
+              <p className="text-xs text-[var(--cor-texto-suave)]">
+                O cliente vai retirar? Escolha <strong>RETIRADA</strong> na coluna Transportadora e
+                marque a linha como <strong>Escolhida</strong>: nela não há valor de frete a
+                registrar.
               </p>
             )}
           </div>

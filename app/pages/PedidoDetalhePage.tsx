@@ -16,6 +16,7 @@ import {
   type PedidoCompleto,
 } from "../lib/db/fechamento";
 import {
+  idsDeRetirada,
   listarMotivosPerda,
   listarModosPagamento,
   listarTransportadoras,
@@ -63,6 +64,13 @@ function novoFreteCotado(): FreteCotadoPedido {
   return { ...FRETE_COTADO_VAZIO, id: globalThis.crypto?.randomUUID?.() ?? String(Date.now()) };
 }
 
+// As travas de "prosseguir" leem o pedido gravado; o formulário de expedição
+// vive na tela. Sem este aviso, quem acabou de preencher as cotações e clicou
+// em Gerar Pedido levava de volta "registre ao menos uma cotação" — mandando
+// corrigir o que já estava corrigido na frente dela (Intertech, 02/09/2026).
+const AVISO_EXPEDICAO_NAO_SALVA =
+  'As alterações da expedição ainda não foram gravadas. Clique em "Salvar condições e expedição" antes de prosseguir.';
+
 const CORES_SELO_MARGEM: Record<string, string> = {
   blue: "bg-blue-100 text-blue-800",
   green: "bg-green-100 text-green-800",
@@ -86,6 +94,11 @@ export default function PedidoDetalhePage() {
   const [motivoPerdaId, setMotivoPerdaId] = useState("");
   const [observacaoPerda, setObservacaoPerda] = useState("");
   const [observacaoAprovacao, setObservacaoAprovacao] = useState("");
+  // Expedição editada e ainda não gravada. As travas de "prosseguir" leem o
+  // pedido COMO ESTÁ NO BANCO — foi assim que, em 02/09/2026, a Intertech
+  // preencheu as cotações, clicou em Gerar Pedido e levou de volta o aviso de
+  // que não havia cotação nenhuma: as linhas estavam na tela, não gravadas.
+  const [expedicaoNaoSalva, setExpedicaoNaoSalva] = useState(false);
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ["pedido", id],
@@ -102,6 +115,13 @@ export default function PedidoDetalhePage() {
   const faixasQuery = useQuery({
     queryKey: ["faixasMargemComercial"],
     queryFn: listarFaixasMargemComercial,
+  });
+  // A lista diz quais opções são RETIRADA — a cotação de frete de uma delas
+  // não tem valor a registrar (Intertech, 02/09/2026). Mesma chave do bloco de
+  // expedição: o React Query serve as duas telas com uma consulta só.
+  const transportadorasQuery = useQuery({
+    queryKey: ["transportadoras"],
+    queryFn: listarTransportadoras,
   });
   const cascataQuery = useQuery({
     queryKey: ["cascataVigente", id],
@@ -209,7 +229,8 @@ export default function PedidoDetalhePage() {
   // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
   // jeito (mesma regra vale no banco, é a garantia real).
   const souRemetente = Boolean(perfil?.id) && pedido.submitted_by === perfil?.id;
-  const pendenciasAprovacao = camposDeExpedicaoPendentes(pedido);
+  const retiradas = idsDeRetirada(transportadorasQuery.data);
+  const pendenciasAprovacao = camposDeExpedicaoPendentes(pedido, retiradas);
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -273,7 +294,7 @@ export default function PedidoDetalhePage() {
         </Card>
       )}
 
-      {!cancelado && <BlocoExpedicao pedido={pedido} />}
+      {!cancelado && <BlocoExpedicao pedido={pedido} aoMudarPendencia={setExpedicaoNaoSalva} />}
 
       <Card className="p-0">
         <table className="w-full text-sm">
@@ -456,6 +477,10 @@ export default function PedidoDetalhePage() {
             disabled={enviar.isPending}
             onClick={() => {
               setErro(null);
+              if (expedicaoNaoSalva) {
+                setErro(AVISO_EXPEDICAO_NAO_SALVA);
+                return;
+              }
               if (pendenciasAprovacao.length > 0) {
                 setErro(`Preencha antes de enviar para aprovação: ${pendenciasAprovacao.join(", ")}.`);
                 return;
@@ -471,9 +496,16 @@ export default function PedidoDetalhePage() {
             disabled={fechar.isPending}
             onClick={() => {
               setErro(null);
+              // Estas travas leem o pedido gravado. Avisar da gravação pendente
+              // antes de tudo evita mandar corrigir o que já está corrigido na
+              // tela (Intertech, 02/09/2026).
+              if (expedicaoNaoSalva) {
+                setErro(AVISO_EXPEDICAO_NAO_SALVA);
+                return;
+              }
               // Mesma exigência do envio para aprovação: pedido de margem boa é
               // aprovado sozinho e chega aqui sem passar por aquela porta.
-              if (!temCotacaoDeFrete(pedido.freight_quotes)) {
+              if (!temCotacaoDeFrete(pedido.freight_quotes, retiradas)) {
                 setErro(AVISO_SEM_COTACAO_DE_FRETE);
                 return;
               }
@@ -772,12 +804,16 @@ function margemPctDaVersao(foto: Record<string, unknown>): string | null {
   }
 }
 
-function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
+function camposDeExpedicaoPendentes(
+  pedido: PedidoCompleto,
+  retiradas: ReadonlySet<string>
+): string[] {
   const pendencias: string[] = [];
   // Pedido da Intertech em 26/08/2026: pelo menos uma cotação de frete, com
   // transportadora E valor. É ela que sustenta a margem apresentada e o que a
-  // expedição usa para fechar com a transportadora.
-  if (!temCotacaoDeFrete(pedido.freight_quotes)) pendencias.push("cotação de frete");
+  // expedição usa para fechar com a transportadora. A opção de RETIRADA
+  // escolhida dispensa o valor: não há transporte a cotar (02/09/2026).
+  if (!temCotacaoDeFrete(pedido.freight_quotes, retiradas)) pendencias.push("cotação de frete");
   if (!pedido.carrier_id) pendencias.push("transportadora");
   if (pedido.carriers?.requires_name && !pedido.carrier_other?.trim()) pendencias.push("nome da transportadora");
   if (!pedido.payment_term_id && pedido.payment_term_days == null) pendencias.push("modo de pagamento");
@@ -812,7 +848,15 @@ function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; des
 // O banco abre esta exceção — e só ela — na regra de imutabilidade do pedido
 // fechado, comparando coluna a coluna e registrando em auditoria. Tentar
 // alterar frete, comissão ou qualquer valor junto continua sendo recusado.
-function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
+function BlocoExpedicao({
+  pedido,
+  aoMudarPendencia,
+}: {
+  pedido: PedidoCompleto;
+  // Avisa a tela do pedido que há edição na mesa ainda não gravada — as
+  // travas de "prosseguir" leem o pedido do banco, não este formulário.
+  aoMudarPendencia: (naoSalva: boolean) => void;
+}) {
   const queryClient = useQueryClient();
   const { data: transportadoras } = useQuery({
     queryKey: ["transportadoras"],
@@ -845,14 +889,22 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
     onSuccess: () => {
       setErro(null);
       setSalvo(true);
+      aoMudarPendencia(false);
       queryClient.invalidateQueries({ queryKey: ["pedido", pedido.id] });
     },
     onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
+  // Toda edição passa por aqui: a faixa verde de "Dados registrados" sai da
+  // tela e a página do pedido passa a saber que há coisa por gravar.
+  const marcarNaoSalvo = () => {
+    setSalvo(false);
+    aoMudarPendencia(true);
+  };
+
   const mudar = (campo: keyof DadosExpedicao) => (valor: string) => {
     setD((a) => ({ ...a, [campo]: valor }));
-    setSalvo(false);
+    marcarNaoSalvo();
   };
 
   function atualizarFreteCotado(id: string, muda: Partial<FreteCotadoPedido>) {
@@ -864,6 +916,11 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
           const carrier = (transportadoras ?? []).find((t) => t.id === muda.carrierId);
           proximo.carrierName = carrier?.nome ?? null;
           if (!carrier?.pedeNome) proximo.carrierOther = null;
+          // Retirada não tem frete: o valor vai a zero e o campo se fecha.
+          // Ao trocar de volta para uma transportadora, o zero sai da frente
+          // para não virar "cotação de graça" (que a regra recusa).
+          if (carrier?.retirada) proximo.amount = "0";
+          else if (f.amount === "0") proximo.amount = null;
         }
         return proximo;
       });
@@ -875,7 +932,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
         carrierOutra: selecionada?.carrierOther ?? atual.carrierOutra,
       };
     });
-    setSalvo(false);
+    marcarNaoSalvo();
   }
 
   function selecionarFreteCotado(freteCotado: FreteCotadoPedido) {
@@ -885,12 +942,12 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
       carrierOutra: freteCotado.carrierOther ?? "",
       fretesCotados: atual.fretesCotados.map((f) => ({ ...f, selected: f.id === freteCotado.id })),
     }));
-    setSalvo(false);
+    marcarNaoSalvo();
   }
 
   function removerFreteCotado(id: string) {
     setD((atual) => ({ ...atual, fretesCotados: atual.fretesCotados.filter((f) => f.id !== id) }));
-    setSalvo(false);
+    marcarNaoSalvo();
   }
 
   // Cidade e UF vêm do CEP pelo mesmo caminho do cadastro do cliente
@@ -906,7 +963,7 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
         cidadeEntrega: achado.city || atual.cidadeEntrega,
         ufEntrega: achado.state || atual.ufEntrega,
       }));
-      setSalvo(false);
+      marcarNaoSalvo();
     } catch (e) {
       setErro(mensagemDaConsulta(e, "cep"));
     } finally {
@@ -996,12 +1053,13 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
               <Button
                 type="button"
                 className="bg-transparent text-[var(--cor-primaria)] hover:bg-[var(--cor-fundo)]"
-                onClick={() =>
+                onClick={() => {
                   setD((atual) => ({
                     ...atual,
                     fretesCotados: [...atual.fretesCotados, novoFreteCotado()],
-                  }))
-                }
+                  }));
+                  marcarNaoSalvo();
+                }}
               >
                 Adicionar opção
               </Button>
@@ -1061,9 +1119,10 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
                           </td>
                           <td className="px-3 py-2">
                             <Input
-                              value={opcao.amount ?? ""}
+                              value={carrierDaOpcao?.retirada ? "0,00" : opcao.amount ?? ""}
+                              disabled={carrierDaOpcao?.retirada ?? false}
                               onChange={(e) => atualizarFreteCotado(opcao.id, { amount: e.target.value })}
-                              placeholder="R$"
+                              placeholder={carrierDaOpcao?.retirada ? "sem frete" : "R$"}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -1091,6 +1150,13 @@ function BlocoExpedicao({ pedido }: { pedido: PedidoCompleto }) {
             ) : (
               <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm text-[var(--cor-texto-suave)]">
                 Nenhuma opção cotada registrada.
+              </p>
+            )}
+            {(transportadoras ?? []).some((t) => t.retirada) && (
+              <p className="text-xs text-[var(--cor-texto-suave)]">
+                O cliente vai retirar? Escolha <strong>RETIRADA</strong> na coluna Transportadora e
+                marque a linha como <strong>Escolhida</strong>: nela não há valor de frete a
+                registrar.
               </p>
             )}
           </div>

@@ -93,7 +93,7 @@ export type ContextoSimulador = {
   // montador — montar "o kit catarata mais uma compressa" sem reescolher tudo.
   kitsParaCopiar: KitParaCopiar[];
   // Transportadoras do formulário de pedido (05/08/2026).
-  transportadoras: Array<{ id: string; nome: string; pedeNome: boolean }>;
+  transportadoras: Array<{ id: string; nome: string; pedeNome: boolean; retirada: boolean }>;
   modosPagamento: Array<{ id: string; label: string }>;
 };
 
@@ -130,7 +130,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // ficava barato demais na tela, para ser recusado no fechamento depois.
     supabase.rpc("custo_dos_kits"),
     supabase.rpc("meu_vendedor"),
-    supabase.from("carriers").select("id, name, requires_name").eq("active", true).order("sort_order"),
+    supabase.from("carriers").select("id, name, requires_name, is_pickup").eq("active", true).order("sort_order"),
     supabase.from("payment_terms").select("id, label").eq("active", true).order("sort_order"),
   ]);
   for (const r of [vend, canais, cli, icsm, difal, portal, regras, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento]) {
@@ -303,6 +303,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       id: t.id as string,
       nome: t.name as string,
       pedeNome: (t.requires_name as boolean | null) ?? false,
+      retirada: (t.is_pickup as boolean | null) ?? false,
     })),
     modosPagamento: (pagamento.data ?? []).map((p) => ({
       id: p.id as string,
@@ -535,12 +536,14 @@ export async function salvarCotacao(
 //
 // Lista enxuta para a tela do pedido. O simulador já recebe as mesmas
 // transportadoras dentro do contexto; aqui é para quem só precisa delas.
-export type TransportadoraOpcao = { id: string; nome: string; pedeNome: boolean };
+// `retirada`: o cliente busca a mercadoria e não há frete a cotar (Intertech,
+// 02/09/2026). A marca é do cadastro, não do código — ver `is_pickup`.
+export type TransportadoraOpcao = { id: string; nome: string; pedeNome: boolean; retirada: boolean };
 
 export async function listarTransportadoras(): Promise<TransportadoraOpcao[]> {
   const { data, error } = await supabase
     .from("carriers")
-    .select("id, name, requires_name")
+    .select("id, name, requires_name, is_pickup")
     .eq("active", true)
     .order("sort_order");
   if (error) throw error;
@@ -548,7 +551,14 @@ export async function listarTransportadoras(): Promise<TransportadoraOpcao[]> {
     id: t.id as string,
     nome: t.name as string,
     pedeNome: (t.requires_name as boolean | null) ?? false,
+    retirada: (t.is_pickup as boolean | null) ?? false,
   }));
+}
+
+// Conjunto de ids das transportadoras de retirada, do jeito que
+// `temCotacaoDeFrete` espera receber.
+export function idsDeRetirada(transportadoras: TransportadoraOpcao[] | null | undefined): Set<string> {
+  return new Set((transportadoras ?? []).filter((t) => t.retirada).map((t) => t.id));
 }
 
 export type ModoPagamentoOpcao = { id: string; label: string };

@@ -125,12 +125,15 @@ export type Transportadora = {
   requires_name: boolean;
   sort_order: number;
   active: boolean;
+  // Retirada pelo cliente: não há transporte pago, então a opção escolhida
+  // dispensa o valor do frete (Intertech, 02/09/2026).
+  is_pickup: boolean;
 };
 
 export async function listarTransportadorasCadastro(): Promise<Transportadora[]> {
   const { data, error } = await supabase
     .from("carriers")
-    .select("id, name, requires_name, sort_order, active")
+    .select("id, name, requires_name, sort_order, active, is_pickup")
     .order("sort_order");
   if (error) throw error;
   return (data ?? []) as Transportadora[];
@@ -141,12 +144,14 @@ export async function salvarTransportadora(item: {
   name: string;
   sort_order: number;
   active: boolean;
+  is_pickup: boolean;
 }): Promise<void> {
   const { error } = await supabase.rpc("save_carrier", {
     p_id: item.id,
     p_name: item.name.trim(),
     p_sort_order: item.sort_order,
     p_active: item.active,
+    p_is_pickup: item.is_pickup,
   });
   if (error) throw error;
 }

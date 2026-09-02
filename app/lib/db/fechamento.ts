@@ -4,7 +4,14 @@ import { AVISO_SEM_COTACAO_DE_FRETE, temCotacaoDeFrete } from "../format";
 import { faixaDoPedido, seloExigeAprovacao, seloMargemComercial, simular, type Simulacao } from "../sim/params";
 import { montarSnapshot, type ItemParaSnapshot, type SnapshotPedido } from "../sim/snapshot";
 import { resolverKitAdHocDoPedido } from "../sim/itensDoPedido";
-import { carregarContextoSimulador, custosDeEmbalagem, montarCatalogoDeKit, type ContextoSimulador } from "./pedidos";
+import {
+  carregarContextoSimulador,
+  custosDeEmbalagem,
+  idsDeRetirada,
+  listarTransportadoras,
+  montarCatalogoDeKit,
+  type ContextoSimulador,
+} from "./pedidos";
 import { type ModoEmbalagem } from "../sim/kitNoPedido";
 
 export type FreteCotadoPedido = {
@@ -450,8 +457,12 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
   if (pedidoAntes.cancelled_at) throw new Error("Pedido cancelado não pode ser fechado.");
   // Intertech, 26/08/2026. Fica aqui além da tela porque "Gerar Pedido" não é
   // o único caminho até o fechamento, e a regra não pode depender de qual
-  // botão a pessoa apertou.
-  if (!temCotacaoDeFrete(pedidoAntes.freight_quotes)) throw new Error(AVISO_SEM_COTACAO_DE_FRETE);
+  // botão a pessoa apertou. A retirada escolhida dispensa o valor (02/09/2026),
+  // e por isso a lista de transportadoras é lida aqui: é ela que diz qual
+  // opção é retirada.
+  if (!temCotacaoDeFrete(pedidoAntes.freight_quotes, idsDeRetirada(await listarTransportadoras()))) {
+    throw new Error(AVISO_SEM_COTACAO_DE_FRETE);
+  }
 
   // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o

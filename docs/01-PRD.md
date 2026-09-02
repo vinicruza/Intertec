@@ -287,6 +287,10 @@ tinha 6. Entram agora os que não encostam em cálculo:
   destacados na ficha quando diferem. Cidade e UF são buscadas pelo CEP, como no cadastro do
   cliente. A UF de entrega é endereço, não fiscal: a base do DIFAL continua sendo `orders.uf`.
   Preenchível **depois** do fechamento (§5.3 continua valendo para o dinheiro).
+  O pedido só prossegue com ao menos uma cotação de frete registrada — transportadora e valor
+  (26/08/2026). A exceção é a **RETIRADA** (02/09/2026): quando o próprio cliente busca a
+  mercadoria não há frete a cotar, então basta escolher essa opção, e o valor fica em R$ 0,00,
+  bloqueado. Qual opção é retirada se marca no cadastro de transportadoras.
 - **Condições**: prazo de pagamento em dias e observação, ambos congelados no fechamento.
 - **Ficha impressa** redesenhada no formato do formulário: cabeçalho do cliente, valor total por
   linha e subtotal, bloco de expedição e rodapé. Campo em branco vira espaço para preencher à mão,

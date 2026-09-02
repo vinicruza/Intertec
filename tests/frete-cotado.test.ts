@@ -50,6 +50,62 @@ describe("cotacaoDeFreteValida", () => {
   });
 });
 
+// ============================================================
+// Retirada pelo cliente (Intertech, 02/09/2026)
+// ============================================================
+//
+// "No caso de retirada elas vão selecionar a opção Retirada, mas não existe
+// valor de frete, porque é o próprio cliente que retira." Sem esta exceção o
+// pedido de retirada ficava preso na tela: a regra pedia um valor que não
+// existe.
+//
+// A dispensa é da opção ESCOLHIDA, e só dela. Uma linha de retirada solta num
+// pedido que vai viajar de transportadora liberaria o pedido sem cotação
+// nenhuma — exatamente o que a regra de 26/08/2026 fecha.
+const RETIRADA = new Set(["retirada-id"]);
+
+describe("retirada dispensa o valor do frete", () => {
+  it("retirada escolhida vale como cotação, mesmo sem valor", () => {
+    expect(
+      cotacaoDeFreteValida(frete({ carrierId: "retirada-id", selected: true }), RETIRADA)
+    ).toBe(true);
+    expect(
+      cotacaoDeFreteValida(frete({ carrierId: "retirada-id", amount: "0", selected: true }), RETIRADA)
+    ).toBe(true);
+  });
+
+  it("retirada NÃO escolhida não libera o pedido", () => {
+    expect(
+      cotacaoDeFreteValida(frete({ carrierId: "retirada-id", amount: "0" }), RETIRADA)
+    ).toBe(false);
+    expect(
+      temCotacaoDeFrete(
+        [frete({ carrierId: "retirada-id", amount: "0" }), frete({ carrierId: "jamef" })],
+        RETIRADA
+      )
+    ).toBe(false);
+  });
+
+  it("transportadora comum escolhida continua precisando de valor", () => {
+    expect(cotacaoDeFreteValida(frete({ carrierId: "jamef", selected: true }), RETIRADA)).toBe(false);
+    expect(
+      cotacaoDeFreteValida(frete({ carrierId: "jamef", amount: "0", selected: true }), RETIRADA)
+    ).toBe(false);
+  });
+
+  it("sem a lista de retiradas nada muda para quem já usava a tela", () => {
+    // A lista é opcional na assinatura: telas que não a carregam continuam
+    // aplicando a regra de 26/08/2026 na íntegra.
+    expect(cotacaoDeFreteValida(frete({ carrierId: "retirada-id", selected: true }))).toBe(false);
+  });
+
+  it("pedido com retirada escolhida passa na checagem da tela", () => {
+    expect(
+      temCotacaoDeFrete([frete({ carrierId: "retirada-id", amount: "0", selected: true })], RETIRADA)
+    ).toBe(true);
+  });
+});
+
 describe("temCotacaoDeFrete", () => {
   it("basta uma válida entre várias começadas", () => {
     expect(temCotacaoDeFrete([

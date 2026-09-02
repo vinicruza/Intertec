@@ -204,10 +204,31 @@ export function problemaNaCidade(valor: ValorNumerico): string | null {
 // Trava o PROSSEGUIR (enviar para aprovação e ganhar o pedido), nunca o salvar:
 // cotar frete é etapa posterior a montar o pedido, e impedir de salvar
 // obrigaria a pessoa a segurar tudo na tela até a transportadora responder.
-export function cotacaoDeFreteValida(f: FreteCotado): boolean {
+//
+// RETIRADA (Intertech, 02/09/2026). Quando o cliente busca a mercadoria não
+// existe frete a cotar, e exigir um valor deixava o pedido preso na tela sem
+// saída — foi o que aconteceu em 02/09/2026. A transportadora marcada como
+// retirada no cadastro (`is_pickup`) dispensa o valor, e só ela.
+//
+// A dispensa vale para a opção ESCOLHIDA, não para qualquer linha da tabela:
+// uma linha de retirada solta num pedido que vai viajar de transportadora
+// liberaria o pedido sem cotação nenhuma — devolvendo pela janela o que a
+// regra fecha pela porta.
+export type TransportadorasDeRetirada = ReadonlySet<string> | null | undefined;
+
+function ehRetirada(f: FreteCotado, retiradas: TransportadorasDeRetirada): boolean {
+  const id = (f.carrierId ?? "").trim();
+  return id !== "" && Boolean(retiradas?.has(id));
+}
+
+export function cotacaoDeFreteValida(
+  f: FreteCotado,
+  retiradas?: TransportadorasDeRetirada
+): boolean {
   const temTransportadora =
     (f.carrierId ?? "").trim() !== "" || (f.carrierOther ?? "").trim() !== "";
   if (!temTransportadora) return false;
+  if (f.selected && ehRetirada(f, retiradas)) return true;
   // Valor é o que diferencia cotação de linha começada e abandonada. Zero não
   // conta: frete de graça não é cotação, é campo esquecido.
   const bruto = numeroDigitado(f.amount ?? "").trim();
@@ -219,9 +240,13 @@ export function cotacaoDeFreteValida(f: FreteCotado): boolean {
   }
 }
 
-export function temCotacaoDeFrete(fretes: FreteCotado[] | null | undefined): boolean {
-  return (fretes ?? []).some(cotacaoDeFreteValida);
+export function temCotacaoDeFrete(
+  fretes: FreteCotado[] | null | undefined,
+  retiradas?: TransportadorasDeRetirada
+): boolean {
+  return (fretes ?? []).some((f) => cotacaoDeFreteValida(f, retiradas));
 }
 
 export const AVISO_SEM_COTACAO_DE_FRETE =
-  "Registre ao menos uma cotação de frete, com transportadora e valor, antes de prosseguir.";
+  "Registre ao menos uma cotação de frete, com transportadora e valor, antes de prosseguir. " +
+  "Se o cliente for retirar, escolha a opção RETIRADA: nela não há valor de frete.";

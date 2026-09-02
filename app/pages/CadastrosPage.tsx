@@ -461,7 +461,9 @@ function AbaTransportadoras() {
     <div className="space-y-3">
       <p className="text-sm text-[var(--cor-texto-suave)]">
         Aparecem no bloco de expedição do pedido e saem impressas na ficha. A lista começou igual
-        à do formulário de papel — troque à vontade conforme mudar de transportadora.
+        à do formulário de papel — troque à vontade conforme mudar de transportadora. Marque
+        <strong> Retirada (sem frete)</strong> na opção em que o próprio cliente busca a
+        mercadoria: escolhida no pedido, ela dispensa o valor do frete.
       </p>
       {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
 
@@ -470,7 +472,9 @@ function AbaTransportadoras() {
           key={t.id}
           item={t}
           salvando={salvar.isPending}
-          aoSalvar={(name, sort_order, active) => salvar.mutate({ id: t.id, name, sort_order, active })}
+          aoSalvar={(name, sort_order, active, is_pickup) =>
+            salvar.mutate({ id: t.id, name, sort_order, active, is_pickup })
+          }
           aoExcluir={() => {
             if (window.confirm(`Excluir "${t.name}"? Só é possível se nenhum pedido usou.`)) {
               excluir.mutate(t.id);
@@ -487,7 +491,13 @@ function AbaTransportadoras() {
         <Button
           disabled={!novo.trim() || salvar.isPending}
           onClick={() =>
-            salvar.mutate({ id: null, name: novo, sort_order: ((data ?? []).length + 1) * 10, active: true })
+            salvar.mutate({
+              id: null,
+              name: novo,
+              sort_order: ((data ?? []).length + 1) * 10,
+              active: true,
+              is_pickup: false,
+            })
           }
         >
           Adicionar
@@ -505,13 +515,18 @@ function LinhaTransportadora({
 }: {
   item: Transportadora;
   salvando: boolean;
-  aoSalvar: (name: string, sort_order: number, active: boolean) => void;
+  aoSalvar: (name: string, sort_order: number, active: boolean, is_pickup: boolean) => void;
   aoExcluir: () => void;
 }) {
   const [name, setName] = useState(item.name);
   const [ordem, setOrdem] = useState(String(item.sort_order));
   const [active, setActive] = useState(item.active);
-  const mudou = name !== item.name || Number(ordem) !== item.sort_order || active !== item.active;
+  const [retirada, setRetirada] = useState(item.is_pickup);
+  const mudou =
+    name !== item.name ||
+    Number(ordem) !== item.sort_order ||
+    active !== item.active ||
+    retirada !== item.is_pickup;
 
   return (
     <Card className="flex flex-wrap items-end gap-3">
@@ -534,7 +549,17 @@ function LinhaTransportadora({
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
         Ativa
       </label>
-      <Button disabled={!mudou || salvando} onClick={() => aoSalvar(name, Number(ordem) || 0, active)}>
+      {/* Retirada não é transportadora: é o cliente buscando a mercadoria.
+          Marcada aqui, a opção escolhida no pedido dispensa o valor do frete
+          (Intertech, 02/09/2026). */}
+      <label className="flex items-center gap-2 pb-2 text-sm">
+        <input type="checkbox" checked={retirada} onChange={(e) => setRetirada(e.target.checked)} />
+        Retirada (sem frete)
+      </label>
+      <Button
+        disabled={!mudou || salvando}
+        onClick={() => aoSalvar(name, Number(ordem) || 0, active, retirada)}
+      >
         Salvar
       </Button>
       <button type="button" className="pb-2 text-xs text-red-600 hover:underline" onClick={aoExcluir}>

@@ -48,8 +48,16 @@ formulário de pedido: `tax_id` (CNPJ 14 ou CPF 11 dígitos), `billing_zip`, `sh
 > 11 nos dois lugares criaria duas cópias da regra que divergem.
 
 **`carriers`** — id, tenant_id, name, `requires_name boolean` (a opção "Outra", que faz a tela
-pedir o nome), sort_order, active. Tabela editável em Cadastros, não enum: transportadora se
-troca por preço de frete, e trocar não pode exigir publicar código.
+pedir o nome), `is_pickup boolean` (a opção **RETIRADA**, em que o cliente busca a mercadoria),
+sort_order, active. Tabela editável em Cadastros, não enum: transportadora se troca por preço de
+frete, e trocar não pode exigir publicar código.
+
+> **Retirada não é frete de graça (02/09/2026).** Na linha marcada `is_pickup`, a cotação
+> **escolhida** dispensa o valor do frete — não há transporte pago para cotar. A regra geral de
+> 26/08/2026 continua inteira para todo o resto: transportadora **e** valor maior que zero, senão
+> o pedido não prossegue. A dispensa vale só para a opção marcada como escolhida; uma linha de
+> retirada solta num pedido que vai viajar de transportadora não libera nada. Quem decide o que é
+> retirada é o Administrador, na tela de Cadastros, não o código.
 
 ### 2.2 Insumos e produtos
 
