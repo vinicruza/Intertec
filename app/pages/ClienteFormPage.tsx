@@ -24,6 +24,10 @@ import { consultarCep as consultarCepNoServico, consultarCnpj as consultarCnpjNo
 import { camposDoCep, camposDoCnpj, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 import { mensagemDeErro } from "../lib/erros";
+import {
+  ROTULOS_OBRIGATORIOS,
+  obrigatoriosPendentes,
+} from "../../lib/cadastro/obrigatorios";
 
 // ============================================================
 // Cadastro do cliente (formulário de pedido — 05/08/2026)
@@ -150,9 +154,18 @@ export default function ClienteFormPage() {
     setErro(null);
   };
 
-  // Validação campo a campo. Vazio nunca é erro: os 13 mil cadastros herdados
-  // estão vazios e continuam válidos — o cliente vai completando conforme
-  // vende. O que não se aceita é o campo PREENCHIDO ERRADO.
+  // Campos obrigatórios (Intertech, 02/09/2026). Até aqui vazio nunca era erro:
+  // o cliente ia completando conforme vendia. Foi essa folga que deixou a Santa
+  // Casa de Igarapava entrar duas vezes — um cadastro sem CNPJ, e outro criado
+  // meia hora depois com o nome digitado errado.
+  //
+  // A régua está em `lib/cadastro/obrigatorios`, com o porquê de cada campo que
+  // FICOU de fora: contato comercial e financeiro, complemento e observação.
+  const pendentes = obrigatoriosPendentes(c);
+  const faltando = new Set(pendentes);
+
+  // Validação de formato. Continua valendo por cima da obrigatoriedade: campo
+  // preenchido ERRADO nunca passou e segue não passando.
   const erros = {
     nome: c.name.trim() === "" ? "Informe o nome do cliente." : null,
     documento:
@@ -192,7 +205,7 @@ export default function ClienteFormPage() {
         ? "E-mail parece incompleto."
         : null,
   };
-  const podeSalvar = !Object.values(erros).some(Boolean);
+  const podeSalvar = !Object.values(erros).some(Boolean) && pendentes.length === 0;
 
   // A consulta é conveniência: preenche o que o serviço público souber e não
   // derruba o que já estava digitado. Falhar aqui nunca impede o cadastro.
@@ -313,8 +326,10 @@ export default function ClienteFormPage() {
             {novo ? "Novo cliente" : cliente?.name}
           </h1>
           <p className="text-sm text-[var(--cor-texto-suave)]">
-            É daqui que sai o cabeçalho da ficha do pedido. Campo em branco não impede de
-            salvar — vá completando conforme for vendendo.
+            É daqui que sai o cabeçalho da ficha do pedido. Os campos marcados com{" "}
+            <span className="font-semibold text-red-600">*</span> são obrigatórios — o CNPJ é o que
+            impede o mesmo cliente de ser cadastrado duas vezes. Contato comercial, financeiro,
+            complemento e observação continuam opcionais.
           </p>
         </div>
         {(cliente?.external_code || cliente?.code) && (
@@ -339,7 +354,7 @@ export default function ClienteFormPage() {
         <h2 className="font-semibold">Identificação</h2>
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <Label htmlFor="codigo-cliente">Código do cliente</Label>
+            <Label htmlFor="codigo-cliente">Código do cliente<Obrig /></Label>
             <Input
               id="codigo-cliente"
               value={c.external_code}
@@ -348,12 +363,12 @@ export default function ClienteFormPage() {
             />
           </div>
           <div className="md:col-span-2">
-            <Label htmlFor="nome">Empresa / nome</Label>
+            <Label htmlFor="nome">Empresa / nome<Obrig /></Label>
             <Input id="nome" value={c.name} onChange={(e) => mudar("name")(e.target.value)} />
             {erros.nome && <p className="mt-1 text-xs text-red-600">{erros.nome}</p>}
           </div>
           <div>
-            <Label htmlFor="uf">UF</Label>
+            <Label htmlFor="uf">UF<Obrig /></Label>
             <select
               id="uf"
               className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
@@ -365,7 +380,7 @@ export default function ClienteFormPage() {
             </select>
           </div>
           <div>
-            <Label htmlFor="doc">CNPJ / CPF</Label>
+            <Label htmlFor="doc">CNPJ / CPF<Obrig /></Label>
             <div className="flex gap-2">
               <Input
                 id="doc"
@@ -386,7 +401,7 @@ export default function ClienteFormPage() {
             {erros.documento && <p className="mt-1 text-xs text-red-600">{erros.documento}</p>}
           </div>
           <div>
-            <Label htmlFor="tipo-cliente">Tipo de cliente</Label>
+            <Label htmlFor="tipo-cliente">Tipo de cliente<Obrig /></Label>
             <select
               id="tipo-cliente"
               className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
@@ -403,7 +418,7 @@ export default function ClienteFormPage() {
             </select>
           </div>
           <div>
-            <Label htmlFor="area-atuacao">Área de atuação</Label>
+            <Label htmlFor="area-atuacao">Área de atuação<Obrig /></Label>
             <select
               id="area-atuacao"
               className="w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm"
@@ -435,7 +450,7 @@ export default function ClienteFormPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label htmlFor="cepfat">CEP de faturamento</Label>
+            <Label htmlFor="cepfat">CEP de faturamento<Obrig /></Label>
             <div className="flex gap-2">
               <Input
                 id="cepfat"
@@ -456,7 +471,7 @@ export default function ClienteFormPage() {
             {erros.cepFat && <p className="mt-1 text-xs text-red-600">{erros.cepFat}</p>}
           </div>
           <div>
-            <Label htmlFor="cepent">CEP de entrega</Label>
+            <Label htmlFor="cepent">CEP de entrega<Obrig /></Label>
             <div className="flex gap-2">
               <Input
                 id="cepent"
@@ -506,6 +521,7 @@ export default function ClienteFormPage() {
       <Card className="space-y-4">
         <h2 className="font-semibold">Contatos</h2>
         <ContatoCampos
+          obrigatorio
           titulo="Contato comercial"
           nomeId="contato-comercial"
           telefoneId="telefone-comercial"
@@ -549,6 +565,14 @@ export default function ClienteFormPage() {
         <Button disabled={!podeSalvar || gravar.isPending} onClick={() => gravar.mutate()}>
           {gravar.isPending ? "Salvando…" : "Salvar"}
         </Button>
+        {pendentes.length > 0 && (
+          <span className="text-sm text-amber-700">
+            {faltando.has("tax_id")
+              ? "Falta o CNPJ/CPF — é ele que impede o mesmo cliente de ser cadastrado duas vezes. "
+              : ""}
+            Falta preencher: {pendentes.map((p) => ROTULOS_OBRIGATORIOS[p]).join(", ")}.
+          </span>
+        )}
         <button
           type="button"
           className="text-sm text-[var(--cor-texto-suave)] hover:underline"
@@ -584,12 +608,12 @@ function EnderecoCampos({
     <div className="space-y-3 rounded-md border border-[var(--cor-borda)] p-3">
       <h3 className="text-sm font-semibold">{titulo}</h3>
       <div>
-        <Label>Logradouro</Label>
+        <Label>Logradouro<Obrig /></Label>
         <Input value={campos[campo("street")]} onChange={(e) => mudar(campo("street"))(e.target.value)} />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <Label>Número</Label>
+          <Label>Número<Obrig /></Label>
           <Input value={campos[campo("number")]} onChange={(e) => mudar(campo("number"))(e.target.value)} />
         </div>
         <div>
@@ -599,15 +623,15 @@ function EnderecoCampos({
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <Label>Bairro</Label>
+          <Label>Bairro<Obrig /></Label>
           <Input value={campos[campo("district")]} onChange={(e) => mudar(campo("district"))(e.target.value)} />
         </div>
         <div>
-          <Label>Cidade</Label>
+          <Label>Cidade<Obrig /></Label>
           <Input value={campos[campo("city")]} onChange={(e) => mudar(campo("city"))(e.target.value)} />
         </div>
         <div>
-          <Label>UF</Label>
+          <Label>UF<Obrig /></Label>
           <Input value={campos[campo("state")]} onChange={(e) => mudar(campo("state"))(e.target.value.toUpperCase())} />
         </div>
       </div>
@@ -628,6 +652,7 @@ function ContatoCampos({
   mudarNome,
   mudarTelefone,
   mudarEmail,
+  obrigatorio,
 }: {
   titulo: string;
   nomeId: string;
@@ -641,17 +666,20 @@ function ContatoCampos({
   mudarNome: (valor: string) => void;
   mudarTelefone: (valor: string) => void;
   mudarEmail: (valor: string) => void;
+  // Só o contato PRINCIPAL é obrigatório: o financeiro faltava em 77 dos 143
+  // cadastros ativos em 02/09/2026, e exigi-lo travaria metade da base.
+  obrigatorio?: boolean;
 }) {
   return (
     <div className="space-y-3 rounded-md border border-[var(--cor-borda)] p-3">
       <h3 className="text-sm font-semibold">{titulo}</h3>
       <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <Label htmlFor={nomeId}>Nome</Label>
+          <Label htmlFor={nomeId}>Nome{obrigatorio && <Obrig />}</Label>
           <Input id={nomeId} value={nome} onChange={(e) => mudarNome(e.target.value)} />
         </div>
         <div>
-          <Label htmlFor={telefoneId}>Telefone</Label>
+          <Label htmlFor={telefoneId}>Telefone{obrigatorio && <Obrig />}</Label>
           <Input
             id={telefoneId}
             value={telefone}
@@ -662,11 +690,22 @@ function ContatoCampos({
           {erroTelefone && <p className="mt-1 text-xs text-red-600">{erroTelefone}</p>}
         </div>
         <div>
-          <Label htmlFor={emailId}>E-mail</Label>
+          <Label htmlFor={emailId}>E-mail{obrigatorio && <Obrig />}</Label>
           <Input id={emailId} value={email} onChange={(e) => mudarEmail(e.target.value)} />
           {erroEmail && <p className="mt-1 text-xs text-red-600">{erroEmail}</p>}
         </div>
       </div>
     </div>
+  );
+}
+
+// Asterisco dos campos obrigatórios. Componente próprio para o vermelho e o
+// title serem os mesmos em todos os campos — e para o leitor de tela anunciar
+// "obrigatório" em vez de ler um asterisco solto.
+function Obrig() {
+  return (
+    <span className="font-semibold text-red-600" title="Campo obrigatório" aria-label="obrigatório">
+      {" *"}
+    </span>
   );
 }

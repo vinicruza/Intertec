@@ -57,7 +57,7 @@ import {
   problemaNoCampoNumerico,
   reais,
 } from "../lib/format";
-import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
+import { cepValido, cnpjCpfValido, formatarCep, formatarCnpjCpf } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
 import { consultarCep } from "../lib/db/consultaReceita";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
@@ -130,6 +130,7 @@ export default function SimuladorPage() {
   const [clienteId, setClienteId] = useState("");
   const [clienteNovoCodigo, setClienteNovoCodigo] = useState("");
   const [clienteNovo, setClienteNovo] = useState("");
+  const [clienteNovoCnpj, setClienteNovoCnpj] = useState("");
   const [canalId, setCanalId] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
   // O que a pessoa DIGITOU no campo de comissão, enquanto está digitando.
@@ -448,6 +449,17 @@ export default function SimuladorPage() {
   const pendenciasExpedicao = [problemaPeso, problemaVolumes, problemaCidade].filter(
     (p): p is string => p !== null
   );
+  const pendenciasCadastro = () => (problemaClienteNovo ? [problemaClienteNovo] : []);
+
+  // Cliente novo criado na cotacao precisa de CNPJ (Intertech, 02/09/2026).
+  const criandoCliente = !clienteId && clienteNovo.trim() !== "";
+  const problemaClienteNovo = !criandoCliente
+    ? null
+    : clienteNovoCnpj.trim() === ""
+      ? "Informe o CNPJ/CPF: sem ele o mesmo cliente pode ser cadastrado duas vezes."
+      : !cnpjCpfValido(clienteNovoCnpj)
+        ? "CNPJ/CPF inválido — confira os dígitos."
+        : null;
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -487,6 +499,7 @@ export default function SimuladorPage() {
         clienteId: clienteId || null,
         clienteNovoCodigo: clienteId ? null : clienteNovoCodigo,
         clienteNovoNome: clienteId ? null : clienteNovo,
+        clienteNovoCnpj: clienteId ? null : clienteNovoCnpj,
         uf,
         vendedorId: vendedor.id,
         channelId: canal.id,
@@ -833,6 +846,23 @@ export default function SimuladorPage() {
               <div>
                 <Label>Nome do novo cliente</Label>
                 <Input value={clienteNovo} onChange={(e) => setClienteNovo(e.target.value)} />
+              </div>
+              {/* Sem CNPJ o mesmo cliente entra duas vezes, e a unica defesa
+                  vira o nome — foi assim que a Santa Casa de Igarapava virou
+                  "IAGARAPAVA" num segundo cadastro (02/09/2026). Se o documento
+                  ja existir, a cotacao usa o cliente existente em vez de criar
+                  outro: quem esta cotando nao queria cadastrar, queria vender. */}
+              <div>
+                <Label>CNPJ / CPF do novo cliente</Label>
+                <Input
+                  value={clienteNovoCnpj}
+                  placeholder="00.000.000/0000-00"
+                  onChange={(e) => setClienteNovoCnpj(e.target.value)}
+                  onBlur={() => setClienteNovoCnpj(formatarCnpjCpf(clienteNovoCnpj))}
+                />
+                {problemaClienteNovo && (
+                  <p className="mt-1 text-xs text-red-600">{problemaClienteNovo}</p>
+                )}
               </div>
             </>
           )}
@@ -1373,7 +1403,12 @@ export default function SimuladorPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={() => salvar.mutate()}
-              disabled={salvar.isPending || pendenciasKit.length > 0 || pendenciasExpedicao.length > 0}
+              disabled={
+                salvar.isPending ||
+                pendenciasKit.length > 0 ||
+                pendenciasExpedicao.length > 0 ||
+                pendenciasCadastro().length > 0
+              }
               title={
                 pendenciasKit.length > 0
                   ? "Corrija as pendências dos kits antes de salvar."
@@ -1403,8 +1438,10 @@ export default function SimuladorPage() {
                       : ""} ✓
               </span>
             )}
-            {pendenciasExpedicao.length > 0 && (
-              <span className="text-sm text-amber-700">{pendenciasExpedicao.join(" ")}</span>
+            {[...pendenciasCadastro(), ...pendenciasExpedicao].length > 0 && (
+              <span className="text-sm text-amber-700">
+                {[...pendenciasCadastro(), ...pendenciasExpedicao].join(" ")}
+              </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}
           </div>
