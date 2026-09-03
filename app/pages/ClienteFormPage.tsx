@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   categorizarCliente,
+  listarClientesPorDocumento,
   listarAreasCliente,
   listarTiposCliente,
   obterCliente,
@@ -262,6 +263,22 @@ export default function ClienteFormPage() {
 
   const gravar = useMutation({
     mutationFn: async () => {
+      const clientesComMesmoDocumento = await listarClientesPorDocumento(c.tax_id, novo ? null : id);
+      if (clientesComMesmoDocumento.length > 0) {
+        const lista = clientesComMesmoDocumento
+          .map((cliente) => {
+            const codigo = cliente.external_code ? `${cliente.external_code} — ` : "";
+            return `${codigo}${cliente.name}`;
+          })
+          .join("\n");
+        const prosseguir = window.confirm(
+          `Cliente já cadastrado com este CNPJ/CPF:\n\n${lista}\n\nDeseja prosseguir mesmo assim?`
+        );
+        if (!prosseguir) {
+          throw new Error("Cadastro não salvo. O CNPJ/CPF já existe em outro cliente.");
+        }
+      }
+
       const d: DadosCliente = {
         external_code: c.external_code || null,
         name: c.name,

@@ -69,6 +69,12 @@ export type ClienteCadastro = {
   customer_specialty_id: string | null;
 };
 
+export type ClienteDocumentoExistente = {
+  id: string;
+  external_code: string | null;
+  name: string;
+};
+
 const CAMPOS_CADASTRO =
   "id, code, external_code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
 
@@ -113,6 +119,28 @@ export async function obterCliente(id: string): Promise<ClienteCadastro | null> 
     .maybeSingle();
   if (error) throw error;
   return (data as unknown as ClienteCadastro | null) ?? null;
+}
+
+export async function listarClientesPorDocumento(
+  documento: string | null | undefined,
+  ignorarId?: string | null
+): Promise<ClienteDocumentoExistente[]> {
+  const taxId = digitosOuNulo(documento);
+  if (!taxId) return [];
+
+  let query = supabase
+    .from("customers")
+    .select("id, external_code, name")
+    .eq("active", true)
+    .eq("tax_id", taxId)
+    .order("name")
+    .limit(10);
+
+  if (ignorarId) query = query.neq("id", ignorarId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ClienteDocumentoExistente[];
 }
 
 // Grava o cadastro. Documento, CEP e telefone vão SEM MÁSCARA — a pontuação
