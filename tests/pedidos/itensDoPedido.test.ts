@@ -5,6 +5,7 @@ import {
   montarItensParaMotor,
   resolverKitAdHocDoPedido,
   resolverLinhaDoPedido,
+  resumoComercialDasLinhas,
   type ItemVendavelResumo,
   type LinhaItem,
 } from "@app/lib/sim/itensDoPedido";
@@ -176,6 +177,21 @@ describe("itens que vão para o motor de cálculo", () => {
     const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
     const r = montarItensParaMotor(linhas, resolvidas);
     expect(r.estado === "ok" && r.itens[0].quantidade).toBe("2.5");
+  });
+
+  it("monta o resumo comercial com subtotal por item antes de salvar", () => {
+    const linhas = [
+      linha({ itemId: "prod-avental", quantidade: "4000", preco: "4,20" }),
+      linha({ itemId: "prod-campo", quantidade: "2", preco: "145" }),
+    ];
+    const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
+    const resumo = resumoComercialDasLinhas(linhas, resolvidas);
+
+    expect(resumo.linhas.map((l) => ({ nome: l.nome, subtotal: toMoney(l.subtotal) }))).toEqual([
+      { nome: "Avental TNT 40g", subtotal: "16800.00" },
+      { nome: "Campo Cirúrgico Catarata", subtotal: "290.00" },
+    ]);
+    expect(toMoney(resumo.subtotal)).toBe("17090.00");
   });
 
   it("kit montado no pedido entra no motor como preço por kit vezes quantidade de kits", () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ErroCalculoBloqueante } from "@calc";
+import { ErroCalculoBloqueante, freteCobradoDoCliente, totalACobrarDoCliente } from "@calc";
 import {
   aplicarFreteDestacadoAosItens,
   faixaDoPedido,
@@ -29,6 +29,7 @@ import {
   produtoKitAleatorioExigeComposicao,
   resolverLinhaDoPedido,
   resumoDoKit,
+  resumoComercialDasLinhas,
   resumoFinanceiroLinhaKit,
   type KitNovoEdicao,
   type LinhaItem,
@@ -713,6 +714,25 @@ export default function SimuladorPage() {
   const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
 
   const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
+  const resumoComercial = useMemo(
+    () => resumoComercialDasLinhas(linhas, resolvidas),
+    [linhas, resolvidas]
+  );
+  const totaisComerciais = useMemo(() => {
+    try {
+      const freteCobrado =
+        simulacao.estado === "ok"
+          ? freteCobradoDoCliente(simulacao.freteUsado, freteCliente)
+          : freteCobradoDoCliente(numeroDigitado(frete) || "0", freteCliente);
+      return {
+        freteCobrado,
+        total: totalACobrarDoCliente(resumoComercial.subtotal, freteCobrado),
+      };
+    } catch {
+      return null;
+    }
+  }, [simulacao, frete, freteCliente, resumoComercial.subtotal]);
+  const modoPagamento = ctx.modosPagamento.find((m) => m.id === modoPagamentoId) ?? null;
   const precoFinalPorLinha = new Map<number, string>();
   if (simulacao.estado === "ok" && freteCliente) {
     const itensComFreteParaExibicao = aplicarFreteDestacadoAosItens(simulacao.itensCalculados, simulacao.freteUsado);
@@ -1303,6 +1323,59 @@ export default function SimuladorPage() {
         </div>
       </Card>
 
+      {resumoComercial.linhas.length > 0 && (
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Resumo do orçamento</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase text-[var(--cor-texto-suave)]">Total</p>
+              <p className="text-2xl font-semibold text-[var(--cor-primaria)]">
+                {totaisComerciais ? reais(totaisComerciais.total.toString()) : "—"}
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border border-[var(--cor-borda)]">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead className="bg-[var(--cor-fundo)] text-left">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Produto / kit</th>
+                  <th className="px-3 py-2 text-right font-medium">Qtd.</th>
+                  <th className="px-3 py-2 text-right font-medium">Valor unit.</th>
+                  <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumoComercial.linhas.map((linha, i) => (
+                  <tr key={`${linha.nome}-${i}`} className="border-t border-[var(--cor-borda)]">
+                    <td className="px-3 py-2">{linha.nome}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{linha.quantidade.toString().replace(".", ",")}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.precoUnitario.toString())}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.subtotal.toString())}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-2 text-sm md:grid-cols-2">
+            <LinhaResumoOrcamento rotulo="Subtotal dos itens" valor={reais(resumoComercial.subtotal.toString())} />
+            <LinhaResumoOrcamento
+              rotulo={freteCliente ? "Frete no orçamento" : "Frete não destacado"}
+              valor={totaisComerciais ? reais(totaisComerciais.freteCobrado.toString()) : "—"}
+            />
+            <LinhaResumoOrcamento rotulo="Condição de pagamento" valor={modoPagamento?.label ?? "—"} />
+            <LinhaResumoOrcamento
+              rotulo="Total do orçamento"
+              valor={totaisComerciais ? reais(totaisComerciais.total.toString()) : "—"}
+              destaque
+            />
+          </div>
+        </Card>
+      )}
+
       {/* Comercial sem vendedor vinculado: a lista de vendedores dele vem vazia,
           entao "falta preencher: vendedor" manda fazer o que a tela nao deixa.
           O vinculo casa `sellers.name` com `profiles.full_name`; uma letra de
@@ -1827,6 +1900,15 @@ function AvisoDeNumero({ valor }: { valor: string }) {
   const aviso = interpretacaoDoNumero(valor);
   if (!aviso) return null;
   return <p className="mt-1 w-28 text-[0.65rem] leading-tight text-amber-700">{aviso}</p>;
+}
+
+function LinhaResumoOrcamento({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 rounded-md bg-[var(--cor-fundo)] px-3 py-2 ${destaque ? "font-semibold" : ""}`}>
+      <span className="text-[var(--cor-texto-suave)]">{rotulo}</span>
+      <span className="text-right tabular-nums">{valor}</span>
+    </div>
+  );
 }
 
 function LinhaCascata({
