@@ -68,6 +68,16 @@ Ele **não** é um quinto perfil. É um Administrador com uma marca a mais (`pro
 
 A marca só é dada por migração, na instalação. Nenhuma tela promove ninguém a dono do sistema: é o tipo de poder que não deve ter botão.
 
+### 2.6 Inativar kit no catálogo: Administrador e Financeiro (04/09/2026)
+
+Pergunta da Patricia: *"eu consigo inativar um kit?"*. Pela tela, não dava — a coluna existia desde o primeiro dia e o sistema já a respeitava, mas faltava onde clicar. Enquanto faltou, quatro kits foram inativados por comando manual no banco, sem registro de quem fez. É a mesma coisa que a decisão de 30/07/2026 quis acabar: *"nada deve ser feito pelo banco de dados."*
+
+O botão passa a existir na tela do kit, e a permissão é de **Administrador e Financeiro**. A escolha não é a mesma do RLS da tabela `kits`, que deixa o Comercial escrever — e continua certa para o que ele faz, que é montar kit dentro de um pedido. Tirar um item do catálogo é outra coisa: muda o que a equipe **inteira** consegue vender. Por isso a trava por perfil mora dentro de `set_kit_status`, e não na política da tabela.
+
+Toda ativação e inativação grava em `audit_logs` com o `auth.uid()` de quem clicou — a função é `security invoker` justamente para isso: quem responde pela mudança é a pessoa, não o sistema.
+
+Inativar não é excluir, pela mesma razão da §2.2: kit usado em pedido fechado não pode sumir do histórico. Excluir kit continua não existindo.
+
 ## 3. Por que criar usuário precisa de um serviço no servidor
 
 Criar credencial, trocar a senha de outra pessoa e apagar acesso são operações que só a **chave de administração** do projeto pode fazer. Essa chave não pode ficar no navegador — o código de uma página é público, e qualquer visitante passaria a ter poder total sobre a base.

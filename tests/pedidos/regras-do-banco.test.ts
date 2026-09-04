@@ -505,3 +505,52 @@ describe("composição dos volumes", () => {
     expect(TODAS).not.toMatch(/volumes_composition[\s\S]{0,80}check\s*\(/);
   });
 });
+
+// ============================================================
+// Inativar um kit no catálogo (Patricia, 04/09/2026)
+// ============================================================
+//
+// A pergunta era "consigo inativar um kit?" e a resposta era não: a coluna
+// `kits.status` existia desde o primeiro dia, o simulador já não vendia kit
+// inativo, mas não havia onde clicar. Enquanto não havia, quatro kits foram
+// inativados por UPDATE manual no banco — sem registro de quem fez.
+describe("ativar e inativar kit", () => {
+  it("só Administrador e Financeiro alteram a situação do kit", () => {
+    const definir = definicaoVigente("set_kit_status");
+    expect(definir).toMatch(/v_papel\s+not\s+in\s*\(\s*'admin',\s*'financeiro'\s*\)/i);
+    // O RLS da tabela deixa o Comercial escrever em `kits` (é assim que ele
+    // monta kit no pedido). A trava por papel tem de estar AQUI, senão tirar
+    // item do catálogo vira decisão de quem vende.
+    expect(definir).toMatch(/raise exception '[^']*Administrador e Financeiro/i);
+  });
+
+  it("toda mudança de situação fica registrada em audit_logs", () => {
+    const definir = definicaoVigente("set_kit_status");
+    expect(definir).toMatch(/insert into public\.audit_logs/i);
+    expect(definir).toMatch(/'kits'/);
+    expect(definir).toMatch(/when p_ativo then 'activate' else 'deactivate'/i);
+    // Quem clicou, e não a função: é SECURITY INVOKER e grava auth.uid().
+    expect(definir).toMatch(/auth\.uid\(\)/);
+    expect(definir).toMatch(/security invoker/i);
+  });
+
+  // Inativar não é apagar. Se um dia alguém trocar o UPDATE por um DELETE, o
+  // histórico de pedidos fechados que usam o kit vai junto.
+  it("inativar nunca apaga o kit", () => {
+    const definir = definicaoVigente("set_kit_status");
+    expect(definir).toMatch(/update public\.kits\s+set status = v_novo/i);
+    expect(definir).not.toMatch(/delete\s+from\s+public\.kits/i);
+  });
+
+  it("o aviso de orçamento em aberto conta só cotação viva", () => {
+    // Pedido gerado guarda custo congelado (D7) e cotação perdida não volta
+    // ao simulador: nenhum dos dois é afetado por inativar o kit.
+    const definir = definicaoVigente("set_kit_status");
+    expect(definir).toMatch(/o\.status = 'simulation'/);
+    expect(definir).toMatch(/o\.cancelled_at is null/);
+
+    const auditoria = definicaoVigente("get_kits_audit");
+    expect(auditoria).toMatch(/open_orders_count/);
+    expect(auditoria).toMatch(/u\.order_status = 'simulation' and u\.cancelled_at is null/);
+  });
+});

@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { CustoProdutoKit, ItemKit } from "@calc";
-import { obterKit, obterOrigemKit, salvarKit, type ResultadoSalvarKit } from "../lib/db/kits";
+import {
+  definirStatusDoKit,
+  listarAuditoriaKits,
+  obterKit,
+  obterOrigemKit,
+  salvarKit,
+  type ResultadoSalvarKit,
+} from "../lib/db/kits";
 import { listarInsumos } from "../lib/db/insumos";
 import { resolverKitDoPedido, type ModoEmbalagem } from "../lib/sim/kitNoPedido";
 import { listarProdutos } from "../lib/db/produtos";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  avisoAoInativarKit,
+  confirmacaoDeStatusDoKit,
+  podeInativarKit,
+} from "../lib/sim/catalogoDeKits";
 import { perfilPodeAcessar } from "../lib/roles";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
@@ -37,6 +49,7 @@ export default function KitFormPage() {
   // quem marca, na tela de Insumos) — sem este escape, quem monta o kit e não
   // acha o insumo certo na lista filtrada ficaria travado.
   const [mostrarTodosInsumos, setMostrarTodosInsumos] = useState(false);
+  const [erroStatus, setErroStatus] = useState<string | null>(null);
 
   const { perfil } = useAuth();
   const produtosQuery = useQuery({ queryKey: ["produtos"], queryFn: listarProdutos });
@@ -44,6 +57,14 @@ export default function KitFormPage() {
   const kitQuery = useQuery({ queryKey: ["kit", id], queryFn: () => obterKit(id!), enabled: editando });
   // Rastreabilidade pedida pelo cliente em 30/07/2026: de onde este kit veio.
   const origemQuery = useQuery({ queryKey: ["origemKit", id], queryFn: () => obterOrigemKit(id!), enabled: editando });
+  // Auditoria de uso, só para saber quantos ORÇAMENTOS EM ABERTO usam este kit
+  // — é o aviso que aparece antes de inativar. Mesma chave da tela de Kits,
+  // então as duas telas dividem a resposta em vez de pedir duas vezes.
+  const auditoriaQuery = useQuery({
+    queryKey: ["kits", "auditoria"],
+    queryFn: listarAuditoriaKits,
+    enabled: editando && podeInativarKit(perfil?.perfil),
+  });
 
   useEffect(() => {
     const k = kitQuery.data;
@@ -181,6 +202,29 @@ export default function KitFormPage() {
     },
   });
 
+  // ---------- Situação no catálogo (Patricia, 04/09/2026) ----------
+  //
+  // Inativar tira o kit da lista de itens vendáveis sem apagar nada: código e
+  // composição continuam reservados, e o histórico não muda. Quem recusa de
+  // verdade é o banco (`set_kit_status`, Admin e Financeiro); a tela só evita
+  // oferecer o botão a quem vai ouvir não.
+  const alterarStatus = useMutation({
+    mutationFn: (ativo: boolean) => definirStatusDoKit(id!, ativo),
+    onSuccess: () => {
+      setErroStatus(null);
+      queryClient.invalidateQueries({ queryKey: ["kit", id] });
+      queryClient.invalidateQueries({ queryKey: ["kits"] });
+    },
+    onError: (e: unknown) => setErroStatus(mensagemDeErro(e, "Não foi possível alterar a situação do kit.")),
+  });
+
+  const kitInativo = kitQuery.data?.status === "inactive";
+  // Quantos orçamentos EM ABERTO usam este kit: é o único efeito colateral da
+  // inativação que exige alguém agir antes.
+  const orcamentosEmAberto =
+    (auditoriaQuery.data ?? []).find((linha) => linha.kit_id === id)?.open_orders_count ?? 0;
+  const avisoDeInativacao = avisoAoInativarKit({ orcamentosEmAberto });
+
   const produtos = produtosQuery.data ?? [];
   const opcoesDeProduto: OpcaoDeBusca[] = produtos.map((p) => ({
     id: p.id,
@@ -262,6 +306,62 @@ export default function KitFormPage() {
             · criado {origemQuery.data.created_by_name ? `por ${origemQuery.data.created_by_name}` : ""} em{" "}
             {dataCurta(origemQuery.data.created_at)}
           </span>
+        </Card>
+      )}
+
+      {/* ---------- Situação no catálogo (pedido da Patricia, 04/09/2026) ----------
+          Fica FORA do formulário de propósito: mudar a situação do kit é uma
+          decisão por si só, não algo que se salva junto com uma edição de
+          composição. Assim também não há como sair da tela sem querer com o
+          kit num estado que ninguém escolheu. */}
+      {editando && kitQuery.data && (
+        <Card className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-[var(--cor-texto-suave)]">Situação no catálogo:</span>
+              {kitInativo ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  inativo — não aparece para vender
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                  ativo
+                </span>
+              )}
+            </div>
+            {podeInativarKit(perfil?.perfil) && (
+              <Button
+                type="button"
+                className={kitInativo ? "" : "bg-transparent text-[var(--cor-primaria)] hover:bg-[var(--cor-fundo)]"}
+                disabled={alterarStatus.isPending}
+                onClick={() => {
+                  const ativando = kitInativo;
+                  const texto = confirmacaoDeStatusDoKit({
+                    ativando,
+                    codigo: kitQuery.data?.code ?? null,
+                    nome: kitQuery.data?.name ?? "",
+                    orcamentosEmAberto,
+                  });
+                  if (window.confirm(texto)) alterarStatus.mutate(ativando);
+                }}
+              >
+                {alterarStatus.isPending
+                  ? "Alterando…"
+                  : kitInativo
+                    ? "Reativar kit"
+                    : "Inativar kit"}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-[var(--cor-texto-suave)]">
+            Kit inativo sai da lista de itens do pedido, mas nada é apagado: o código e a composição
+            continuam reservados (montar a mesma composição cai neste kit), os pedidos já feitos não
+            mudam, e dá para reativar quando quiser.
+          </p>
+          {!kitInativo && avisoDeInativacao && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{avisoDeInativacao}</p>
+          )}
+          {erroStatus && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erroStatus}</p>}
         </Card>
       )}
 

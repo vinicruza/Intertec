@@ -173,6 +173,10 @@ export type AuditoriaKit = {
   source_order_status: "simulation" | "closed" | "lost" | string | null;
   used_in_orders_count: number;
   generated_orders_count: number;
+  // Orçamentos ainda em aberto que usam este kit. É o número que decide o
+  // aviso na hora de inativar: kit inativo sai da lista de itens vendáveis, e
+  // a linha dele numa cotação aberta volta em branco no simulador.
+  open_orders_count: number;
   total_quantity: string;
   last_used_at: string | null;
   recent_orders: PedidoRecenteDoKit[];
@@ -180,10 +184,15 @@ export type AuditoriaKit = {
 
 type AuditoriaKitBruta = Omit<
   AuditoriaKit,
-  "used_in_orders_count" | "generated_orders_count" | "total_quantity" | "recent_orders"
+  | "used_in_orders_count"
+  | "generated_orders_count"
+  | "open_orders_count"
+  | "total_quantity"
+  | "recent_orders"
 > & {
   used_in_orders_count: number | string;
   generated_orders_count: number | string;
+  open_orders_count: number | string | null;
   total_quantity: number | string;
   recent_orders: unknown;
 };
@@ -193,6 +202,9 @@ function normalizarAuditoriaKit(linha: AuditoriaKitBruta): AuditoriaKit {
     ...linha,
     used_in_orders_count: Number(linha.used_in_orders_count ?? 0),
     generated_orders_count: Number(linha.generated_orders_count ?? 0),
+    // Zero quando a coluna ainda não existe no banco: a tela abre normalmente
+    // durante a janela entre publicar o site e aplicar a migração.
+    open_orders_count: Number(linha.open_orders_count ?? 0),
     total_quantity: String(linha.total_quantity ?? "0"),
     recent_orders: Array.isArray(linha.recent_orders)
       ? (linha.recent_orders as PedidoRecenteDoKit[]).map((p) => ({
@@ -207,4 +219,36 @@ export async function listarAuditoriaKits(): Promise<AuditoriaKit[]> {
   const { data, error } = await supabase.rpc("get_kits_audit");
   if (error) throw error;
   return ((data ?? []) as unknown as AuditoriaKitBruta[]).map(normalizarAuditoriaKit);
+}
+
+// ---------- Ativar / inativar o kit no catálogo (Patricia, 04/09/2026) ----------
+//
+// Quem decide se pode é o BANCO (`set_kit_status` tranca em Admin e
+// Financeiro). A tela só esconde o botão de quem não pode, para não oferecer o
+// que vai ser recusado — a regra de verdade nunca é a da tela.
+export type ResultadoStatusDoKit = {
+  // "sem_mudanca" quando o kit já estava no status pedido — dois cliques
+  // seguidos, ou duas pessoas ao mesmo tempo. Não é erro.
+  tipo: "alterado" | "sem_mudanca";
+  status: "active" | "inactive";
+  orcamentos_em_aberto: number;
+};
+
+export async function definirStatusDoKit(
+  kitId: string,
+  ativo: boolean,
+  motivo?: string | null
+): Promise<ResultadoStatusDoKit> {
+  const { data, error } = await supabase.rpc("set_kit_status", {
+    p_kit_id: kitId,
+    p_ativo: ativo,
+    p_motivo: motivo?.trim() || null,
+  });
+  if (error) throw error;
+  const bruto = data as { tipo: string; status: string; orcamentos_em_aberto: number | string };
+  return {
+    tipo: bruto.tipo === "sem_mudanca" ? "sem_mudanca" : "alterado",
+    status: bruto.status === "inactive" ? "inactive" : "active",
+    orcamentos_em_aberto: Number(bruto.orcamentos_em_aberto ?? 0),
+  };
 }

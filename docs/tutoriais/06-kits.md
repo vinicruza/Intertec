@@ -26,6 +26,35 @@ Abra **Kits** no menu. Cada linha mostra:
 
 Clique em uma linha para abrir os detalhes e editar.
 
+O filtro à direita da busca ajuda a achar o que interessa: **Ativos**, **Inativos**, CMV pendente,
+nunca usados, nascidos de pedido ou cadastro manual.
+
+## Tirar um kit de circulação (inativar)
+
+Kit que a empresa não vende mais não precisa continuar atrapalhando a lista de itens do pedido.
+Abra o kit e use o botão **Inativar kit**, no card **Situação no catálogo**, no alto da tela.
+
+O que acontece:
+
+- O kit **deixa de aparecer** na lista de itens do simulador e no "partir de um kit existente".
+  Ninguém consegue mais vendê-lo.
+- **Nada é apagado.** O código e a composição continuam reservados: quem montar exatamente os
+  mesmos itens cai neste kit, com o mesmo código, em vez de criar um kit repetido.
+- **Os pedidos já feitos não mudam.** Pedido fechado guarda nome, código e custo congelados.
+- Dá para **reativar** quando quiser, pelo mesmo botão — o código volta a valer, é o mesmo.
+
+Não existe excluir kit, e é de propósito: kit usado em pedido fechado não pode sumir do histórico.
+
+**Quem pode:** Administrador e Financeiro. Tirar um item do catálogo muda o que a equipe inteira
+consegue vender, então é decisão de catálogo, não de venda — o Comercial continua criando kits ao
+montar pedidos, mas não aposenta nenhum. Toda ativação e inativação fica registrada com o nome de
+quem fez.
+
+**Um aviso pode aparecer:** se o kit estiver dentro de algum **orçamento em aberto**, a tela avisa
+antes, com o número de cotações. Ao inativar, a linha daquele kit volta **em branco** quando essas
+cotações forem reabertas — troque o item nelas antes, ou reative o kit. Cotação cancelada, cotação
+perdida e pedido já gerado não entram nessa conta: nenhum dos três volta ao simulador.
+
 ## Kit que nasceu de um pedido ganho: a composição não muda mais
 
 Se o kit nasceu do fechamento de um pedido, o código dele já foi para o papel, para a nota e para

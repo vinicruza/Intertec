@@ -7,7 +7,18 @@ import { listarProdutos } from "../lib/db/produtos";
 import { dataCurta, reais } from "../lib/format";
 import { Badge, Card, Input, Label } from "@components/ui/primitives";
 
-type FiltroAuditoria = "todos" | "risco" | "cmv" | "sem-uso" | "de-pedido" | "manual";
+// "ativos" e "inativos" entraram em 04/09/2026, junto com o botão de inativar:
+// sem eles, achar o que já foi tirado de circulação exigia varrer a lista
+// inteira procurando o selo.
+type FiltroAuditoria =
+  | "todos"
+  | "risco"
+  | "cmv"
+  | "sem-uso"
+  | "de-pedido"
+  | "manual"
+  | "ativos"
+  | "inativos";
 
 export default function KitsPage() {
   const navigate = useNavigate();
@@ -85,7 +96,9 @@ export default function KitsPage() {
       (filtro === "cmv" && cmv === null) ||
       (filtro === "sem-uso" && (auditoria?.used_in_orders_count ?? 0) === 0) ||
       (filtro === "de-pedido" && Boolean(k.source_order_id)) ||
-      (filtro === "manual" && !k.source_order_id);
+      (filtro === "manual" && !k.source_order_id) ||
+      (filtro === "ativos" && k.status !== "inactive") ||
+      (filtro === "inativos" && k.status === "inactive");
     return passaBusca && passaFiltro;
   });
 
@@ -167,6 +180,8 @@ export default function KitsPage() {
               <option value="sem-uso">Nunca usados</option>
               <option value="de-pedido">Nascidos de pedido</option>
               <option value="manual">Cadastro manual</option>
+              <option value="ativos">Ativos</option>
+              <option value="inativos">Inativos</option>
             </select>
           </div>
         </Card>
