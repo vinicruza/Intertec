@@ -732,6 +732,10 @@ export default function SimuladorPage() {
       return null;
     }
   }, [simulacao, frete, freteCliente, resumoComercial.subtotal]);
+  const impostosAplicaveis =
+    simulacao.estado === "ok"
+      ? simulacao.resultado.imposto.plus(simulacao.resultado.impostoFrete).plus(simulacao.resultado.difal)
+      : null;
   const modoPagamento = ctx.modosPagamento.find((m) => m.id === modoPagamentoId) ?? null;
   const precoFinalPorLinha = new Map<number, string>();
   if (simulacao.estado === "ok" && freteCliente) {
@@ -1362,9 +1366,15 @@ export default function SimuladorPage() {
 
           <div className="grid gap-2 text-sm md:grid-cols-2">
             <LinhaResumoOrcamento rotulo="Subtotal dos itens" valor={reais(resumoComercial.subtotal.toString())} />
+            <LinhaResumoOrcamento rotulo="Descontos" valor={reais("0")} />
+            <LinhaResumoOrcamento rotulo="Acréscimos" valor={reais("0")} />
             <LinhaResumoOrcamento
               rotulo={freteCliente ? "Frete no orçamento" : "Frete não destacado"}
               valor={totaisComerciais ? reais(totaisComerciais.freteCobrado.toString()) : "—"}
+            />
+            <LinhaResumoOrcamento
+              rotulo="Impostos aplicáveis"
+              valor={impostosAplicaveis ? reais(impostosAplicaveis.toString()) : "—"}
             />
             <LinhaResumoOrcamento rotulo="Condição de pagamento" valor={modoPagamento?.label ?? "—"} />
             <LinhaResumoOrcamento
