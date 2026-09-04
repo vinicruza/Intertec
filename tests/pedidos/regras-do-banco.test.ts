@@ -514,6 +514,24 @@ describe("composição dos volumes", () => {
 // `kits.status` existia desde o primeiro dia, o simulador já não vendia kit
 // inativo, mas não havia onde clicar. Enquanto não havia, quatro kits foram
 // inativados por UPDATE manual no banco — sem registro de quem fez.
+// A migração de 02/09 trocou save_carrier(4 args) por uma de 5 SEM valor
+// padrão, e derrubou a antiga. O app chama por argumentos NOMEADOS, então
+// nenhuma assinatura casava: salvar transportadora ficou quebrado em produção
+// de 02/09 a 04/09/2026, sem ninguém notar — a tela de Cadastros é pouco usada.
+describe("save_carrier aceita a chamada que a tela faz", () => {
+  it("p_is_pickup tem valor padrão, senão a chamada de 4 argumentos não resolve", () => {
+    const definir = definicaoVigente("save_carrier");
+    expect(definir).toMatch(/p_is_pickup boolean default null/i);
+  });
+
+  it("não informar p_is_pickup MANTÉM a marca, em vez de desmarcar", () => {
+    // Sem isto, editar o nome da RETIRADA pela tela tiraria a marca dela e a
+    // trava do frete voltaria a exigir valor de um transporte que não existe.
+    const definir = definicaoVigente("save_carrier");
+    expect(definir).toMatch(/is_pickup = coalesce\(p_is_pickup, is_pickup\)/i);
+  });
+});
+
 describe("ativar e inativar kit", () => {
   it("só Administrador e Financeiro alteram a situação do kit", () => {
     const definir = definicaoVigente("set_kit_status");
