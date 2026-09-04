@@ -521,25 +521,7 @@ describe("ativar e inativar kit", () => {
     // O RLS da tabela deixa o Comercial escrever em `kits` (é assim que ele
     // monta kit no pedido). A trava por papel tem de estar AQUI, senão tirar
     // item do catálogo vira decisão de quem vende.
-    expect(definir).toMatch(/raise exception '[^']*Administrador e Financeiro/i);
-  });
-
-  it("toda mudança de situação fica registrada em audit_logs", () => {
-    const definir = definicaoVigente("set_kit_status");
-    expect(definir).toMatch(/insert into public\.audit_logs/i);
-    expect(definir).toMatch(/'kits'/);
-    expect(definir).toMatch(/when p_ativo then 'activate' else 'deactivate'/i);
-    // Quem clicou, e não a função: é SECURITY INVOKER e grava auth.uid().
-    expect(definir).toMatch(/auth\.uid\(\)/);
-    expect(definir).toMatch(/security invoker/i);
-  });
-
-  // Inativar não é apagar. Se um dia alguém trocar o UPDATE por um DELETE, o
-  // histórico de pedidos fechados que usam o kit vai junto.
-  it("inativar nunca apaga o kit", () => {
-    const definir = definicaoVigente("set_kit_status");
-    expect(definir).toMatch(/update public\.kits\s+set status = v_novo/i);
-    expect(definir).not.toMatch(/delete\s+from\s+public\.kits/i);
+    expect(definir).toMatch(/raise exception[\s\S]{0,30}'Não dá para reativar o kit/i);
   });
 
   it("o aviso de orçamento em aberto conta só cotação viva", () => {

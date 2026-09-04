@@ -72,6 +72,22 @@ describe("texto da confirmação", () => {
     expect(texto).toContain("reativar");
   });
 
+  // O texto NÃO pode prometer que a composição fica reservada. Prometia, até
+  // eu conferir o banco: em 04/09/2026 o índice único da assinatura virou
+  // parcial (só kits ativos), então montar os mesmos itens com o kit fora
+  // cria um kit NOVO, com código novo. Promessa de tela que o banco não
+  // cumpre é pior do que não avisar.
+  it("ao inativar, avisa que a composição fica livre — e não promete reserva", () => {
+    const texto = confirmacaoDeStatusDoKit({
+      ativando: false,
+      codigo: "KC0028",
+      nome: "kit vet saúde animal",
+      orcamentosEmAberto: 0,
+    });
+    expect(texto).toContain("cria um kit novo");
+    expect(texto).not.toContain("reservad");
+  });
+
   it("ao inativar com orçamento aberto, o aviso entra na confirmação", () => {
     const texto = confirmacaoDeStatusDoKit({
       ativando: false,

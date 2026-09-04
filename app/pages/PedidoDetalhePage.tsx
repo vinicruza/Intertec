@@ -237,15 +237,17 @@ export default function PedidoDetalhePage() {
 
       <Card className="space-y-1 text-sm">
         <p><span className="text-[var(--cor-texto-suave)]">Orçamento:</span> <strong className="font-mono">{pedido.quote_number ?? "—"}</strong></p>
-        {/* O número diário do pedido é atribuído pelo banco já na CRIAÇÃO da
-            cotação — toda cotação nasce com um. Sem dizer isso, a tela
-            anunciava "Pedido 06270826" ao lado do selo "Orçamento em aberto",
-            que foi a pergunta da Cris em 31/08/2026. Aqui ele continua à
-            vista, porque é por esse número que se procura o pedido na lista;
-            o que muda é a tela avisar que ele ainda está reservado. Na folha
-            impressa, que vai para a mesa e para o cliente, ele não sai antes
-            de o pedido existir. */}
-        <p><span className="text-[var(--cor-texto-suave)]">Pedido:</span> <strong className="font-mono">{pedido.order_number ?? "—"}</strong>{!fechado && !cancelado && !perdida && <span className="text-[var(--cor-texto-suave)]"> — número reservado; vale quando o pedido for gerado</span>}</p>
+        {/* O número diário do pedido nasce no FECHAMENTO (gatilho
+            `trg_orders_order_number`, desde 04/09/2026), então cotação em
+            aberto simplesmente não tem um — e a tela diz isso em vez de
+            mostrar um traço mudo.
+
+            Até 04/09 o número era atribuído já na criação da cotação, e era
+            daí que vinha a pergunta da Cris em 31/08: a folha anunciava
+            "Pedido 06270826" ao lado de "Orçamento em aberto". Os pedidos
+            criados antes dessa mudança guardam o número do dia em que a
+            COTAÇÃO nasceu, não o do fechamento. */}
+        <p><span className="text-[var(--cor-texto-suave)]">Pedido:</span> <strong className="font-mono">{pedido.order_number ?? "—"}</strong>{!fechado && !cancelado && !perdida && !pedido.order_number && <span className="text-[var(--cor-texto-suave)]"> (o número sai quando o pedido for gerado)</span>}</p>
         <p><span className="text-[var(--cor-texto-suave)]">Vendedor:</span> {pedido.sellers?.name ?? "—"} · <span className="text-[var(--cor-texto-suave)]">UF:</span> {pedido.uf ?? "—"} · <span className="text-[var(--cor-texto-suave)]">Comissão:</span> {pedido.commission_rate ?? "—"}</p>
         {fechado && (
           <p className="text-xs text-[var(--cor-texto-suave)]">

@@ -10,11 +10,17 @@
 -- quatro com a mesma marca de tempo. Funcionou e não quebrou nada, mas ficou
 -- sem registro de quem fez e por quê. É esse buraco que esta migração fecha.
 --
--- INATIVAR NÃO É APAGAR. A assinatura da composição continua reservada: quem
--- montar exatamente os mesmos itens cai no kit inativo, com o mesmo código, em
--- vez de ganhar um código novo. Voltar a vender aquele conjunto é reativar.
--- Excluir kit continua não existindo, e é proposital: kit usado em pedido
--- fechado não pode sumir do histórico.
+-- INATIVAR NÃO É APAGAR: o kit continua no sistema, com o mesmo código, e
+-- voltar a vender aquele conjunto é reativar. Excluir kit continua não
+-- existindo, e é proposital: kit usado em pedido fechado não pode sumir do
+-- histórico.
+--
+-- O que a inativação NÃO faz mais é reservar a composição. Até 04/09/2026 o
+-- índice único da assinatura valia para qualquer status; nesse dia ele virou
+-- parcial (`kits_active_signature_unique ... where status = 'active'`), então
+-- montar os mesmos itens com o kit fora cria um kit NOVO. A migração
+-- 20260904213000 cuida do que isso permite: reativar um kit cuja composição
+-- foi ocupada no meio-tempo.
 
 -- ------------------------------------------------------------------
 -- 1. A auditoria passa a contar os ORÇAMENTOS EM ABERTO de cada kit

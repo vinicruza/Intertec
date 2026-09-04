@@ -47,9 +47,16 @@ export function avisoAoInativarKit(entrada: { orcamentosEmAberto: number }): str
 // sentidos, e o que muda de verdade entre elas é o que a pessoa precisa
 // entender antes de clicar:
 //
-//   inativar → o kit some da lista de venda, mas NÃO é apagado: o código e a
-//              composição continuam reservados, e o histórico não muda
+//   inativar → o kit some da lista de venda, mas NÃO é apagado, e o histórico
+//              não muda
 //   reativar → o kit volta a aparecer para vender, com o mesmo código
+//
+// O que este texto NÃO promete mais: que a composição fica reservada. Era
+// verdade até 04/09/2026, quando o índice único passou a valer só para kits
+// ATIVOS (`kits_active_signature_unique`). Com o kit fora, montar os mesmos
+// itens cria um kit NOVO, com código novo — e é justamente por isso que
+// reativar pode esbarrar num kit que ocupou a composição no meio-tempo
+// (`set_kit_status` explica isso quando acontece).
 export function confirmacaoDeStatusDoKit(entrada: {
   ativando: boolean;
   codigo: string | null;
@@ -63,7 +70,7 @@ export function confirmacaoDeStatusDoKit(entrada: {
   const aviso = avisoAoInativarKit({ orcamentosEmAberto: entrada.orcamentosEmAberto });
   return [
     `Inativar o kit ${identificacao}?`,
-    "Ele deixa de aparecer na lista de itens do pedido. Nada é apagado: o código e a composição continuam reservados, os pedidos já feitos não mudam, e dá para reativar quando quiser.",
+    "Ele deixa de aparecer na lista de itens do pedido. Nada é apagado: os pedidos já feitos não mudam e dá para reativar quando quiser. Enquanto ele estiver fora, montar essa mesma composição cria um kit novo, com código novo.",
     aviso,
   ]
     .filter(Boolean)

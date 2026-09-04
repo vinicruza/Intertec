@@ -354,9 +354,9 @@ export default function KitFormPage() {
             )}
           </div>
           <p className="text-xs text-[var(--cor-texto-suave)]">
-            Kit inativo sai da lista de itens do pedido, mas nada é apagado: o código e a composição
-            continuam reservados (montar a mesma composição cai neste kit), os pedidos já feitos não
-            mudam, e dá para reativar quando quiser.
+            Kit inativo sai da lista de itens do pedido, mas nada é apagado: os pedidos já feitos não
+            mudam e dá para reativar quando quiser, com o mesmo código. Enquanto ele estiver fora,
+            montar essa mesma composição cria um kit novo, com código novo.
           </p>
           {!kitInativo && avisoDeInativacao && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{avisoDeInativacao}</p>

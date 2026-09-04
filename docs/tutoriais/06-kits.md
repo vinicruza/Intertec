@@ -38,10 +38,13 @@ O que acontece:
 
 - O kit **deixa de aparecer** na lista de itens do simulador e no "partir de um kit existente".
   Ninguém consegue mais vendê-lo.
-- **Nada é apagado.** O código e a composição continuam reservados: quem montar exatamente os
-  mesmos itens cai neste kit, com o mesmo código, em vez de criar um kit repetido.
+- **Nada é apagado.** O kit continua no sistema, com o mesmo código.
 - **Os pedidos já feitos não mudam.** Pedido fechado guarda nome, código e custo congelados.
 - Dá para **reativar** quando quiser, pelo mesmo botão — o código volta a valer, é o mesmo.
+- **Enquanto ele estiver fora, a composição fica livre:** quem montar exatamente os mesmos itens
+  ganha um kit **novo**, com código novo. Se isso acontecer e depois alguém tentar reativar o kit
+  antigo, o sistema explica qual kit ficou com a composição — dois kits ativos não podem ter a
+  mesma.
 
 Não existe excluir kit, e é de propósito: kit usado em pedido fechado não pode sumir do histórico.
 
