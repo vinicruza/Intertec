@@ -379,6 +379,9 @@ export type DadosSimulacao = {
   clienteId: string | null;
   clienteNovoCodigo: string | null;
   clienteNovoNome: string | null;
+  // Sem documento, nada impede o mesmo cliente de entrar duas vezes: a unica
+  // defesa vira o nome, e nome se digita errado (02/09/2026).
+  clienteNovoCnpj: string | null;
   uf: string;
   vendedorId: string;
   channelId: string;
@@ -457,6 +460,7 @@ export async function salvarCotacao(
       customer_id: d.clienteId,
       customer_external_code: textoOuVazio(d.clienteNovoCodigo).trim().toUpperCase() || null,
       customer_name: textoOuVazio(d.clienteNovoNome).trim() || null,
+      customer_tax_id: textoOuVazio(d.clienteNovoCnpj).trim() || null,
       uf: d.uf,
       seller_id: d.vendedorId,
       channel_id: d.channelId,

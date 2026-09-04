@@ -7,6 +7,9 @@ export type ResumoIntegridade = {
   kit_items_without_cmv: number;
   orders_without_items: number;
   closed_orders_without_snapshot: number;
+  // Pedido aprovado SOZINHO que o selo manda parar na fila. Ver o comentário
+  // em `get_data_quality_summary`: é o alarme que faltava em 01/09/2026.
+  auto_approved_below_seal: number;
   customers_without_uf: number;
   commercial_users_without_seller: number;
   active_products_without_open_allocation: number;

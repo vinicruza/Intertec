@@ -84,6 +84,20 @@ const POR_TRAVA: Record<string, string> = {
     "Cada linha do pedido tem de ser um produto OU um kit — não os dois. Refaça a linha.",
 
   // ---- Cadastro de cliente ----
+  //
+  // As três travas abaixo faltavam, e a diferença apareceu em 02/09/2026: a
+  // Patrícia tentou completar o CNPJ de um cliente e leu "Já existe um registro
+  // com estes dados" — sem dizer QUAL campo nem QUAL cliente. O CNPJ estava num
+  // registro duplicado com o nome errado ("IAGARAPAVA"), que a busca pelo nome
+  // certo não encontrava. Ela não tinha como descobrir sozinha.
+  //
+  // A frase de `salvarCliente` vai além destas e nomeia o cliente que já tem o
+  // documento; estas ficam como rede quando a consulta do nome não responde.
+  customers_tax_id_unico:
+    "Este CNPJ/CPF já está cadastrado em outro cliente. Procure por ele antes de criar um novo — pode ser um cadastro repetido.",
+  customers_code_unique: "Já existe um cliente com este código.",
+  customers_external_code_unique:
+    "Já existe um cliente com este código do ERP. Confira se não é o mesmo cliente cadastrado duas vezes.",
   customers_tax_id_formato: "O CNPJ precisa ter 14 dígitos e o CPF, 11. Confira o número digitado.",
   customers_billing_zip_formato: "O CEP de faturamento precisa ter 8 dígitos.",
   customers_shipping_zip_formato: "O CEP de entrega precisa ter 8 dígitos.",

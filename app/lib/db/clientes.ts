@@ -69,6 +69,12 @@ export type ClienteCadastro = {
   customer_specialty_id: string | null;
 };
 
+export type ClienteDocumentoExistente = {
+  id: string;
+  external_code: string | null;
+  name: string;
+};
+
 const CAMPOS_CADASTRO =
   "id, code, external_code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
 
@@ -113,6 +119,28 @@ export async function obterCliente(id: string): Promise<ClienteCadastro | null> 
     .maybeSingle();
   if (error) throw error;
   return (data as unknown as ClienteCadastro | null) ?? null;
+}
+
+export async function listarClientesPorDocumento(
+  documento: string | null | undefined,
+  ignorarId?: string | null
+): Promise<ClienteDocumentoExistente[]> {
+  const taxId = digitosOuNulo(documento);
+  if (!taxId) return [];
+
+  let query = supabase
+    .from("customers")
+    .select("id, external_code, name")
+    .eq("active", true)
+    .eq("tax_id", taxId)
+    .order("name")
+    .limit(10);
+
+  if (ignorarId) query = query.neq("id", ignorarId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ClienteDocumentoExistente[];
 }
 
 // Grava o cadastro. Documento, CEP e telefone vão SEM MÁSCARA — a pontuação
@@ -161,6 +189,29 @@ function digitosOuNulo(valor: string | null | undefined): string | null {
   return d === "" ? null : d;
 }
 
+// Quem já tem este CNPJ/CPF, além do próprio cliente que está sendo editado.
+//
+// Existe por causa de 02/09/2026: a Patrícia tentou completar o CNPJ do cliente
+// 1000-0008 e levou "Já existe um registro com estes dados" — sem dizer qual
+// campo nem qual cliente. O documento estava num cadastro duplicado com o nome
+// digitado errado ("IAGARAPAVA" no lugar de "IGARAPAVA"), e procurar pelo nome
+// certo não achava o errado. A mensagem mandava conferir algo que ela não tinha
+// como encontrar.
+export async function clienteComEsteDocumento(
+  taxId: string,
+  exceto: string | null
+): Promise<{ code: string | null; name: string } | null> {
+  const digitos = taxId.replace(/D/g, "");
+  if (digitos === "") return null;
+  let q = supabase.from("customers").select("code, name").eq("tax_id", digitos).limit(1);
+  if (exceto) q = q.neq("id", exceto);
+  const { data, error } = await q;
+  // Falha na consulta não pode virar erro na tela: quem manda é a trava do
+  // banco, e a frase específica é um extra.
+  if (error || !data || data.length === 0) return null;
+  return data[0] as { code: string | null; name: string };
+}
+
 export async function salvarCliente(id: string | null, d: DadosCliente): Promise<string> {
   const { data, error } = await supabase.rpc("save_customer", {
     p_id: id,
@@ -192,7 +243,21 @@ export async function salvarCliente(id: string | null, d: DadosCliente): Promise
     p_financial_email: limpar(d.financial_email),
     p_notes: limpar(d.notes),
   });
-  if (error) throw error;
+  if (error) {
+    // Antes de repassar o erro, tenta dizer QUEM já tem o documento. Sem isso a
+    // pessoa fica sabendo que existe um repetido, mas não onde.
+    const doc = digitosOuNulo(d.tax_id);
+    if (doc && /customers_tax_id_unico/i.test(JSON.stringify(error))) {
+      const dono = await clienteComEsteDocumento(doc, id);
+      if (dono) {
+        throw new Error(
+          `Este CNPJ/CPF já está no cliente ${dono.code ? dono.code + " — " : ""}${dono.name}. ` +
+            "Se for o mesmo cliente cadastrado duas vezes, complete os dados naquele e desative este."
+        );
+      }
+    }
+    throw error;
+  }
   const clienteId = data as string;
   const { error: erroCodigo } = await supabase.rpc("set_customer_external_code", {
     p_customer_id: clienteId,

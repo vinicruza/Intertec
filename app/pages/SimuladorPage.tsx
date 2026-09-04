@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ErroCalculoBloqueante } from "@calc";
+import { ErroCalculoBloqueante, freteCobradoDoCliente, totalACobrarDoCliente } from "@calc";
 import {
   aplicarFreteDestacadoAosItens,
   faixaDoPedido,
@@ -29,6 +29,7 @@ import {
   produtoKitAleatorioExigeComposicao,
   resolverLinhaDoPedido,
   resumoDoKit,
+  resumoComercialDasLinhas,
   resumoFinanceiroLinhaKit,
   type KitNovoEdicao,
   type LinhaItem,
@@ -57,7 +58,7 @@ import {
   problemaNoCampoNumerico,
   reais,
 } from "../lib/format";
-import { cepValido, formatarCep } from "../../lib/cadastro/documentos";
+import { cepValido, cnpjCpfValido, formatarCep, formatarCnpjCpf } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
 import { consultarCep } from "../lib/db/consultaReceita";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
@@ -130,6 +131,7 @@ export default function SimuladorPage() {
   const [clienteId, setClienteId] = useState("");
   const [clienteNovoCodigo, setClienteNovoCodigo] = useState("");
   const [clienteNovo, setClienteNovo] = useState("");
+  const [clienteNovoCnpj, setClienteNovoCnpj] = useState("");
   const [canalId, setCanalId] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
   // O que a pessoa DIGITOU no campo de comissão, enquanto está digitando.
@@ -448,6 +450,17 @@ export default function SimuladorPage() {
   const pendenciasExpedicao = [problemaPeso, problemaVolumes, problemaCidade].filter(
     (p): p is string => p !== null
   );
+  const pendenciasCadastro = () => (problemaClienteNovo ? [problemaClienteNovo] : []);
+
+  // Cliente novo criado na cotacao precisa de CNPJ (Intertech, 02/09/2026).
+  const criandoCliente = !clienteId && clienteNovo.trim() !== "";
+  const problemaClienteNovo = !criandoCliente
+    ? null
+    : clienteNovoCnpj.trim() === ""
+      ? "Informe o CNPJ/CPF: sem ele o mesmo cliente pode ser cadastrado duas vezes."
+      : !cnpjCpfValido(clienteNovoCnpj)
+        ? "CNPJ/CPF inválido — confira os dígitos."
+        : null;
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -487,6 +500,7 @@ export default function SimuladorPage() {
         clienteId: clienteId || null,
         clienteNovoCodigo: clienteId ? null : clienteNovoCodigo,
         clienteNovoNome: clienteId ? null : clienteNovo,
+        clienteNovoCnpj: clienteId ? null : clienteNovoCnpj,
         uf,
         vendedorId: vendedor.id,
         channelId: canal.id,
@@ -700,6 +714,29 @@ export default function SimuladorPage() {
   const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
 
   const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
+  const resumoComercial = useMemo(
+    () => resumoComercialDasLinhas(linhas, resolvidas),
+    [linhas, resolvidas]
+  );
+  const totaisComerciais = useMemo(() => {
+    try {
+      const freteCobrado =
+        simulacao.estado === "ok"
+          ? freteCobradoDoCliente(simulacao.freteUsado, freteCliente)
+          : freteCobradoDoCliente(numeroDigitado(frete) || "0", freteCliente);
+      return {
+        freteCobrado,
+        total: totalACobrarDoCliente(resumoComercial.subtotal, freteCobrado),
+      };
+    } catch {
+      return null;
+    }
+  }, [simulacao, frete, freteCliente, resumoComercial.subtotal]);
+  const impostosAplicaveis =
+    simulacao.estado === "ok"
+      ? simulacao.resultado.imposto.plus(simulacao.resultado.impostoFrete).plus(simulacao.resultado.difal)
+      : null;
+  const modoPagamento = ctx.modosPagamento.find((m) => m.id === modoPagamentoId) ?? null;
   const precoFinalPorLinha = new Map<number, string>();
   if (simulacao.estado === "ok" && freteCliente) {
     const itensComFreteParaExibicao = aplicarFreteDestacadoAosItens(simulacao.itensCalculados, simulacao.freteUsado);
@@ -833,6 +870,23 @@ export default function SimuladorPage() {
               <div>
                 <Label>Nome do novo cliente</Label>
                 <Input value={clienteNovo} onChange={(e) => setClienteNovo(e.target.value)} />
+              </div>
+              {/* Sem CNPJ o mesmo cliente entra duas vezes, e a unica defesa
+                  vira o nome — foi assim que a Santa Casa de Igarapava virou
+                  "IAGARAPAVA" num segundo cadastro (02/09/2026). Se o documento
+                  ja existir, a cotacao usa o cliente existente em vez de criar
+                  outro: quem esta cotando nao queria cadastrar, queria vender. */}
+              <div>
+                <Label>CNPJ / CPF do novo cliente</Label>
+                <Input
+                  value={clienteNovoCnpj}
+                  placeholder="00.000.000/0000-00"
+                  onChange={(e) => setClienteNovoCnpj(e.target.value)}
+                  onBlur={() => setClienteNovoCnpj(formatarCnpjCpf(clienteNovoCnpj))}
+                />
+                {problemaClienteNovo && (
+                  <p className="mt-1 text-xs text-red-600">{problemaClienteNovo}</p>
+                )}
               </div>
             </>
           )}
@@ -1273,6 +1327,65 @@ export default function SimuladorPage() {
         </div>
       </Card>
 
+      {resumoComercial.linhas.length > 0 && (
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Resumo do orçamento</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase text-[var(--cor-texto-suave)]">Total</p>
+              <p className="text-2xl font-semibold text-[var(--cor-primaria)]">
+                {totaisComerciais ? reais(totaisComerciais.total.toString()) : "—"}
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border border-[var(--cor-borda)]">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead className="bg-[var(--cor-fundo)] text-left">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Produto / kit</th>
+                  <th className="px-3 py-2 text-right font-medium">Qtd.</th>
+                  <th className="px-3 py-2 text-right font-medium">Valor unit.</th>
+                  <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumoComercial.linhas.map((linha, i) => (
+                  <tr key={`${linha.nome}-${i}`} className="border-t border-[var(--cor-borda)]">
+                    <td className="px-3 py-2">{linha.nome}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{linha.quantidade.toString().replace(".", ",")}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.precoUnitario.toString())}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.subtotal.toString())}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-2 text-sm md:grid-cols-2">
+            <LinhaResumoOrcamento rotulo="Subtotal dos itens" valor={reais(resumoComercial.subtotal.toString())} />
+            <LinhaResumoOrcamento rotulo="Descontos" valor={reais("0")} />
+            <LinhaResumoOrcamento rotulo="Acréscimos" valor={reais("0")} />
+            <LinhaResumoOrcamento
+              rotulo={freteCliente ? "Frete no orçamento" : "Frete não destacado"}
+              valor={totaisComerciais ? reais(totaisComerciais.freteCobrado.toString()) : "—"}
+            />
+            <LinhaResumoOrcamento
+              rotulo="Impostos aplicáveis"
+              valor={impostosAplicaveis ? reais(impostosAplicaveis.toString()) : "—"}
+            />
+            <LinhaResumoOrcamento rotulo="Condição de pagamento" valor={modoPagamento?.label ?? "—"} />
+            <LinhaResumoOrcamento
+              rotulo="Total do orçamento"
+              valor={totaisComerciais ? reais(totaisComerciais.total.toString()) : "—"}
+              destaque
+            />
+          </div>
+        </Card>
+      )}
+
       {/* Comercial sem vendedor vinculado: a lista de vendedores dele vem vazia,
           entao "falta preencher: vendedor" manda fazer o que a tela nao deixa.
           O vinculo casa `sellers.name` com `profiles.full_name`; uma letra de
@@ -1373,7 +1486,12 @@ export default function SimuladorPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               onClick={() => salvar.mutate()}
-              disabled={salvar.isPending || pendenciasKit.length > 0 || pendenciasExpedicao.length > 0}
+              disabled={
+                salvar.isPending ||
+                pendenciasKit.length > 0 ||
+                pendenciasExpedicao.length > 0 ||
+                pendenciasCadastro().length > 0
+              }
               title={
                 pendenciasKit.length > 0
                   ? "Corrija as pendências dos kits antes de salvar."
@@ -1403,8 +1521,10 @@ export default function SimuladorPage() {
                       : ""} ✓
               </span>
             )}
-            {pendenciasExpedicao.length > 0 && (
-              <span className="text-sm text-amber-700">{pendenciasExpedicao.join(" ")}</span>
+            {[...pendenciasCadastro(), ...pendenciasExpedicao].length > 0 && (
+              <span className="text-sm text-amber-700">
+                {[...pendenciasCadastro(), ...pendenciasExpedicao].join(" ")}
+              </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}
           </div>
@@ -1790,6 +1910,15 @@ function AvisoDeNumero({ valor }: { valor: string }) {
   const aviso = interpretacaoDoNumero(valor);
   if (!aviso) return null;
   return <p className="mt-1 w-28 text-[0.65rem] leading-tight text-amber-700">{aviso}</p>;
+}
+
+function LinhaResumoOrcamento({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 rounded-md bg-[var(--cor-fundo)] px-3 py-2 ${destaque ? "font-semibold" : ""}`}>
+      <span className="text-[var(--cor-texto-suave)]">{rotulo}</span>
+      <span className="text-right tabular-nums">{valor}</span>
+    </div>
+  );
 }
 
 function LinhaCascata({

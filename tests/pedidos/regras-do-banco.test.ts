@@ -554,3 +554,142 @@ describe("ativar e inativar kit", () => {
     expect(auditoria).toMatch(/u\.order_status = 'simulation' and u\.cancelled_at is null/);
   });
 });
+
+// ============================================================
+// Aprovação automática (relatado em 01/09/2026)
+// ============================================================
+//
+// "A Isabela conseguiu aprovar um pedido com margem baixa, não deveria."
+//
+// O sistema tem DUAS tabelas de faixa, e elas não querem dizer a mesma
+// coisa. `margin_rules` são as faixas de STATUS do painel, onde "Boa"
+// começa em 40% e a cor dela é 'green'. `commercial_margin_bands` é o SELO
+// do pedido, onde 40% ainda é AMARELA e verde só começa acima de 50%.
+//
+// O gatilho da aprovação automática lia a primeira. Como as duas usam a
+// palavra "green" para coisas diferentes, o erro passou despercebido: entre
+// 40% e 50% a tela dizia amarela e o banco aprovava como verde. 21
+// orçamentos entraram assim, de 41,12% a 49,95%.
+describe("aprovação automática usa o selo comercial", () => {
+  it("o gatilho não lê mais as faixas de status do painel", () => {
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    expect(gatilho).toContain("public.selo_comercial_do_pedido(new.order_id, v_margem_pct)");
+    expect(gatilho).not.toContain("from public.margin_rules");
+  });
+
+  it("o selo do banco tem os mesmos tetos e a mesma precedência do navegador", () => {
+    const selo = definicaoVigente("selo_comercial_do_pedido");
+    // Tetos inclusivos, na mesma ordem do `seloMargemComercial`.
+    expect(selo).toContain("p_pct <= (select red_max from tetos) then 'red'");
+    expect(selo).toContain("p_pct <= (select yellow_max from tetos) then 'yellow'");
+    expect(selo).toContain("p_pct <= (select green_max from tetos) then 'green'");
+    // vendedor > canal > padrão da casa, e o mesmo fallback do TypeScript.
+    expect(selo).toContain("order by (b.seller_id is not null) desc, (b.channel_id is not null) desc");
+    expect(selo).toContain("0.40");
+    expect(selo).toContain("0.50");
+    expect(selo).toContain("0.65");
+  });
+
+  it("só verde e azul entram sozinhos — amarelo e vermelho nunca", () => {
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    expect(gatilho).toContain("v_color in ('blue', 'green') and status = 'simulation'");
+    expect(gatilho).not.toContain("'yellow'");
+  });
+});
+
+// O alarme que faltava. A correção da regra impede ESTE erro; esta contagem
+// é sobre o próximo — ela não depende de qual regra quebrou, compara o que
+// foi aprovado sozinho com o selo vigente.
+describe("integridade acusa aprovação automática abaixo do selo", () => {
+  it("a contagem existe e usa o selo comercial", () => {
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("auto_approved_below_seal");
+    expect(resumo).toContain("public.selo_comercial_do_pedido(o.id, o.contribution_margin_snapshot/o.net_revenue_snapshot)");
+    expect(resumo).toContain("in ('red','yellow')");
+  });
+
+  it("aprovação manual de margem baixa não entra na conta", () => {
+    // Um humano pode aprovar o que quiser — é para isso que a fila existe.
+    // Só conta o que o sistema aprovou sozinho.
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("o.approval_notes ilike 'Aprovado automaticamente pela margem%'");
+  });
+
+  it("pedido ratificado por um administrador sai da conta, e a ratificação fica registrada", () => {
+    // Pedido fechado é imutável: não dá para corrigir a aprovação dele. Um
+    // alarme que nunca zera deixa de ser lido, então a saída é alguém com
+    // autoridade assumir a decisão — com motivo obrigatório e nome no log.
+    const resumo = definicaoVigente("get_data_quality_summary");
+    expect(resumo).toContain("a.action='ratifica_aprovacao_automatica'");
+    const rat = definicaoVigente("ratificar_aprovacao_automatica");
+    expect(rat).toContain("public.current_user_role() <> 'admin'");
+    expect(rat).toContain("Escreva o motivo da ratificação");
+    expect(rat).toContain("insert into public.audit_logs");
+  });
+});
+
+// ============================================================
+// Causa raiz: duas tabelas, a mesma palavra
+// ============================================================
+//
+// `margin_rules` (status do painel) e `commercial_margin_bands` (o selo que
+// decide aprovação) guardavam ambas a palavra "green" — significando faixas
+// diferentes. O gatilho leu uma achando que era a outra, e nada reclamou:
+// nem o Postgres, nem o TypeScript, nem os testes.
+//
+// Consertar quem lê qual resolveu aquele erro. Isto trava a família dele.
+describe("as duas tabelas de faixa não compartilham vocabulário", () => {
+  it("o banco recusa a cor do selo nas faixas do painel", () => {
+    expect(TODAS).toContain("margin_rules_nao_usa_cores_do_selo");
+    expect(TODAS).toContain("not in ('green','yellow','orange','red','blue')");
+  });
+
+  it("as faixas do painel foram renomeadas para rótulos de status", () => {
+    expect(TODAS).toContain("then 'status_boa'");
+    expect(TODAS).toContain("then 'status_negativa'");
+  });
+
+  it("nenhuma função do banco decide aprovação LENDO margin_rules", () => {
+    // O que não pode voltar é a CONSULTA. Citar a tabela em comentário é
+    // desejável: é o registro de por que a regra é como é.
+    const gatilho = definicaoVigente("sync_order_snapshot_from_version");
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    for (const fn of [gatilho, fechar]) {
+      expect(fn).not.toContain("from public.margin_rules");
+      expect(fn).not.toContain("join public.margin_rules");
+    }
+  });
+});
+
+// A quarta camada, e a única que não depende de alguém olhar: o banco recusa
+// o estado ruim na gravação. Conferido em produção em 01/09/2026 — a
+// tentativa de aprovar sozinho um pedido amarelo foi rejeitada, e a
+// aprovação humana do mesmo pedido passou.
+describe("o banco recusa aprovação automática abaixo do selo", () => {
+  it("a trava existe e roda em toda gravação de pedido", () => {
+    expect(TODAS).toContain("trg_orders_aprovacao_automatica_valida");
+    expect(TODAS).toContain("before update on public.orders");
+  });
+
+  it("recusa só a aprovação AUTOMÁTICA, e só em faixa que exige aprovação", () => {
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("not ilike 'Aprovado automaticamente pela margem%'");
+    expect(t).toContain("v_selo in ('red','yellow')");
+    expect(t).toContain("public.selo_comercial_do_pedido(new.id, v_pct)");
+  });
+
+  it("aprovação humana de margem baixa continua permitida", () => {
+    // Travar isso seria trocar um erro por outro: a fila existe justamente
+    // para alguém poder aprovar uma margem baixa com conhecimento de causa.
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("return new");
+    expect(t).toContain("new.approval_status <> 'aprovado' then return new");
+  });
+
+  it("pedido que já estava nesse estado não é bloqueado", () => {
+    // Senão editar a expedição de um pedido antigo pararia por causa de um
+    // erro que já aconteceu.
+    const t = definicaoVigente("impede_aprovacao_automatica_abaixo_do_selo");
+    expect(t).toContain("old.approval_status = 'aprovado'");
+  });
+});

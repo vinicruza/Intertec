@@ -128,6 +128,41 @@ export type ItensParaMotor =
 
 const numero = numeroDigitado;
 
+export type LinhaResumoComercial = {
+  nome: string;
+  quantidade: ReturnType<typeof dec>;
+  precoUnitario: ReturnType<typeof dec>;
+  subtotal: ReturnType<typeof dec>;
+};
+
+export function resumoComercialDasLinhas(
+  linhas: LinhaItem[],
+  resolvidas: Array<LinhaResolvida | null>
+): { linhas: LinhaResumoComercial[]; subtotal: ReturnType<typeof dec> } {
+  const linhasResumo = linhas.flatMap((linha, i) => {
+    const resolvida = resolvidas[i];
+    if (!resolvida || resolvida.erro || linha.quantidade.trim() === "" || linha.preco.trim() === "") return [];
+
+    try {
+      const quantidade = dec(numero(linha.quantidade));
+      const precoUnitario = dec(numero(linha.preco));
+      return [{
+        nome: resolvida.nome,
+        quantidade,
+        precoUnitario,
+        subtotal: precoUnitario.times(quantidade),
+      }];
+    } catch {
+      return [];
+    }
+  });
+
+  return {
+    linhas: linhasResumo,
+    subtotal: linhasResumo.reduce((s, l) => s.plus(l.subtotal), dec("0")),
+  };
+}
+
 export function montarItensParaMotor(
   linhas: LinhaItem[],
   resolvidas: Array<LinhaResolvida | null>

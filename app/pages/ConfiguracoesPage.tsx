@@ -542,7 +542,10 @@ function AbaMargem() {
   return (
     <Card className="overflow-x-auto p-0">
       <p className="px-4 pt-4 text-xs text-[var(--cor-texto-suave)]">
-        Faixas de status da margem de contribuição, sobre a receita líquida (Decisão D2).
+        Faixas de <strong>status do painel</strong>, sobre a receita líquida (Decisão D2). Servem
+        para classificar e filtrar o histórico — <strong>não decidem aprovação</strong>. Quem decide
+        se o pedido segue sozinho ou para na fila é o <strong>Selo por canal</strong>, na aba ao
+        lado. Foi confundir as duas que aprovou 21 orçamentos indevidamente em 01/09/2026.
       </p>
       <table className="w-full text-sm">
         <thead>
@@ -550,7 +553,7 @@ function AbaMargem() {
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 font-medium">Mínimo</th>
             <th className="px-4 py-3 font-medium">Máximo</th>
-            <th className="px-4 py-3 font-medium">Cor</th>
+            <th className="px-4 py-3 font-medium">Rótulo de status</th>
           </tr>
         </thead>
         <tbody>
@@ -577,7 +580,10 @@ function LinhaMargem({ regra, onSalvar }: { regra: RegraMargemLinha; onSalvar: (
       <td className="px-4 py-3"><Input className="w-24" placeholder="sem piso" value={min} onChange={(e) => setMin(e.target.value)} /></td>
       <td className="px-4 py-3"><Input className="w-24" placeholder="sem teto" value={max} onChange={(e) => setMax(e.target.value)} /></td>
       <td className="px-4 py-3">
-        <Input className="w-24" value={cor} onChange={(e) => setCor(e.target.value)} />
+        {/* Não é cor de tela: nada é pintado com este valor. É um rótulo de
+            status, e o banco recusa o vocabulário do selo (green/yellow/red/
+            blue) para que as duas tabelas nunca mais se pareçam. */}
+        <Input className="w-32" value={cor} onChange={(e) => setCor(e.target.value)} placeholder="status_boa" />
         {alterado && (
           <Button className="ml-2 px-2 py-1 text-xs" onClick={() => onSalvar({ min_rate: min || null, max_rate: max || null, color: cor || null })}>
             Salvar

@@ -95,3 +95,49 @@ describe("faixaDoPedido: do mais específico para o mais geral", () => {
     expect(faixaDoPedido([], { channelId: MARKETPLACE, sellerId: MARI })).toEqual(FAIXA_MARGEM_PADRAO);
   });
 });
+
+// ============================================================
+// Vetores conferidos contra o BANCO em produção (01/09/2026)
+// ============================================================
+//
+// A regra do selo vive em dois lugares: aqui, em `seloMargemComercial`, e no
+// banco, em `selo_comercial_do_pedido`. Foi a separação entre duas
+// implementações da mesma regra que produziu o erro de 01/09 — a tela dizia
+// amarela e o banco aprovava como verde.
+//
+// Estes vetores foram executados contra a função SQL PUBLICADA, com as faixas
+// reais (Interno 40/50/65, Marketplace 29,99/39,99/50), e as duas
+// implementações deram o mesmo resultado em todas as bordas. Se alguém mexer
+// no lado TypeScript, este teste quebra; se mexer no lado SQL, a contagem
+// `auto_approved_below_seal` da tela de Integridade acusa.
+//
+// As bordas são o que importa: 40,00 e 50,00 decidem se o pedido segue sozinho.
+const VETORES: Array<[string, string, string]> = [
+  // margem      Interno    Marketplace
+  ["0.2999", "Vermelha", "Vermelha"],
+  ["0.30", "Vermelha", "Amarela"],
+  ["0.3999", "Vermelha", "Amarela"],
+  ["0.40", "Vermelha", "Verde"],
+  ["0.4001", "Amarela", "Verde"],
+  ["0.4999", "Amarela", "Verde"],
+  ["0.50", "Amarela", "Verde"],
+  ["0.5001", "Verde", "Azul"],
+  ["0.65", "Verde", "Azul"],
+  ["0.6501", "Azul", "Azul"],
+];
+
+describe("golden: o navegador e o banco dão o mesmo selo", () => {
+  const interno = faixaDoPedido(FAIXAS, { channelId: INTERNO });
+  const marketplace = faixaDoPedido(FAIXAS, { channelId: MARKETPLACE });
+
+  it.each(VETORES)("margem %s → Interno %s, Marketplace %s", (pct, noInterno, noMarketplace) => {
+    expect(seloMargemComercial(dec(pct), interno).label).toBe(noInterno);
+    expect(seloMargemComercial(dec(pct), marketplace).label).toBe(noMarketplace);
+  });
+
+  // A trava que interessa ao negócio, dita em palavras e não em cores.
+  it("no Interno, 40% ainda para na fila; no Marketplace, 40% já segue sozinho", () => {
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.40"), interno))).toBe(true);
+    expect(seloExigeAprovacao(seloMargemComercial(dec("0.40"), marketplace))).toBe(false);
+  });
+});
