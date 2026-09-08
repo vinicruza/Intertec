@@ -212,3 +212,55 @@ export async function salvarProduto(
   if (error) throw error;
   return data as string;
 }
+
+// ---------- Situação do produto no catálogo (Patricia, 08/09/2026) ----------
+//
+// "Pode liberar no acesso de administrador o cancelamento ou exclusão de
+// produtos." São duas portas, e quem recusa de verdade é o banco: inativar é
+// de Administrador e Financeiro; excluir é só do Administrador, e só para
+// produto que nunca foi usado em lugar nenhum.
+export type UsoDoProduto = {
+  em_pedidos: number;
+  em_kits: number;
+  em_fichas: number;
+  em_vendas: number;
+  em_despesas: number;
+};
+
+export async function obterUsoDoProduto(produtoId: string): Promise<UsoDoProduto> {
+  const { data, error } = await supabase.rpc("uso_do_produto", { p_product_id: produtoId });
+  if (error) throw error;
+  const linha = ((data ?? []) as Array<Record<string, number | string>>)[0];
+  return {
+    em_pedidos: Number(linha?.em_pedidos ?? 0),
+    em_kits: Number(linha?.em_kits ?? 0),
+    em_fichas: Number(linha?.em_fichas ?? 0),
+    em_vendas: Number(linha?.em_vendas ?? 0),
+    em_despesas: Number(linha?.em_despesas ?? 0),
+  };
+}
+
+export async function definirStatusDoProduto(
+  produtoId: string,
+  ativo: boolean,
+  motivo?: string | null
+): Promise<{ tipo: "alterado" | "sem_mudanca"; status: "active" | "inactive" }> {
+  const { data, error } = await supabase.rpc("set_product_status", {
+    p_product_id: produtoId,
+    p_ativo: ativo,
+    p_motivo: motivo?.trim() || null,
+  });
+  if (error) throw error;
+  const bruto = data as { tipo: string; status: string };
+  return {
+    tipo: bruto.tipo === "sem_mudanca" ? "sem_mudanca" : "alterado",
+    status: bruto.status === "inactive" ? "inactive" : "active",
+  };
+}
+
+export async function excluirProduto(produtoId: string): Promise<{ code: string | null; name: string }> {
+  const { data, error } = await supabase.rpc("delete_product", { p_product_id: produtoId });
+  if (error) throw error;
+  const bruto = data as { code: string | null; name: string };
+  return { code: bruto.code ?? null, name: bruto.name };
+}

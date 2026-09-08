@@ -19,9 +19,21 @@ import {
 import { descricaoNFdoProduto } from "../../lib/nomenclatura/descricaoNF";
 import { familiasAtivas, listarFamiliasNF } from "../lib/db/nomenclaturaNF";
 import { listarInsumos } from "../lib/db/insumos";
-import { listarProdutos } from "../lib/db/produtos";
+import {
+  definirStatusDoProduto,
+  excluirProduto,
+  listarProdutos,
+  obterUsoDoProduto,
+} from "../lib/db/produtos";
 import { reais, percentual } from "../lib/format";
 import { useAuth } from "../auth/AuthProvider";
+import {
+  confirmacaoDeExclusaoDoProduto,
+  confirmacaoDeStatusDoProduto,
+  podeExcluirProduto,
+  podeInativarProduto,
+  produtoPodeSerExcluido,
+} from "../lib/sim/catalogoDeProdutos";
 import { perfilPodeEditarProduto } from "../lib/roles";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 import { mensagemDeErro } from "../lib/erros";
@@ -114,6 +126,38 @@ export default function ProdutoFormPage() {
     }
   }, [componentes, baseQuery.data, idAtual]);
 
+  // ---------- Situação no catálogo (Patricia, 08/09/2026) ----------
+  //
+  // Quem recusa de verdade é o banco (`set_product_status` e `delete_product`);
+  // a tela só evita oferecer o que vai ser recusado. O uso do produto é
+  // carregado à parte porque é ele que decide se excluir sequer aparece.
+  const usoQuery = useQuery({
+    queryKey: ["usoDoProduto", id],
+    queryFn: () => obterUsoDoProduto(id!),
+    enabled: podeEditar && editando && podeInativarProduto(perfil?.perfil),
+  });
+
+  const alterarStatus = useMutation({
+    mutationFn: (ativo: boolean) => definirStatusDoProduto(id!, ativo),
+    onSuccess: () => {
+      setErroSalvar(null);
+      queryClient.invalidateQueries({ queryKey: ["produto", id] });
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+    },
+    onError: (e: unknown) => setErroSalvar(mensagemErro(e)),
+  });
+
+  const excluir = useMutation({
+    mutationFn: () => excluirProduto(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+      navigate("/produtos");
+    },
+    onError: (e: unknown) => setErroSalvar(mensagemErro(e)),
+  });
+
   const salvar = useMutation({
     mutationFn: async (form: ProdutoForm) => {
       await salvarProduto(id ?? null, form, familias);
@@ -127,6 +171,14 @@ export default function ProdutoFormPage() {
 
   const insumos = insumosQuery.data ?? [];
   const produtosRef = (produtosQuery.data ?? []).filter((p) => p.id !== id);
+  const produtoInativo = produtoQuery.data?.produto.status === "inactive";
+  const usoResumo = {
+    emPedidos: usoQuery.data?.em_pedidos ?? 0,
+    emKits: usoQuery.data?.em_kits ?? 0,
+    emFichas: usoQuery.data?.em_fichas ?? 0,
+    emVendas: usoQuery.data?.em_vendas ?? 0,
+    emDespesas: usoQuery.data?.em_despesas ?? 0,
+  };
 
   if (!podeEditar) {
     return <Navigate to="/produtos" replace />;
@@ -135,6 +187,79 @@ export default function ProdutoFormPage() {
   return (
     <div className="max-w-4xl space-y-4">
       <h1 className="text-2xl font-semibold">{editando ? "Editar produto" : "Novo produto"}</h1>
+
+      {/* ---------- Situação no catálogo (pedido da Patricia, 08/09/2026) ----------
+          Fora do formulário de propósito: tirar um produto de circulação é uma
+          decisão por si só, não algo que se salva junto com uma edição de
+          ficha técnica. */}
+      {editando && produtoQuery.data && podeInativarProduto(perfil?.perfil) && (
+        <Card className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-[var(--cor-texto-suave)]">Situação no catálogo:</span>
+              {produtoInativo ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  inativo — não aparece para vender
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                  ativo
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className={produtoInativo ? "" : "bg-transparent text-[var(--cor-primaria)] hover:bg-[var(--cor-fundo)]"}
+                disabled={alterarStatus.isPending || excluir.isPending}
+                onClick={() => {
+                  const ativando = produtoInativo;
+                  const texto = confirmacaoDeStatusDoProduto({
+                    ativando,
+                    codigo: produtoQuery.data?.produto.code ?? null,
+                    nome: produtoQuery.data?.produto.name ?? "",
+                    uso: usoResumo,
+                  });
+                  if (window.confirm(texto)) alterarStatus.mutate(ativando);
+                }}
+              >
+                {alterarStatus.isPending ? "Alterando…" : produtoInativo ? "Reativar produto" : "Inativar produto"}
+              </Button>
+              {/* Excluir só aparece quando é possível: produto que nunca andou.
+                  Oferecer e recusar depois seria pior do que não oferecer. */}
+              {podeExcluirProduto(perfil?.perfil) && usoQuery.data && produtoPodeSerExcluido(usoResumo) && (
+                <Button
+                  type="button"
+                  className="bg-transparent text-red-700 hover:bg-red-50"
+                  disabled={excluir.isPending || alterarStatus.isPending}
+                  onClick={() => {
+                    const texto = confirmacaoDeExclusaoDoProduto({
+                      codigo: produtoQuery.data?.produto.code ?? null,
+                      nome: produtoQuery.data?.produto.name ?? "",
+                    });
+                    if (window.confirm(texto)) excluir.mutate();
+                  }}
+                >
+                  {excluir.isPending ? "Excluindo…" : "Excluir produto"}
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-[var(--cor-texto-suave)]">
+            Produto inativo sai da lista de itens do pedido e da montagem de kits, mas nada é
+            apagado: pedidos e kits já feitos não mudam, e dá para reativar quando quiser.
+            {usoQuery.data && !produtoPodeSerExcluido(usoResumo)
+              ? " Excluir não é possível porque ele já foi usado — apagar levaria junto o histórico que o menciona."
+              : " Excluir só está disponível porque ele nunca foi usado em lugar nenhum."}
+          </p>
+          {usoQuery.data && usoResumo.emKits > 0 && !produtoInativo && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Este produto está em {usoResumo.emKits} kit(s). Inativá-lo não tira esses kits de
+              venda — eles continuam à venda com ele dentro.
+            </p>
+          )}
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit((f) => salvar.mutate(f))} className="space-y-4" noValidate>
         <Card className="space-y-4">

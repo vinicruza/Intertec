@@ -18,6 +18,11 @@ import {
   type ModoEmbalagem,
   type PapelNoKit,
 } from "../lib/sim/kitNoPedido";
+import {
+  AVISO_ALTERACOES_NAO_SALVAS,
+  impressaoDaCotacao,
+  temAlteracoesNaoSalvas,
+} from "../lib/sim/alteracoesNaoSalvas";
 import { mensagemDeErro } from "../lib/erros";
 import {
   KIT_NOVO,
@@ -184,6 +189,10 @@ export default function SimuladorPage() {
     aprovacao: "aprovado_auto" | "rascunho" | "pendente" | "pendente_com_pendencia";
   } | null>(null);
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+  // Impressão digital do formulário no último save bem-sucedido. Ref, e não
+  // estado: mudá-la não precisa redesenhar a tela, e ela tem de valer já no
+  // mesmo instante em que o save termina.
+  const impressaoSalva = useRef<string | null>(null);
   // Trava para o formulário ser preenchido uma vez só quando o pedido chega —
   // sem isto, todo refetch (ex.: ao voltar de outra aba) apagaria o que a
   // pessoa estava digitando.
@@ -462,6 +471,59 @@ export default function SimuladorPage() {
         ? "CNPJ/CPF inválido — confira os dígitos."
         : null;
 
+  // Tudo o que vai para o banco, num texto só. Comparado com o do último save,
+  // responde "mudou alguma coisa depois de salvar?" sem depender de alguém
+  // lembrar de marcar cada campo — foi esquecer isso em vários campos que
+  // deixou a tela dizer "salva ✓" com o formulário já diferente (08/09/2026).
+  const impressaoAtual = useMemo(
+    () =>
+      impressaoDaCotacao({
+        clienteId,
+        clienteNovoCodigo,
+        clienteNovoNome: clienteNovo,
+        clienteNovoCnpj,
+        uf,
+        vendedorId: vendedorIdEfetivo,
+        canalId: canalIdEfetivo,
+        frete,
+        freteDestacado: freteCliente,
+        comissao,
+        aplicaDifal: aplicaDifalOverride,
+        // As linhas inteiras, com a composição do kit montado dentro delas: é
+        // exatamente ali que estava a diferença relatada (2 × 4 campos de mesa).
+        linhas: linhas.map((l) => JSON.stringify(l)),
+        transportadoraId,
+        transportadoraOutra,
+        fretesCotados: fretesCotados.map((f) => JSON.stringify(f)),
+        pesoKg,
+        volumes,
+        composicaoVolumes,
+        cepEntrega,
+        cidadeEntrega,
+        ufEntrega,
+        modoPagamentoId,
+        observacao,
+      }),
+    [
+      clienteId, clienteNovoCodigo, clienteNovo, clienteNovoCnpj, uf,
+      vendedorIdEfetivo, canalIdEfetivo, frete, freteCliente, comissao,
+      aplicaDifalOverride, linhas, transportadoraId, transportadoraOutra,
+      fretesCotados, pesoKg, volumes, composicaoVolumes, cepEntrega,
+      cidadeEntrega, ufEntrega, modoPagamentoId, observacao,
+    ]
+  );
+  const alteradoDepoisDeSalvar = temAlteracoesNaoSalvas(impressaoSalva.current, impressaoAtual);
+
+  // Fechar a aba com alteração não salva também perde o trabalho. O navegador
+  // mostra a confirmação padrão dele; o texto é escolha do navegador, não
+  // nossa.
+  useEffect(() => {
+    if (!alteradoDepoisDeSalvar) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [alteradoDepoisDeSalvar]);
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (simulacao.estado !== "ok" || !vendedor || !canal || !ctx) throw new Error("Cotação incompleta.");
@@ -558,6 +620,7 @@ export default function SimuladorPage() {
         },
       });
       setCotacaoId(r.id);
+      impressaoSalva.current = impressaoAtual;
       setSalvo({ quote_number: r.quote_number, order_number: r.order_number, version: r.version, aprovacao: r.aprovacao });
       setErroSalvar("erroAprovacao" in r ? r.erroAprovacao : null);
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
@@ -1508,7 +1571,15 @@ export default function SimuladorPage() {
                 {pendenciasKit.length > 2 ? ` Mais ${pendenciasKit.length - 2} pendência(s).` : ""}
               </span>
             )}
-            {salvo && (
+            {/* O aviso vem ANTES do "salva ✓" e o substitui: eram os dois na
+                mesma faixa que faziam a tela dizer que estava tudo gravado
+                enquanto o formulário já era outro. */}
+            {alteradoDepoisDeSalvar && (
+              <span className="rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900">
+                {AVISO_ALTERACOES_NAO_SALVAS}
+              </span>
+            )}
+            {salvo && !alteradoDepoisDeSalvar && (
               <span className={`text-sm ${salvo.aprovacao === "pendente_com_pendencia" ? "text-amber-700" : "text-green-700"}`}>
                 Cotação <strong>{salvo.quote_number}</strong>
                 {salvo.order_number ? <> / Pedido <strong>{salvo.order_number}</strong></> : ""} salva — versão {salvo.version}{" "}

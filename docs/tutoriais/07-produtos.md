@@ -13,6 +13,25 @@ competência.
 
 Clique em **Novo produto** para cadastrar um produto, ou em uma linha para editar um existente.
 
+## Tirar um produto de circulação (inativar) ou excluir
+
+Abra o produto: no alto da tela há o card **Situação no catálogo**.
+
+**Inativar** (Administrador e Financeiro) tira o produto da lista de itens do pedido e da montagem
+de kits. **Nada é apagado**: os pedidos e kits já feitos não mudam, e dá para **reativar** quando
+quiser, pelo mesmo botão. Use a lista de **situação** ("Só inativos") para achar depois o que foi
+tirado de circulação.
+
+> **Um detalhe importante:** inativar o produto **não** tira de venda os kits que o contêm. Um kit
+> ativo continua vendável com ele dentro, e o custo do kit continua vindo desse produto. Por isso a
+> confirmação avisa em quantos kits o produto está — confira esses kits.
+
+**Excluir** (só o Administrador) apaga o produto, a ficha técnica e o custo dele, e **não tem
+volta**. Por isso o botão só aparece quando o produto **nunca foi usado** — nem em pedido, nem em
+kit, nem na ficha de outro produto, nem em venda importada, nem em rateio de despesa. É a saída para
+o cadastro digitado errado que nasceu e nunca andou. Para todo o resto existe inativar: apagar
+levaria junto o histórico que menciona o produto.
+
 ## Cadastrando ou editando um produto
 
 ### Dados gerais

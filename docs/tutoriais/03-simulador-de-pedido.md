@@ -36,6 +36,18 @@ No topo da tela, preencha:
    branco, porque ali o frete é uma estimativa que a Intertech paga. Ao reabrir um pedido já
    salvo, vale sempre o que foi gravado nele.
 
+## Cuidado com alterações depois de salvar
+
+Depois de clicar em **Salvar cotação**, a tela mostra em verde "Cotação ORC-… salva ✓". Se você
+mexer em qualquer campo depois disso, o verde some e entra um aviso em âmbar:
+
+> Você mudou algo depois de salvar. Clique em "Salvar nova versão" — senão o pedido sai com o que
+> está gravado, não com o que está na tela.
+
+Leve esse aviso a sério: **quem vira pedido é o que está gravado**, não o que está na tela. Como o
+botão "Gerar Pedido" fica na tela do pedido, e não aqui, dá para editar, sair e gerar sem perceber.
+Se fechar a aba com alteração não salva, o navegador também pergunta antes.
+
 ## Passo 2 — Adicionar itens
 
 Clique em **Adicionar item** para criar uma nova linha. Em cada linha:

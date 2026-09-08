@@ -518,6 +518,31 @@ describe("composição dos volumes", () => {
 // padrão, e derrubou a antiga. O app chama por argumentos NOMEADOS, então
 // nenhuma assinatura casava: salvar transportadora ficou quebrado em produção
 // de 02/09 a 04/09/2026, sem ninguém notar — a tela de Cadastros é pouco usada.
+// Pedido da Patricia em 08/09/2026: "inverte a numeração do pedido; hoje está
+// 05040926, deixa 04092605 — a data vem primeiro e os dois últimos dígitos o
+// número do pedido". Ordenar por número passa a ordenar por dia, que é como a
+// operação procura o papel na mesa.
+describe("número do pedido começa pela data", () => {
+  it("o número é ddmmaa + sequência, e não o contrário", () => {
+    const proximo = definicaoVigente("next_order_number");
+    expect(proximo).toMatch(/v_data text := to_char\(p_order_date, 'DDMMYY'\)/i);
+    expect(proximo).toMatch(/return v_data \|\| lpad\(v_next::text, 2, '0'\)/i);
+    // O formato antigo era o inverso; se voltar, a folha volta a mentir.
+    expect(proximo).not.toMatch(/return lpad\(v_next::text, 2, '0'\) \|\| /i);
+  });
+
+  // Pedido já numerado NÃO é renumerado — o número foi impresso e foi para a
+  // mesa. Mas a sequência do dia tem de continuar de onde parou, senão dois
+  // pedidos do mesmo dia disputam o mesmo par de dígitos e o índice único
+  // recusa o fechamento, na frente da vendedora.
+  it("a contagem do dia enxerga os dois formatos, para não colidir", () => {
+    const proximo = definicaoVigente("next_order_number");
+    expect(proximo).toMatch(/'\^' \|\| v_data \|\| '\[0-9\]\+\$'/);
+    expect(proximo).toMatch(/'\^\[0-9\]\+' \|\| v_data \|\| '\$'/);
+    expect(proximo).toMatch(/max\(sequencia\)/i);
+  });
+});
+
 describe("save_carrier aceita a chamada que a tela faz", () => {
   it("p_is_pickup tem valor padrão, senão a chamada de 4 argumentos não resolve", () => {
     const definir = definicaoVigente("save_carrier");
@@ -529,6 +554,49 @@ describe("save_carrier aceita a chamada que a tela faz", () => {
     // trava do frete voltaria a exigir valor de um transporte que não existe.
     const definir = definicaoVigente("save_carrier");
     expect(definir).toMatch(/is_pickup = coalesce\(p_is_pickup, is_pickup\)/i);
+  });
+});
+
+// Pedido da Patricia em 08/09/2026: "pode liberar no acesso de administrador o
+// cancelamento ou exclusão de produtos". Duas portas, dois riscos.
+describe("ativar, inativar e excluir produto", () => {
+  it("inativar é de Administrador e Financeiro", () => {
+    const definir = definicaoVigente("set_product_status");
+    expect(definir).toMatch(/v_papel\s+not\s+in\s*\(\s*'admin',\s*'financeiro'\s*\)/i);
+  });
+
+  it("excluir é SÓ do Administrador", () => {
+    const excluir = definicaoVigente("delete_product");
+    expect(excluir).toMatch(/v_papel <> 'admin'/i);
+    expect(excluir).toMatch(/raise exception '[^']*Somente o Administrador/i);
+  });
+
+  // Apagar um produto que já andou levaria junto o passado que o menciona. As
+  // chaves estrangeiras barrariam de qualquer jeito, mas em inglês e sem dizer
+  // ONDE ele está sendo usado.
+  it("excluir recusa produto usado, dizendo onde ele está", () => {
+    const excluir = definicaoVigente("delete_product");
+    for (const campo of ["em_pedidos", "em_kits", "em_fichas", "em_vendas", "em_despesas"]) {
+      expect(excluir).toContain(`v_uso.${campo}`);
+    }
+    expect(excluir).toMatch(/não pode ser excluído/i);
+    // E aponta a saída mais branda, senão a pessoa fica sem ação nenhuma.
+    expect(excluir).toMatch(/inative-o/i);
+  });
+
+  it("a exclusão fica registrada ANTES de apagar a linha", () => {
+    const excluir = definicaoVigente("delete_product");
+    const auditoria = excluir.search(/insert into public\.audit_logs/i);
+    const apagar = excluir.search(/delete from public\.products/i);
+    expect(auditoria).toBeGreaterThanOrEqual(0);
+    expect(apagar).toBeGreaterThan(auditoria);
+  });
+
+  // As duas portas leem a MESMA contagem de uso: se cada uma tivesse a sua,
+  // um dia elas discordariam sobre o que é "usado".
+  it("inativar e excluir usam a mesma contagem de uso", () => {
+    expect(definicaoVigente("set_product_status")).toMatch(/public\.uso_do_produto/);
+    expect(definicaoVigente("delete_product")).toMatch(/public\.uso_do_produto/);
   });
 });
 

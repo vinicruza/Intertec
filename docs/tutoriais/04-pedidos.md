@@ -107,7 +107,8 @@ aparece na impressão).
 
 **Orçamento ou pedido?** O cabeçalho diz o que a folha é. Enquanto o pedido não foi gerado, ela sai
 como **ORÇAMENTO**, com o número `ORC-...` e a linha "Orçamento em aberto". Depois de gerado, o
-título passa a ser **PEDIDO** com o número do dia (ex.: `06270826`), o orçamento vira subtítulo e a
+título passa a ser **PEDIDO** com o número do dia (ex.: `04092605` — a data primeiro, depois a
+sequência daquele dia), o orçamento vira subtítulo e a
 linha embaixo mostra a data em que o pedido foi gerado. O número do pedido existe desde a criação
 da cotação — a tela do pedido o mostra como *número reservado* —, mas ele só sai na folha quando o
 pedido de fato existe, para o papel nunca anunciar um pedido que ninguém gerou.

@@ -78,6 +78,20 @@ Toda ativação e inativação grava em `audit_logs` com o `auth.uid()` de quem 
 
 Inativar não é excluir, pela mesma razão da §2.2: kit usado em pedido fechado não pode sumir do histórico. Excluir kit continua não existindo.
 
+### 2.7 Excluir produto: só o Administrador (08/09/2026)
+
+Pedido da Patricia: *"pode liberar no acesso de administrador o cancelamento ou exclusão de produtos"*.
+
+**Inativar/reativar** ficou com Administrador e Financeiro — é a mesma régua do kit (§2.6) e a mesma
+de quem já pode escrever em `products`. **Excluir** ficou só com o Administrador: é a única operação
+do sistema que não tem volta, e o Financeiro não precisa dela para o trabalho dele.
+
+A exclusão só é possível para produto que nunca foi usado em pedido, kit, ficha de outro produto,
+venda importada ou rateio de despesa. As chaves estrangeiras já barrariam o resto, mas com erro em
+inglês e sem dizer onde o produto está — `delete_product` recusa antes, nomeando os lugares e
+apontando a saída, que é inativar. Toda exclusão fica em `audit_logs`, gravada **antes** do delete:
+depois dele não há mais linha para descrever.
+
 ## 3. Por que criar usuário precisa de um serviço no servidor
 
 Criar credencial, trocar a senha de outra pessoa e apagar acesso são operações que só a **chave de administração** do projeto pode fazer. Essa chave não pode ficar no navegador — o código de uma página é público, e qualquer visitante passaria a ter poder total sobre a base.

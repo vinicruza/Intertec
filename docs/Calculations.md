@@ -864,3 +864,67 @@ reservado e passa a valer quando o pedido for gerado.
 criada, não a do dia em que o pedido foi gerado. Uma cotação criada dia 27 e fechada dia 30 vira
 "pedido do dia 27". Corrigir isso é mover a numeração para o fechamento (`close_order_with_snapshots`),
 o que é mudança de banco e de sprint própria — não foi feito aqui.
+
+## 17. Três pedidos da Intertech (08/09/2026)
+
+### 17.1 O número do pedido passa a começar pela data
+
+Pedido da Patricia: *"inverte a numeração do pedido; hoje está 05040926, deixa 04092605 — a data
+vem primeiro e os dois últimos dígitos o número do pedido."*
+
+| | Formato | Exemplo |
+|---|---|---|
+| Antes | sequência(2) + ddmmaa | `05040926` |
+| Agora | ddmmaa + sequência(2) | `04092605` |
+
+Ordenar por número passa a ordenar por dia, que é como a operação procura o papel na mesa.
+
+**Pedido já numerado não é renumerado.** Aquele número foi impresso, foi para a mesa da conferência
+e para o cliente — mudá-lo faria o papel na mão de alguém deixar de existir no sistema. Mas a
+sequência do dia precisa continuar de onde parou: por isso `next_order_number` conta as DUAS formas
+do mesmo dia e pega a maior. Sem isso, dois pedidos do mesmo dia disputariam o mesmo par de dígitos
+e o índice único recusaria o fechamento, na frente da vendedora.
+
+Fecha a pendência aberta em §16.3 — junto com a mudança de 04/09, que já tinha movido a atribuição
+do número para o FECHAMENTO (antes ele nascia com a cotação e carregava a data errada).
+
+> **⚠️ Papéis impressos antes de 04/09/2026 podem não bater com o sistema.** Ao mover a numeração
+> para o fechamento, os pedidos existentes foram renumerados pela data de fechamento. O ORC-2026-0170,
+> por exemplo, foi impresso como `PEDIDO 18030926` e hoje está como `15040926`. Não há o que
+> recalcular — é conferência de papel com o sistema, pelo número do ORÇAMENTO, que não mudou.
+
+### 17.2 "Montei de um jeito e o sistema salvou de outro"
+
+Relatado pela Patricia. Conferido na base, no caso citado (ORC-2026-0210, kit KC0039): a cotação foi
+salva **uma vez**, às 12h31m16s, e o pedido foi gerado 40 segundos depois. `order_versions` tem uma
+única versão. **O que ficou gravado é exatamente o que a tela enviou naquele save** — o banco não
+alterou nada, e não há divergência entre o que foi salvo e o que foi impresso.
+
+A divergência é entre a TELA e o BANCO, e ela era possível porque o simulador não avisava. Depois de
+salvar, a mensagem verde "Cotação ORC-… salva ✓" continuava lá enquanto a pessoa mexia nos campos, e
+só alguns campos a apagavam — os que passam pelas funções `atualizar*`. Frete, peso, volumes,
+observação, prazo de pagamento e vários outros trocavam de valor com a mensagem de "salva" intacta.
+Como "Gerar Pedido" fica em OUTRA tela, dava para montar, editar, sair e gerar o pedido sem nunca
+ver um aviso.
+
+A correção não é lembrar de apagar o aviso em cada campo — foi esquecer isso em vários campos que
+criou o problema. `impressaoDaCotacao` serializa TUDO o que vai para o banco e compara com o que foi
+da última vez; campo novo no formulário entra na conta sozinho. Havendo diferença, o verde some e
+entra um aviso âmbar dizendo que o pedido sai com o que está gravado, não com o que está na tela.
+
+### 17.3 Inativar e excluir produto
+
+Mesma história do kit (04/09): `products.status` existe desde o primeiro dia e o simulador já o
+respeita, mas não havia onde clicar. Agora há, com duas portas de risco diferente:
+
+| | Quem pode | O que faz |
+|---|---|---|
+| Inativar / reativar | Administrador e Financeiro | tira de circulação sem apagar nada; reversível |
+| Excluir | **Só o Administrador** | apaga a linha — e só se o produto nunca foi usado |
+
+"Nunca usado" é uma consulta só (`uso_do_produto`), lida pelas duas portas para nunca discordarem:
+pedido, kit, ficha de outro produto, venda importada e rateio de despesa.
+
+**Um aviso que a tela dá e o banco não tem como dar:** produto inativo dentro de um kit ATIVO não
+tira o kit de venda. O kit continua vendável com ele dentro, e o custo segue vindo dele. Por isso a
+confirmação mostra em quantos kits o produto está antes de inativar.
