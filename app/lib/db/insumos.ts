@@ -13,13 +13,13 @@ export type InsumoLinha = {
   category: string | null;
   status: "active" | "inactive";
   purchase_unit: string | null;
-  purchase_price: number | null;
-  conversion_factor: number;
+  purchase_price: string | number | null;
+  conversion_factor: string | number;
   consumption_unit: string | null;
-  price_with_tax: number | null;
-  icms_rate: number;
-  pis_cofins_rate: number;
-  price_without_tax: number | null;
+  price_with_tax: string | number | null;
+  icms_rate: string | number;
+  pis_cofins_rate: string | number;
+  price_without_tax: string | number | null;
   price_updated_at: string | null;
   updated_at: string | null;
   // Mão de obra (costureira): entra no CMV cheio e sai do CMV de competência.
@@ -58,6 +58,16 @@ export function derivarPrecos(form: InsumoFormulario): { comImposto: Decimal; se
   const comImposto = paraDecimal(form.purchase_price).times(paraDecimal(form.conversion_factor || "1"));
   const semImposto = precoSemImposto(comImposto, paraDecimal(form.icms_rate), paraDecimal(form.pis_cofins_rate));
   return { comImposto, semImposto };
+}
+
+export function precoCompraParaFormulario(insumo: Pick<InsumoLinha, "purchase_price" | "price_with_tax" | "conversion_factor">): string {
+  if (insumo.purchase_price !== null && insumo.purchase_price !== undefined) return String(insumo.purchase_price);
+  if (insumo.price_with_tax === null || insumo.price_with_tax === undefined) return "";
+
+  const fator = paraDecimal(insumo.conversion_factor || "1");
+  if (fator.isZero()) return String(insumo.price_with_tax);
+
+  return paraDecimal(insumo.price_with_tax).div(fator).toString();
 }
 
 export async function listarInsumos(): Promise<InsumoLinha[]> {

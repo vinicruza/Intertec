@@ -10,6 +10,7 @@ import {
   derivarPrecos,
   listarHistorico,
   obterInsumo,
+  precoCompraParaFormulario,
   type InsumoFormulario,
 } from "../lib/db/insumos";
 import { reais, dataCurta } from "../lib/format";
@@ -71,7 +72,7 @@ export default function InsumoFormPage() {
     if (i) {
       reset({
         name: i.name, category: i.category ?? "", purchase_unit: i.purchase_unit ?? "",
-        purchase_price: texto(i.purchase_price), conversion_factor: texto(i.conversion_factor, "1"),
+        purchase_price: precoCompraParaFormulario(i), conversion_factor: texto(i.conversion_factor, "1"),
         consumption_unit: i.consumption_unit ?? "", icms_rate: texto(i.icms_rate, "0"),
         pis_cofins_rate: texto(i.pis_cofins_rate, "0"),
         is_labor: i.is_labor ?? false,

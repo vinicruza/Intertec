@@ -54,4 +54,17 @@ describe("formulário de insumo", () => {
     expect(digitado.comImposto.toString()).toBe("0.872");
     expect(digitado.semImposto.toString()).toBe("0.6867");
   });
+
+  it("preenche o preço de compra pelo preço vigente quando a coluna antiga está nula", async () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "test-key");
+
+    const { precoCompraParaFormulario } = await import("@app/lib/db/insumos");
+
+    expect(precoCompraParaFormulario({
+      purchase_price: null,
+      price_with_tax: "0.872",
+      conversion_factor: "0.04",
+    })).toBe("21.8");
+  });
 });
