@@ -638,31 +638,6 @@ export default function SimuladorPage() {
     onError: (e: unknown) => setErroSalvar(mensagemDeErro(e, "Erro ao salvar.")),
   });
 
-  if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {
-    return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
-  }
-  if (!ctx) return <p className="text-red-600">Erro ao carregar o simulador.</p>;
-  if (idParaEditar && !pedidoParaEditar) return <p className="text-red-600">Pedido não encontrado.</p>;
-  if (idParaEditar && pedidoParaEditar && !editavel) {
-    const motivo = pedidoParaEditar.cancelled_at
-      ? "está cancelado"
-      : pedidoParaEditar.status !== "simulation"
-        ? "já foi fechado"
-        : pedidoParaEditar.approval_status === "pendente"
-          ? "está aguardando aprovação"
-          : "já foi aprovado";
-    return (
-      <div className="mx-auto max-w-xl space-y-3">
-        <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-900">
-          Este pedido {motivo} — não é mais possível editar os itens ou valores por aqui.
-          {pedidoParaEditar.approval_status === "pendente" &&
-            " Se precisar mudar algo, peça para recusarem a aprovação primeiro; ao editar de novo, o pedido volta para rascunho."}
-        </p>
-        <Button onClick={() => navigate(`/pedidos/${pedidoParaEditar.id}`)}>Voltar ao pedido</Button>
-      </div>
-    );
-  }
-
   function atualizarLinha(i: number, campo: "itemId" | "quantidade" | "preco", valor: string) {
     setLinhas((a) =>
       a.map((l, idx) => {
@@ -795,6 +770,32 @@ export default function SimuladorPage() {
       return null;
     }
   }, [simulacao, frete, freteCliente, resumoComercial.subtotal]);
+
+  if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {
+    return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
+  }
+  if (!ctx) return <p className="text-red-600">Erro ao carregar o simulador.</p>;
+  if (idParaEditar && !pedidoParaEditar) return <p className="text-red-600">Pedido não encontrado.</p>;
+  if (idParaEditar && pedidoParaEditar && !editavel) {
+    const motivo = pedidoParaEditar.cancelled_at
+      ? "está cancelado"
+      : pedidoParaEditar.status !== "simulation"
+        ? "já foi fechado"
+        : pedidoParaEditar.approval_status === "pendente"
+          ? "está aguardando aprovação"
+          : "já foi aprovado";
+    return (
+      <div className="mx-auto max-w-xl space-y-3">
+        <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-900">
+          Este pedido {motivo} — não é mais possível editar os itens ou valores por aqui.
+          {pedidoParaEditar.approval_status === "pendente" &&
+            " Se precisar mudar algo, peça para recusarem a aprovação primeiro; ao editar de novo, o pedido volta para rascunho."}
+        </p>
+        <Button onClick={() => navigate(`/pedidos/${pedidoParaEditar.id}`)}>Voltar ao pedido</Button>
+      </div>
+    );
+  }
+
   const impostosAplicaveis =
     simulacao.estado === "ok"
       ? simulacao.resultado.imposto.plus(simulacao.resultado.impostoFrete).plus(simulacao.resultado.difal)
