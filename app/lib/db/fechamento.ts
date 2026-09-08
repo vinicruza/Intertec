@@ -211,8 +211,9 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   if (kitIds.length > 0) {
     const { data: kitItems, error: e4 } = await supabase
       .from("kit_items")
-      .select("kit_id, quantity, products(name)")
-      .in("kit_id", kitIds);
+      .select("kit_id, quantity, sort_order, products(name)")
+      .in("kit_id", kitIds)
+      .order("sort_order", { ascending: true });
     if (e4) throw e4;
     for (const ki of kitItems ?? []) {
       const lista = composicaoPorKit.get(ki.kit_id as string) ?? [];
@@ -354,7 +355,7 @@ export async function simularPedidoComCustosVigentes(
   const composicaoPorKit = new Map<string, Array<{ produtoId: string; nome: string; quantidade: string; cmvUnitario: string }>>();
   if (kitIds.length > 0) {
     const [{ data: kitItems, error: e1 }, { data: custos, error: e2 }] = await Promise.all([
-      supabase.from("kit_items").select("kit_id, product_id, quantity, products(name)").in("kit_id", kitIds),
+      supabase.from("kit_items").select("kit_id, product_id, quantity, sort_order, products(name)").in("kit_id", kitIds).order("sort_order", { ascending: true }),
       supabase.from("product_costs").select("product_id, cmv"),
     ]);
     if (e1) throw e1;

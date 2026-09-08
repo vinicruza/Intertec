@@ -16,6 +16,7 @@ export type KitLinha = {
   kit_items: Array<{
     product_id: string;
     quantity: string;
+    sort_order: number | null;
     products: { name: string } | null;
   }>;
   // Envelope e caixas de esterilização: consumidos UMA vez por kit
@@ -37,6 +38,7 @@ type KitLinhaBruta = Omit<KitLinha, "kit_items" | "kit_packaging"> & {
   kit_items?: Array<{
     product_id: string;
     quantity: string;
+    sort_order?: number | null;
     products?: { name: string } | { name: string }[] | null;
   }> | null;
   kit_packaging?: Array<{
@@ -57,11 +59,14 @@ function primeiro<T>(rel: T | T[] | null | undefined): T | null {
 function normalizarKit(kit: KitLinhaBruta): KitLinha {
   return {
     ...kit,
-    kit_items: (kit.kit_items ?? []).map((item) => ({
-      product_id: item.product_id,
-      quantity: String(item.quantity),
-      products: primeiro(item.products),
-    })),
+    kit_items: [...(kit.kit_items ?? [])]
+      .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+      .map((item) => ({
+        product_id: item.product_id,
+        quantity: String(item.quantity),
+        sort_order: item.sort_order ?? null,
+        products: primeiro(item.products),
+      })),
     kit_packaging: (kit.kit_packaging ?? []).map((emb) => ({
       input_id: emb.input_id,
       quantity_type: emb.quantity_type ?? "direct",
@@ -74,7 +79,7 @@ function normalizarKit(kit: KitLinhaBruta): KitLinha {
 
 const SELECT_KIT =
   "id, code, legacy_code, name, description, signature, status, source_order_id, " +
-  "kit_items(product_id, quantity, products(name)), " +
+  "kit_items(product_id, quantity, sort_order, products(name)), " +
   "kit_packaging(input_id, quantity_type, quantity, lot_size, inputs(name, price_without_tax, is_labor))";
 
 export async function listarKits(): Promise<KitLinha[]> {

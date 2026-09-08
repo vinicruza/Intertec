@@ -119,7 +119,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     // índice único — precisa aparecer no aviso de "esta composição já existe".
     supabase
       .from("kits")
-      .select("id, code, name, status, signature, kit_items(product_id, quantity), kit_packaging(input_id, quantity_type, quantity, lot_size)")
+      .select("id, code, name, status, signature, kit_items(product_id, quantity, sort_order), kit_packaging(input_id, quantity_type, quantity, lot_size)")
       .order("name"),
     // Pela RPC, e não pela tabela: `inputs` é fechada ao Comercial por decisão
     // de acesso (RLS), e a leitura direta voltava VAZIA para ele — sem erro,
@@ -206,10 +206,12 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       id: k.id as string,
       codigo: (k.code as string | null) ?? "—",
       nome: k.name as string,
-      produtos: (k.kit_items as Array<{ product_id: string; quantity: string }>).map((i) => ({
-        produtoId: i.product_id,
-        quantidade: String(i.quantity),
-      })),
+      produtos: [...(k.kit_items as Array<{ product_id: string; quantity: string; sort_order?: number | null }>)]
+        .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+        .map((i) => ({
+          produtoId: i.product_id,
+          quantidade: String(i.quantity),
+        })),
       embalagem: ((k.kit_packaging ?? []) as EmbalagemBruta[]).map((e) => ({
         insumoId: e.input_id,
         modo: (e.quantity_type === "lot" ? "itensPorCaixa" : "porKit") as "itensPorCaixa" | "porKit",
