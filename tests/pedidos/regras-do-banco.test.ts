@@ -154,7 +154,8 @@ describe("kit montado dentro do pedido", () => {
   it("preserva a ordem da composição ao virar kit oficial", () => {
     expect(TODAS).toMatch(/alter table public\.kit_items[\s\S]*sort_order/i);
     expect(materializar).toMatch(/insert into public\.kit_items \(tenant_id, kit_id, product_id, quantity, sort_order\)/i);
-    expect(materializar).toMatch(/jsonb_to_recordset\(v_item\.ad_hoc_kit_composition\) with ordinality/i);
+    expect(materializar).toMatch(/jsonb_array_elements\(v_item\.ad_hoc_kit_composition\) with ordinality/i);
+    expect(materializar).toMatch(/cross join lateral jsonb_to_record\(e\.item\)/i);
   });
 
   it("devolve QUAIS kits nasceram, não só quantos — para a tela dizer o código", () => {
