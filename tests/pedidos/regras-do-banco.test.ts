@@ -232,7 +232,18 @@ describe("ciclo da cotação", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
     expect(fechar).toMatch(/v_margin_pct := case when v_net = 0 then 0 else v_margin \/ abs\(v_net\) end/i);
     expect(fechar).toMatch(/v_role in \('admin', 'comercial'\)/i);
-    expect(fechar).toMatch(/approval_status=case when v_self_approved_by_margin then 'aprovado'::approval_status/i);
+    expect(fechar).toMatch(/when v_self_approved_by_margin then 'aprovado'::approval_status/i);
+  });
+
+  it("amostra passa pelo fechamento sem aprovação por margem e fica segregada", () => {
+    const fechar = definicaoVigente("close_order_with_snapshots");
+    const proteger = definicaoVigente("protect_closed_order");
+    const gravar = definicaoVigente("save_quote_revision");
+    expect(TODAS).toMatch(/add column if not exists order_kind text not null default 'sale'/i);
+    expect(gravar).toMatch(/v_order_kind = 'sample'[\s\S]*Amostra exige motivo e autorização/i);
+    expect(proteger).toMatch(/coalesce\(new\.order_kind,\s*'sale'\) <> 'sample'[\s\S]*tem_cotacao_de_frete/i);
+    expect(fechar).toMatch(/coalesce\(v_order\.order_kind,\s*'sale'\) <> 'sample'[\s\S]*v_cfg\.require_approval/i);
+    expect(fechar).toMatch(/when coalesce\(v_order\.order_kind,\s*'sale'\) = 'sample' then 'aprovado'::approval_status/i);
   });
 
   // Até 26/08/2026 o limite da auto-aprovação era `v_margin_pct > 0.50`,

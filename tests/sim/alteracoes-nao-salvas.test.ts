@@ -22,6 +22,9 @@ const BASE: CamposDaCotacao = {
   uf: "SE",
   vendedorId: "v-1",
   canalId: "c-1",
+  tipoPedido: "sale",
+  motivoAmostra: "",
+  autorizadoPorAmostra: "",
   frete: "460",
   freteDestacado: true,
   comissao: null,
@@ -71,6 +74,7 @@ describe("impressão digital da cotação", () => {
     ["modo de pagamento", { modoPagamentoId: "p-2" }],
     ["CEP de entrega", { cepEntrega: "49020411" }],
     ["frete destacado", { freteDestacado: false }],
+    ["tipo de solicitação", { tipoPedido: "sample" as const, motivoAmostra: "avaliação", autorizadoPorAmostra: "Patricia" }],
   ])("mudar %s muda a impressão", (_rotulo, mudanca) => {
     expect(impressaoDaCotacao({ ...BASE, ...mudanca })).not.toBe(impressaoDaCotacao(BASE));
   });

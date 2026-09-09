@@ -11,6 +11,7 @@ export async function dadosDREDoMes(mes: string): Promise<{ pedidos: PedidoParaD
       "id, closed_at, cancelled_at, gross_revenue_snapshot, tax_snapshot, freight_tax_snapshot, difal_snapshot, commission_amount_snapshot, cmv_total_snapshot, expense_total_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name), channels(id, name), order_items(id, order_id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, item_name_snapshot, item_category_snapshot)"
     )
     .eq("status", "closed")
+    .neq("order_kind", "sample")
     .or(`and(closed_at.gte.${inicio},closed_at.lt.${fim}),and(cancelled_at.gte.${inicio},cancelled_at.lt.${fim})`);
   if (error) throw error;
   const pedidos: PedidoParaDRE[] = [];

@@ -172,6 +172,7 @@ export default function PedidoDetalhePage() {
   if (!pedido) return <p className="text-red-600">Pedido não encontrado.</p>;
 
   const fechado = pedido.status === "closed";
+  const amostra = pedido.order_kind === "sample";
   const perdida = pedido.status === "lost";
   const params = paramsQuery.data;
   const verNumeros = podeVerCascataOperacional(perfil?.perfil);
@@ -194,7 +195,7 @@ export default function PedidoDetalhePage() {
       !seloExigeAprovacao(seloDaCascata) &&
       (perfil?.perfil === "admin" || perfil?.perfil === "comercial")
   );
-  const podeGerarPedido = !fechado && !cancelado && !perdida && (aprovacao === "aprovado" || !params?.require_approval || podeFecharDiretoPeloSelo);
+  const podeGerarPedido = !fechado && !cancelado && !perdida && (amostra || aprovacao === "aprovado" || !params?.require_approval || podeFecharDiretoPeloSelo);
   const statusFluxo = statusDoFluxoDoPedido({
     pedido,
     fechado,
@@ -216,7 +217,7 @@ export default function PedidoDetalhePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">Orçamento / Pedido — {pedido.customers?.name ?? "sem cliente"}</h1>
-          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : fechado ? `Pedido gerado em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : "Orçamento em aberto"}</Badge>
+          <Badge>{cancelado ? `Cancelado em ${dataCurta(pedido.cancelled_at)}` : amostra && fechado ? `Amostra gerada em ${dataCurta(pedido.closed_at)}` : fechado ? `Pedido gerado em ${dataCurta(pedido.closed_at)}` : pedido.status === "lost" ? "Cotação perdida" : amostra ? "Amostra em aberto" : "Orçamento em aberto"}</Badge>
           {!cancelado && !perdida && aprovacao !== "rascunho" && (
             <Badge>
               {aprovacao === "pendente" ? "Aguardando aprovação"
@@ -249,6 +250,11 @@ export default function PedidoDetalhePage() {
             COTAÇÃO nasceu, não o do fechamento. */}
         <p><span className="text-[var(--cor-texto-suave)]">Pedido:</span> <strong className="font-mono">{pedido.order_number ?? "—"}</strong>{!fechado && !cancelado && !perdida && !pedido.order_number && <span className="text-[var(--cor-texto-suave)]"> (o número sai quando o pedido for gerado)</span>}</p>
         <p><span className="text-[var(--cor-texto-suave)]">Vendedor:</span> {pedido.sellers?.name ?? "—"} · <span className="text-[var(--cor-texto-suave)]">UF:</span> {pedido.uf ?? "—"} · <span className="text-[var(--cor-texto-suave)]">Comissão:</span> {pedido.commission_rate ?? "—"}</p>
+        {amostra && (
+          <p className="rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <strong>Amostra sem cobrança.</strong> Motivo: {pedido.sample_reason ?? "—"} · Autorizado por: {pedido.sample_authorized_by ?? "—"}
+          </p>
+        )}
         {fechado && (
           <p className="text-xs text-[var(--cor-texto-suave)]">
             Custos congelados no fechamento (snapshot imutável — Decisão D7). Este pedido nunca é recalculado.
@@ -475,16 +481,16 @@ export default function PedidoDetalhePage() {
               setErro(null);
               // Mesma exigência do envio para aprovação: pedido de margem boa é
               // aprovado sozinho e chega aqui sem passar por aquela porta.
-              if (!temCotacaoDeFrete(pedido.freight_quotes)) {
+              if (!amostra && !temCotacaoDeFrete(pedido.freight_quotes)) {
                 setErro(AVISO_SEM_COTACAO_DE_FRETE);
                 return;
               }
-              if (window.confirm("Gerar pedido? Os custos serão congelados e esta versão não mudará mais.")) {
+              if (window.confirm(amostra ? "Gerar amostra? O custo será congelado e não haverá cobrança ao cliente." : "Gerar pedido? Os custos serão congelados e esta versão não mudará mais.")) {
                 fechar.mutate();
               }
             }}
           >
-            {fechar.isPending ? "Gerando…" : "Gerar Pedido"}
+            {fechar.isPending ? "Gerando…" : amostra ? "Gerar Amostra" : "Gerar Pedido"}
           </Button>
         )}
         {fechado && !cancelado && perfil?.perfil === "admin" && (
@@ -704,9 +710,19 @@ function statusDoFluxoDoPedido({
   }
   if (fechado) {
     return {
-      titulo: "Pedido gerado",
-      descricao: `O pedido ${pedido.order_number ?? ""} foi gerado e os custos desta versão estão congelados.`,
+      titulo: pedido.order_kind === "sample" ? "Amostra gerada" : "Pedido gerado",
+      descricao:
+        pedido.order_kind === "sample"
+          ? `A amostra ${pedido.order_number ?? ""} foi gerada sem cobrança, com custo interno congelado.`
+          : `O pedido ${pedido.order_number ?? ""} foi gerado e os custos desta versão estão congelados.`,
       classe: "border-green-200 bg-green-50 text-green-900",
+    };
+  }
+  if (pedido.order_kind === "sample") {
+    return {
+      titulo: "Amostra pronta para gerar",
+      descricao: "Sem cobrança ao cliente. Ao gerar, o sistema congela o CMV e preserva a saída para controle interno.",
+      classe: "border-sky-200 bg-sky-50 text-sky-900",
     };
   }
   if (aprovacao === "pendente") {
@@ -779,7 +795,7 @@ function camposDeExpedicaoPendentes(pedido: PedidoCompleto): string[] {
   // Pedido da Intertech em 26/08/2026: pelo menos uma cotação de frete, com
   // transportadora E valor. É ela que sustenta a margem apresentada e o que a
   // expedição usa para fechar com a transportadora.
-  if (!temCotacaoDeFrete(pedido.freight_quotes)) pendencias.push("cotação de frete");
+  if (pedido.order_kind !== "sample" && !temCotacaoDeFrete(pedido.freight_quotes)) pendencias.push("cotação de frete");
   if (!pedido.carrier_id) pendencias.push("transportadora");
   if (pedido.carriers?.requires_name && !pedido.carrier_other?.trim()) pendencias.push("nome da transportadora");
   if (!pedido.payment_term_id && pedido.payment_term_days == null) pendencias.push("modo de pagamento");

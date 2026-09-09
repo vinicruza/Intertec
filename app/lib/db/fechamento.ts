@@ -22,6 +22,7 @@ export type FreteCotadoPedido = {
 
 export type PedidoResumo = {
   id: string;
+  order_kind: "sale" | "sample";
   status: "simulation" | "closed" | "lost";
   approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
   approved_at: string | null;
@@ -68,7 +69,7 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, submitted_at, quote_number, order_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
+      "id, order_kind, status, approval_status, approved_at, submitted_at, quote_number, order_number, uf, created_at, closed_at, lost_at, loss_notes, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, contribution_margin_snapshot, net_revenue_snapshot, customers(id, name, customer_types(id, name), customer_specialties(id, name)), sellers(id, name), channels(id, name), loss_reasons(id, label), order_items(item_name_snapshot, item_code_snapshot, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code))"
     )
     .order("created_at", { ascending: false })
     .limit(500);
@@ -78,6 +79,9 @@ export async function listarPedidos(): Promise<PedidoResumo[]> {
 
 export type PedidoCompleto = {
   id: string;
+  order_kind: "sale" | "sample";
+  sample_reason: string | null;
+  sample_authorized_by: string | null;
   status: "simulation" | "closed" | "lost";
   approval_status: "rascunho" | "pendente" | "aprovado" | "recusado";
   approved_at: string | null;
@@ -182,7 +186,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, difal_destacado_snapshot, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, volumes_composition, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, order_kind, sample_reason, sample_authorized_by, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, difal_destacado_snapshot, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, volumes_composition, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -452,7 +456,8 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
   // Intertech, 26/08/2026. Fica aqui além da tela porque "Gerar Pedido" não é
   // o único caminho até o fechamento, e a regra não pode depender de qual
   // botão a pessoa apertou.
-  if (!temCotacaoDeFrete(pedidoAntes.freight_quotes)) throw new Error(AVISO_SEM_COTACAO_DE_FRETE);
+  const amostra = pedidoAntes.order_kind === "sample";
+  if (!amostra && !temCotacaoDeFrete(pedidoAntes.freight_quotes)) throw new Error(AVISO_SEM_COTACAO_DE_FRETE);
 
   // O código oficial do kit só nasce agora (reunião 16/07/2026). Os kits
   // montados dentro do pedido viram kits de catálogo aqui — reaproveitando o
@@ -478,7 +483,7 @@ export async function fecharPedido(orderId: string): Promise<KitMaterializado[]>
       faixaDoPedido(ctx.faixasMargem, { channelId: pedido.channel_id, sellerId: pedido.seller_id })
     )
   );
-  if (precisaAprovacao || pedido.approval_status === "aprovado") {
+  if (!amostra && (precisaAprovacao || pedido.approval_status === "aprovado")) {
     const { error: erroAprovacao } = await supabase.rpc("assert_order_approved", { p_order_id: orderId });
     if (erroAprovacao) throw erroAprovacao;
   }

@@ -30,6 +30,9 @@ export type CamposDaCotacao = {
   uf: string;
   vendedorId: string;
   canalId: string;
+  tipoPedido: "sale" | "sample";
+  motivoAmostra: string;
+  autorizadoPorAmostra: string;
   frete: string;
   freteDestacado: boolean;
   comissao: string | null;
@@ -61,6 +64,9 @@ export function impressaoDaCotacao(campos: CamposDaCotacao): string {
     campos.uf,
     campos.vendedorId,
     campos.canalId,
+    campos.tipoPedido,
+    campos.motivoAmostra.trim(),
+    campos.autorizadoPorAmostra.trim(),
     campos.frete.trim(),
     campos.freteDestacado,
     campos.comissao,

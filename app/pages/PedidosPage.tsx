@@ -20,6 +20,8 @@ function statusLogico(p: PedidoResumo): StatusFiltro {
 }
 
 function rotuloStatus(p: PedidoResumo): string {
+  if (p.order_kind === "sample" && p.status === "closed") return `Amostra gerada ${dataCurta(p.closed_at)}`;
+  if (p.order_kind === "sample") return "Amostra em aberto";
   if (p.cancelled_at) return `Cancelado ${dataCurta(p.cancelled_at)}`;
   if (p.status === "closed") return `Pedido gerado ${dataCurta(p.closed_at)}`;
   if (p.status === "lost") return `Perdida ${dataCurta(p.lost_at)}`;

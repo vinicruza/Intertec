@@ -105,6 +105,7 @@ export default function PedidoFichaPage() {
 
   const t = pedido.totals_display;
   const fechado = pedido.status === "closed";
+  const amostra = pedido.order_kind === "sample";
   const cascata = cascataQuery.data;
   const totaisFinanceiros = fechado ? t : cascata?.ok ? cascata.totals : t;
   // Destaque do DIFAL (Calculations.md §7.2.1). Pedido fechado usa o que ficou
@@ -159,7 +160,7 @@ export default function PedidoFichaPage() {
   // Relatado em 27/08/2026 no pedido 05270826.
   const freteDestacado = pedido.freight_paid_by_customer;
   const freteCobrado = freteCobradoDoCliente(pedido.freight ?? "0", freteDestacado);
-  const totalACobrar = totalACobrarDoCliente(totais.subtotal, freteCobrado);
+  const totalACobrar = amostra ? totais.subtotal.times(0) : totalACobrarDoCliente(totais.subtotal, freteCobrado);
 
   // ---------- Selo da faixa de margem (pedido da Intertech, 24/08/2026) ----------
   //
@@ -243,7 +244,11 @@ export default function PedidoFichaPage() {
           {/* Selo da faixa no meio da faixa superior: é o primeiro dado que
               quem confere procura na folha. */}
           <div className="justify-self-center">
-            {selo && (
+            {amostra ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-100 px-5 py-2 text-sm font-bold text-sky-800">
+                Amostra
+              </span>
+            ) : selo && (
               <span
                 className={`inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-bold ${CORES_DO_SELO[selo.color]}`}
               >
@@ -259,6 +264,7 @@ export default function PedidoFichaPage() {
             </p>
             <p className="mt-1 text-sm font-semibold text-[var(--cor-primaria)]">{folha.subtitulo}</p>
             <p className="mt-2 text-[10px] text-black/60">{folha.situacao}</p>
+            {amostra && <p className="text-[10px] font-semibold text-sky-800">Sem cobrança ao cliente</p>}
             <p className="text-[10px] text-black/60">Impresso em {impressoEm}</p>
           </div>
         </div>
@@ -293,6 +299,12 @@ export default function PedidoFichaPage() {
               <Par rotulo="E-mail" valor={cliente?.email} className="w-1/2" larguraRotulo="w-28" />
               <Par rotulo="Vendedor" valor={pedido.sellers?.name} className="w-1/2" larguraRotulo="w-32" />
             </LinhaDeDados>
+            {amostra && (
+              <LinhaDeDados ultima>
+                <Par rotulo="Motivo amostra" valor={pedido.sample_reason} className="w-1/2" larguraRotulo="w-28" />
+                <Par rotulo="Autorizado por" valor={pedido.sample_authorized_by} className="w-1/2" larguraRotulo="w-32" />
+              </LinhaDeDados>
+            )}
           </div>
           {/* Endereço de entrega diferente do de sempre precisa saltar aos
               olhos: é o erro de expedição mais caro que existe. */}

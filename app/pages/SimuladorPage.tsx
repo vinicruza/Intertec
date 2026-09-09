@@ -74,6 +74,8 @@ import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBus
 // cálculo dentro de componente de tela, e o que fica na tela não é testável.
 
 const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", kitNovo: null };
+const TIPO_PEDIDO_VENDA = "sale";
+const TIPO_PEDIDO_AMOSTRA = "sample";
 const FRETE_COTADO_VAZIO: FreteCotado = {
   id: "",
   carrierId: null,
@@ -138,6 +140,9 @@ export default function SimuladorPage() {
   const [clienteNovo, setClienteNovo] = useState("");
   const [clienteNovoCnpj, setClienteNovoCnpj] = useState("");
   const [canalId, setCanalId] = useState("");
+  const [tipoPedido, setTipoPedido] = useState<"sale" | "sample">(TIPO_PEDIDO_VENDA);
+  const [motivoAmostra, setMotivoAmostra] = useState("");
+  const [autorizadoPorAmostra, setAutorizadoPorAmostra] = useState("");
   const [comissao, setComissao] = useState<string | null>(null); // null = padrão do canal
   // O que a pessoa DIGITOU no campo de comissão, enquanto está digitando.
   //
@@ -226,6 +231,9 @@ export default function SimuladorPage() {
     setClienteId(textoDeCampo(p.customer_id));
     setClienteNovoCodigo("");
     setClienteNovo("");
+    setTipoPedido(p.order_kind ?? TIPO_PEDIDO_VENDA);
+    setMotivoAmostra(textoDeCampo(p.sample_reason));
+    setAutorizadoPorAmostra(textoDeCampo(p.sample_authorized_by));
     setComissao(p.commission_rate == null ? null : textoDeCampo(p.commission_rate));
     setComissaoTexto(null);
     setFrete(textoDeCampo(p.freight, "0"));
@@ -313,6 +321,19 @@ export default function SimuladorPage() {
     channelId: canal?.id ?? null,
     sellerId: vendedor?.id ?? null,
   });
+  const amostra = tipoPedido === TIPO_PEDIDO_AMOSTRA;
+  const freteClienteEfetivo = amostra ? false : freteCliente;
+
+  const linhasParaCalculo = useMemo(
+    () =>
+      amostra
+        ? linhas.map((linha) => ({
+            ...linha,
+            preco: linha.itemId && linha.quantidade.trim() !== "" ? "0" : linha.preco,
+          }))
+        : linhas,
+    [amostra, linhas]
+  );
 
   // O padrão de "Frete destacado" segue o canal enquanto ninguém tiver mexido
   // na caixa: marcado na venda direta, em branco no canal de frete automático
@@ -426,14 +447,14 @@ export default function SimuladorPage() {
     if (!vendedor || !canal || pendencias.length > 0) return { estado: "incompleto" as const, pendencias };
     const tabela = ctx.tabelaPorUF.get(uf);
     if (!tabela) return { estado: "incompleto" as const, pendencias: ["UF de destino"] };
-    const preparados = montarItensParaMotor(linhas, resolvidas);
+    const preparados = montarItensParaMotor(linhasParaCalculo, resolvidas);
     if (preparados.estado !== "ok") return preparados;
 
     try {
       const s = simular({
         itens: preparados.itens,
         freteManual: numeroDigitado(frete) || "0",
-        fretePorContaCliente: freteCliente,
+        fretePorContaCliente: freteClienteEfetivo,
         comissao: comissao ? numeroDigitado(comissao) : null,
         aplicaDifal: aplicaDifalOverride,
         canal: canal.regras,
@@ -444,7 +465,7 @@ export default function SimuladorPage() {
       if (e instanceof ErroCalculoBloqueante) return { estado: "bloqueado" as const, msg: e.message };
       return { estado: "bloqueado" as const, msg: "Não foi possível calcular." };
     }
-  }, [ctx, vendedor, canal, uf, linhas, resolvidas, frete, freteCliente, comissao, aplicaDifalOverride]);
+  }, [ctx, vendedor, canal, uf, linhasParaCalculo, resolvidas, frete, freteClienteEfetivo, comissao, aplicaDifalOverride]);
 
   // Kit incompleto não é salvo: ao Gerar Pedido ele vira código oficial de
   // catálogo, então nome e composição precisam estar fechados desde a cotação.
@@ -459,6 +480,12 @@ export default function SimuladorPage() {
   const pendenciasExpedicao = [problemaPeso, problemaVolumes, problemaCidade].filter(
     (p): p is string => p !== null
   );
+  const pendenciasAmostra = amostra
+    ? [
+        motivoAmostra.trim() === "" ? "Informe o motivo da amostra." : null,
+        autorizadoPorAmostra.trim() === "" ? "Informe quem autorizou a amostra." : null,
+      ].filter((p): p is string => p !== null)
+    : [];
   const pendenciasCadastro = () => (problemaClienteNovo ? [problemaClienteNovo] : []);
 
   // Cliente novo criado na cotacao precisa de CNPJ (Intertech, 02/09/2026).
@@ -489,6 +516,9 @@ export default function SimuladorPage() {
         freteDestacado: freteCliente,
         comissao,
         aplicaDifal: aplicaDifalOverride,
+        tipoPedido,
+        motivoAmostra,
+        autorizadoPorAmostra,
         // As linhas inteiras, com a composição do kit montado dentro delas: é
         // exatamente ali que estava a diferença relatada (2 × 4 campos de mesa).
         linhas: linhas.map((l) => JSON.stringify(l)),
@@ -507,7 +537,7 @@ export default function SimuladorPage() {
     [
       clienteId, clienteNovoCodigo, clienteNovo, clienteNovoCnpj, uf,
       vendedorIdEfetivo, canalIdEfetivo, frete, freteCliente, comissao,
-      aplicaDifalOverride, linhas, transportadoraId, transportadoraOutra,
+      aplicaDifalOverride, tipoPedido, motivoAmostra, autorizadoPorAmostra, linhas, transportadoraId, transportadoraOutra,
       fretesCotados, pesoKg, volumes, composicaoVolumes, cepEntrega,
       cidadeEntrega, ufEntrega, modoPagamentoId, observacao,
     ]
@@ -543,12 +573,17 @@ export default function SimuladorPage() {
         );
       }
 
-      const itens = montarItensDaCotacao(linhas, resolvidas, ctx.itens);
+      if (pendenciasAmostra.length > 0) throw new Error(pendenciasAmostra.join(" "));
+
+      const itens = montarItensDaCotacao(linhasParaCalculo, resolvidas, ctx.itens);
 
       // A foto da cotação vai junto na versão, para a análise do que não vingou.
       const foto = {
         registrado_em: new Date().toISOString(),
         uf,
+        tipo_pedido: tipoPedido,
+        motivo_amostra: amostra ? motivoAmostra.trim() : null,
+        autorizado_por_amostra: amostra ? autorizadoPorAmostra.trim() : null,
         itens: itens.map((i) => ({ tipo: i.tipo, quantidade: i.quantidade, preco: i.precoVenda, rotulo: i.kitNovo?.rotulo })),
         receita_bruta: simulacao.resultado.receitaBruta.toString(),
         receita_liquida: simulacao.resultado.receitaLiquida.toString(),
@@ -567,10 +602,13 @@ export default function SimuladorPage() {
         vendedorId: vendedor.id,
         channelId: canal.id,
         frete: simulacao.freteUsado.toString(),
-        fretePorContaCliente: freteCliente,
+        fretePorContaCliente: amostra ? false : freteCliente,
         comissao: simulacao.comissaoUsada.toString(),
         aplicaDifal: simulacao.aplicaDifalUsado,
         itens,
+        tipoPedido,
+        motivoAmostra: amostra ? motivoAmostra : null,
+        autorizadoPorAmostra: amostra ? autorizadoPorAmostra : null,
         transportadoraId: transportadoraId || null,
         transportadoraOutra: transportadoraPedeNome ? transportadoraOutra : null,
         fretesCotados,
@@ -594,7 +632,7 @@ export default function SimuladorPage() {
         }
       }
 
-      if (!seloExigeAprovacao(selo)) {
+      if (amostra || !seloExigeAprovacao(selo)) {
         return { ...cotacao, aprovacao: "aprovado_auto" as const };
       }
 
@@ -616,6 +654,7 @@ export default function SimuladorPage() {
         contexto: {
           aprovacao: r.aprovacao,
           editando: Boolean(idParaEditar),
+          tipoPedido,
           itens: linhas.length,
         },
       });
@@ -753,23 +792,23 @@ export default function SimuladorPage() {
 
   const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
   const resumoComercial = useMemo(
-    () => resumoComercialDasLinhas(linhas, resolvidas),
-    [linhas, resolvidas]
+    () => resumoComercialDasLinhas(linhasParaCalculo, resolvidas),
+    [linhasParaCalculo, resolvidas]
   );
   const totaisComerciais = useMemo(() => {
     try {
       const freteCobrado =
         simulacao.estado === "ok"
-          ? freteCobradoDoCliente(simulacao.freteUsado, freteCliente)
-          : freteCobradoDoCliente(numeroDigitado(frete) || "0", freteCliente);
+          ? freteCobradoDoCliente(simulacao.freteUsado, freteClienteEfetivo)
+          : freteCobradoDoCliente(numeroDigitado(frete) || "0", freteClienteEfetivo);
       return {
         freteCobrado,
-        total: totalACobrarDoCliente(resumoComercial.subtotal, freteCobrado),
+        total: amostra ? freteCobrado.times(0) : totalACobrarDoCliente(resumoComercial.subtotal, freteCobrado),
       };
     } catch {
       return null;
     }
-  }, [simulacao, frete, freteCliente, resumoComercial.subtotal]);
+  }, [simulacao, frete, freteClienteEfetivo, resumoComercial.subtotal, amostra]);
 
   if (ctxQuery.isLoading || (idParaEditar && pedidoQuery.isLoading)) {
     return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
@@ -802,7 +841,7 @@ export default function SimuladorPage() {
       : null;
   const modoPagamento = ctx.modosPagamento.find((m) => m.id === modoPagamentoId) ?? null;
   const precoFinalPorLinha = new Map<number, string>();
-  if (simulacao.estado === "ok" && freteCliente) {
+  if (simulacao.estado === "ok" && freteClienteEfetivo) {
     const itensComFreteParaExibicao = aplicarFreteDestacadoAosItens(simulacao.itensCalculados, simulacao.freteUsado);
     let itemCalculado = 0;
     linhas.forEach((linha, i) => {
@@ -956,6 +995,53 @@ export default function SimuladorPage() {
           )}
         </div>
 
+        <div className="rounded-md border border-[var(--cor-borda)] bg-[var(--cor-fundo)] p-3">
+          <Label>Tipo de solicitação</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${!amostra ? "bg-[var(--cor-primaria)] text-white" : "bg-white text-[var(--cor-texto)]"}`}
+              onClick={() => setTipoPedido(TIPO_PEDIDO_VENDA)}
+            >
+              Venda
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${amostra ? "bg-[var(--cor-primaria)] text-white" : "bg-white text-[var(--cor-texto)]"}`}
+              onClick={() => {
+                setTipoPedido(TIPO_PEDIDO_AMOSTRA);
+                setFreteCliente(false);
+                freteClienteEscolhido.current = true;
+              }}
+            >
+              Amostra sem cobrança
+            </button>
+          </div>
+          {amostra && (
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <Label>Motivo da amostra</Label>
+                <Input
+                  value={motivoAmostra}
+                  onChange={(e) => setMotivoAmostra(e.target.value)}
+                  placeholder="ex.: avaliação do cliente"
+                />
+              </div>
+              <div>
+                <Label>Autorizado por</Label>
+                <Input
+                  value={autorizadoPorAmostra}
+                  onChange={(e) => setAutorizadoPorAmostra(e.target.value)}
+                  placeholder="nome de quem autorizou"
+                />
+              </div>
+              <p className="md:col-span-2 text-xs text-[var(--cor-texto-suave)]">
+                A amostra baixa custo/CMV interno, mas o valor cobrado do cliente fica travado em R$ 0,00.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
             {/* Em porcentagem, não em fração: pedir 0,025 é pedir para alguém
@@ -1070,10 +1156,15 @@ export default function SimuladorPage() {
                 <AvisoDeNumero valor={l.quantidade} />
               </div>
               <div>
-                <Label>{l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
-                <Input className="w-28" value={l.preco} onChange={(e) => atualizarLinha(i, "preco", e.target.value)} />
-                <AvisoDeNumero valor={l.preco} />
-                {freteCliente && precoFinalPorLinha.has(i) && (
+                <Label>{amostra ? "Preço cliente" : l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
+                <Input
+                  className="w-28"
+                  value={amostra && l.itemId ? "0" : l.preco}
+                  onChange={(e) => atualizarLinha(i, "preco", e.target.value)}
+                  disabled={amostra}
+                />
+                {!amostra && <AvisoDeNumero valor={l.preco} />}
+                {freteClienteEfetivo && precoFinalPorLinha.has(i) && (
                   <p className="mt-1 w-32 text-[0.65rem] leading-tight text-[var(--cor-texto-suave)]">
                     Final com frete: {reais(precoFinalPorLinha.get(i)!)}
                   </p>
@@ -1196,7 +1287,8 @@ export default function SimuladorPage() {
           <label className="flex items-end gap-2 pb-2 text-sm">
             <input
               type="checkbox"
-              checked={freteCliente}
+              checked={freteClienteEfetivo}
+              disabled={amostra}
               onChange={(e) => {
                 setFreteCliente(e.target.checked);
                 freteClienteEscolhido.current = true;
@@ -1205,7 +1297,9 @@ export default function SimuladorPage() {
             Frete destacado
           </label>
           <p className="col-span-2 text-xs text-[var(--cor-texto-suave)] md:col-span-4">
-            {freteCliente
+            {amostra
+              ? "Amostra: o frete pode ser registrado como custo interno, mas não é cobrado do cliente."
+              : freteCliente
               ? "Ativado: o frete é rateado nos itens e entra na margem com o imposto sobre frete."
               : "Desativado: o frete fica só na expedição e a margem bate com a rentabilidade antiga."}
           </p>
@@ -1433,7 +1527,7 @@ export default function SimuladorPage() {
             <LinhaResumoOrcamento rotulo="Descontos" valor={reais("0")} />
             <LinhaResumoOrcamento rotulo="Acréscimos" valor={reais("0")} />
             <LinhaResumoOrcamento
-              rotulo={freteCliente ? "Frete no orçamento" : "Frete não destacado"}
+              rotulo={amostra ? "Frete cobrado" : freteClienteEfetivo ? "Frete no orçamento" : "Frete não destacado"}
               valor={totaisComerciais ? reais(totaisComerciais.freteCobrado.toString()) : "—"}
             />
             <LinhaResumoOrcamento
@@ -1465,7 +1559,7 @@ export default function SimuladorPage() {
         </p>
       )}
 
-      {simulacao.estado === "incompleto" && !semVendedorVinculado && linhas.some((l) => l.itemId && l.quantidade && l.preco) && (
+      {simulacao.estado === "incompleto" && !semVendedorVinculado && linhasParaCalculo.some((l) => l.itemId && l.quantidade && l.preco) && (
         <p className="rounded-md bg-amber-50 px-3 py-3 text-sm text-amber-800">
           Para calcular a cascata, falta preencher: {"pendencias" in simulacao ? simulacao.pendencias.join(", ") : "dados do pedido"}.
         </p>
@@ -1478,8 +1572,12 @@ export default function SimuladorPage() {
       {simulacao.estado === "ok" && (
         <Card className="space-y-2">
           <div className={`flex items-center ${verNumeros ? "justify-between" : "justify-center"}`}>
-            {verNumeros && <h2 className="text-lg font-semibold">Cascata do pedido</h2>}
-            {(() => {
+            {verNumeros && <h2 className="text-lg font-semibold">{amostra ? "Custo interno da amostra" : "Cascata do pedido"}</h2>}
+            {amostra ? (
+              <span className="rounded-full bg-sky-100 px-6 py-3 text-xl font-semibold text-sky-800 shadow-sm">
+                Amostra
+              </span>
+            ) : (() => {
               const st = seloMargemComercial(simulacao.resultado.margemContribuicaoPct, faixaMargem);
               return (
                 <span className={`rounded-full px-6 py-3 text-xl font-semibold shadow-sm ${CORES[st.color]}`}>
@@ -1498,7 +1596,7 @@ export default function SimuladorPage() {
               />
               <LinhaCascata
                 rotulo="(−) Frete destacado / cliente"
-                detalhe={freteCliente ? `Cliente paga ${reais(simulacao.freteUsado.toString())}; não reduz a margem` : "Frete só registrado na expedição"}
+                detalhe={freteClienteEfetivo ? `Cliente paga ${reais(simulacao.freteUsado.toString())}; não reduz a margem` : "Frete só registrado na expedição"}
                 valor={simulacao.resultado.frete.negated().toString()}
               />
               <LinhaCascata
@@ -1540,7 +1638,9 @@ export default function SimuladorPage() {
             </tbody>
           </table>}
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
-            Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; frete cliente não reduz a margem, mas o imposto sobre frete aparece separado.
+            {amostra
+              ? "Amostra sem cobrança: o cliente não paga nada, mas CMV e frete interno ficam registrados para controle."
+              : "Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; frete cliente não reduz a margem, mas o imposto sobre frete aparece separado."}
           </p>}
 
           {simulacao.avisos.map((a, i) => (
@@ -1553,12 +1653,15 @@ export default function SimuladorPage() {
               disabled={
                 salvar.isPending ||
                 pendenciasKit.length > 0 ||
+                pendenciasAmostra.length > 0 ||
                 pendenciasExpedicao.length > 0 ||
                 pendenciasCadastro().length > 0
               }
               title={
                 pendenciasKit.length > 0
                   ? "Corrija as pendências dos kits antes de salvar."
+                  : pendenciasAmostra.length > 0
+                    ? pendenciasAmostra.join(" ")
                   : pendenciasExpedicao.length > 0
                     ? pendenciasExpedicao.join(" ")
                     : undefined
@@ -1584,7 +1687,9 @@ export default function SimuladorPage() {
               <span className={`text-sm ${salvo.aprovacao === "pendente_com_pendencia" ? "text-amber-700" : "text-green-700"}`}>
                 Cotação <strong>{salvo.quote_number}</strong>
                 {salvo.order_number ? <> / Pedido <strong>{salvo.order_number}</strong></> : ""} salva — versão {salvo.version}{" "}
-                {salvo.aprovacao === "aprovado_auto"
+                {amostra
+                  ? "como amostra sem cobrança"
+                  : salvo.aprovacao === "aprovado_auto"
                   ? "e aprovada automaticamente pela margem"
                   : salvo.aprovacao === "pendente"
                     ? "e enviada para aprovação"
@@ -1593,9 +1698,9 @@ export default function SimuladorPage() {
                       : ""} ✓
               </span>
             )}
-            {[...pendenciasCadastro(), ...pendenciasExpedicao].length > 0 && (
+            {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasExpedicao].length > 0 && (
               <span className="text-sm text-amber-700">
-                {[...pendenciasCadastro(), ...pendenciasExpedicao].join(" ")}
+                {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasExpedicao].join(" ")}
               </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}

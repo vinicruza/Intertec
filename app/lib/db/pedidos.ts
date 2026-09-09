@@ -377,6 +377,9 @@ export type ItemSimulacao = {
 };
 
 export type DadosSimulacao = {
+  tipoPedido: "sale" | "sample";
+  motivoAmostra: string | null;
+  autorizadoPorAmostra: string | null;
   clienteId: string | null;
   clienteNovoCodigo: string | null;
   clienteNovoNome: string | null;
@@ -478,6 +481,9 @@ export async function salvarCotacao(
       payment_term_id: d.modoPagamentoId,
       payment_term_days: numeroOuVazio(d.prazoPagamentoDias),
       order_notes: d.observacao,
+      order_kind: d.tipoPedido,
+      sample_reason: d.motivoAmostra,
+      sample_authorized_by: d.autorizadoPorAmostra,
     },
     p_items: d.itens.map((i) => ({
       product_id: i.tipo === "produto" ? i.refId : null,

@@ -29,6 +29,8 @@ function nomeNFDoItem(i: ItemDoPedido): string {
 
 function statusDoPedido(p: PedidoResumo): string {
   if (p.cancelled_at) return "Cancelado";
+  if (p.order_kind === "sample" && p.status === "closed") return "Amostra gerada";
+  if (p.order_kind === "sample") return "Amostra em aberto";
   if (p.status === "closed") return "Pedido gerado";
   if (p.status === "lost") return "Perdida";
   if (p.approval_status === "pendente") return "Enviado para aprovação";

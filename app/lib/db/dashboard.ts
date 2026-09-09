@@ -16,7 +16,8 @@ export async function carregarDadosDashboard(mes: string | null): Promise<{
     .select(
       "id, closed_at, cancelled_at, gross_revenue_snapshot, net_revenue_snapshot, contribution_margin_snapshot, customers(id, name), sellers(id, name)"
     )
-    .eq("status", "closed");
+    .eq("status", "closed")
+    .neq("order_kind", "sample");
   if (mes) {
     const { inicio, fim } = limitesMesSaoPaulo(mes);
     q = q.or(`and(closed_at.gte.${inicio},closed_at.lt.${fim}),and(cancelled_at.gte.${inicio},cancelled_at.lt.${fim})`);
