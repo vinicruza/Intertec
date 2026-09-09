@@ -107,6 +107,12 @@ describe("gravar kit pela tela de Kits", () => {
     expect(salvar).toMatch(/source_order_id is not null[\s\S]*signature is distinct from p_signature/i);
     expect(salvar).toMatch(/nasceu de um pedido ganho/);
   });
+
+  it("aceita produto repetido para preservar sequência de montagem", () => {
+    expect(TODAS).toMatch(/drop constraint if exists kit_items_kit_id_product_id_key/i);
+    expect(TODAS).toMatch(/create index if not exists kit_items_kit_product_idx/i);
+    expect(salvar).toMatch(/jsonb_array_elements\(p_items\) with ordinality/i);
+  });
 });
 
 describe("kit montado dentro do pedido", () => {
@@ -153,6 +159,7 @@ describe("kit montado dentro do pedido", () => {
 
   it("preserva a ordem da composição ao virar kit oficial", () => {
     expect(TODAS).toMatch(/alter table public\.kit_items[\s\S]*sort_order/i);
+    expect(TODAS).toMatch(/drop constraint if exists kit_items_kit_id_product_id_key/i);
     expect(materializar).toMatch(/insert into public\.kit_items \(tenant_id, kit_id, product_id, quantity, sort_order\)/i);
     expect(materializar).toMatch(/jsonb_array_elements\(v_item\.ad_hoc_kit_composition\) with ordinality/i);
     expect(materializar).toMatch(/cross join lateral jsonb_to_record\(e\.item\)/i);
