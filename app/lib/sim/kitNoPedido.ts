@@ -149,11 +149,9 @@ export type CatalogoParaKit = {
   // por `chaveDaEmbalagem`. Ausente = ainda calculando; nulo = não deu para
   // custear (insumo sem preço ou quantidade inválida).
   custoEmbalagemPorChave?: Map<string, string | null>;
-  // Assinatura → kit já cadastrado. Inclui kit INATIVO de propósito: a
-  // assinatura é única no banco independentemente do status, então uma
-  // composição igual à de um kit inativo não gera código novo — vai cair no
-  // kit inativo de qualquer jeito. Melhor o vendedor saber disso na hora do
-  // que descobrir depois de ganhar o pedido.
+  // Assinatura → kit ativo já cadastrado. Kit inativo não pode ser puxado para
+  // um pedido novo; se a pessoa montar a mesma composição, ela segue como kit
+  // novo e ganha outro código ao gerar pedido.
   kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string; ativo?: boolean }>;
 };
 
@@ -266,11 +264,13 @@ export function resolverKitDoPedido(
   // Enquanto o servidor não devolveu o custo, o kit fica sem CMV em vez de
   // mostrar um número que ainda vai mudar.
   if (embalagemValida.some((x) => x.pendente)) {
-    return { ...vazio, assinatura, kitExistente: catalogo.kitPorAssinatura.get(assinatura) ?? null };
+    const cadastrado = catalogo.kitPorAssinatura.get(assinatura) ?? null;
+    return { ...vazio, assinatura, kitExistente: cadastrado?.ativo === false ? null : cadastrado };
   }
   const linhasEmbalagem: EmbalagemKit[] = embalagemValida.map((x) => x.item);
 
-  const kitExistente = catalogo.kitPorAssinatura.get(assinatura) ?? null;
+  const cadastrado = catalogo.kitPorAssinatura.get(assinatura) ?? null;
+  const kitExistente = cadastrado?.ativo === false ? null : cadastrado;
 
   try {
     const r = custoKitCompleto(produtos, catalogo.custoPorProduto, linhasEmbalagem);

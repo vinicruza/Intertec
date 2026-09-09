@@ -369,7 +369,7 @@ describe("kit montado na hora cuja composição JÁ existe", () => {
     ]);
   });
 
-  it("avisa também quando o kit gêmeo está INATIVO — a assinatura é única de qualquer jeito", () => {
+  it("kit gêmeo inativo não é puxado para pedido novo", () => {
     const inativo: CatalogoParaKit["kitPorAssinatura"] = new Map([
       [ASSINATURA_KC0001, { id: "kit-KC0001", codigo: "KC0001", nome: "Kit Catarata", ativo: false }],
     ]);
@@ -382,8 +382,13 @@ describe("kit montado na hora cuja composição JÁ existe", () => {
       })],
       kitsCadastrados: inativo,
     });
-    expect(pedido.resolvidas[0]!.kitExistente?.ativo).toBe(false);
-    expect(pedido.resolvidas[0]!.kitExistente?.codigo).toBe("KC0001");
+    expect(pedido.resolvidas[0]!.kitExistente).toBeNull();
+    expect(pedido.itensDaCotacao[0]).toMatchObject({
+      tipo: "kitNovo",
+      refId: "",
+      quantidade: "100",
+      precoVenda: "25",
+    });
   });
 
   it("mudar só o número de caixas já é outro kit — o custo é outro", () => {

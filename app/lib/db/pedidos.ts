@@ -84,10 +84,9 @@ export type ContextoSimulador = {
   // Para montar kit dentro do pedido (reunião 16/07/2026):
   produtos: Array<{ id: string; nome: string; codigo: string; cmv: string | null }>;
   insumosEmbalagem: InsumoEmbalagem[];
-  // Assinatura → kit existente, para avisar na hora que a composição já existe.
-  // Inclui kit inativo (`ativo: false`): a assinatura é única no banco
-  // independentemente do status, então a composição igual à de um kit inativo
-  // não ganha código novo — cai no kit inativo.
+  // Assinatura → kit ativo existente, para avisar na hora que a composição já
+  // existe. Kit inativo sai deste mapa: ele não pode ser puxado para venda nem
+  // para fechamento; composição igual deve seguir como kit novo.
   kitPorAssinatura: Map<string, { id: string; codigo: string; nome: string; ativo: boolean }>;
   // Kits ativos com a composição aberta, para "partir de um kit existente" no
   // montador — montar "o kit catarata mais uma compressa" sem reescolher tudo.
@@ -184,17 +183,17 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
     };
   });
 
-  // Assinatura → kit já cadastrado. Serve para o simulador avisar, enquanto a
-  // pessoa monta, que aquela composição já existe e tem código.
+  // Assinatura → kit ativo já cadastrado. Inativo não reserva a composição para
+  // pedido novo: se a pessoa montar igual, o fluxo cria outro kit ativo.
   const kitPorAssinatura = new Map<string, { id: string; codigo: string; nome: string; ativo: boolean }>();
   for (const k of kits.data ?? []) {
     const assinatura = k.signature as string | null;
-    if (assinatura) {
+    if (assinatura && k.status === "active") {
       kitPorAssinatura.set(assinatura, {
         id: k.id as string,
         codigo: (k.code as string | null) ?? "—",
         nome: k.name as string,
-        ativo: k.status === "active",
+        ativo: true,
       });
     }
   }
