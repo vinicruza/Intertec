@@ -240,7 +240,18 @@ export default function PedidoFichaPage() {
       <div className="ficha-pedido space-y-4 rounded-xl border border-[var(--cor-borda)] bg-white p-8 text-[11px] leading-snug text-black shadow-[var(--sombra-cartao)] print:rounded-none print:border-0 print:p-0 print:shadow-none">
         {/* ---------- Cabeçalho ---------- */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-          <IntertechLogo size="lg" className="h-16 [&_img]:h-16" />
+          <div>
+            <IntertechLogo size="lg" className="h-16 [&_img]:h-16" />
+            {/* Aviso de canal (pedido da Patricia, 10/09/2026): quem confere
+                na mesa precisa ver, sem abrir o pedido, que quem fatura este
+                aqui não é a Intertech Surgical. Mesmo tamanho do número do
+                pedido — é para chamar a atenção, não para ser mais um dado. */}
+            {pedido.channels?.rotulo_ficha && (
+              <p className="mt-1 text-2xl font-extrabold leading-none tracking-tight text-[var(--cor-primaria)]">
+                {pedido.channels.rotulo_ficha}
+              </p>
+            )}
+          </div>
           {/* Selo da faixa no meio da faixa superior: é o primeiro dado que
               quem confere procura na folha. */}
           <div className="justify-self-center">

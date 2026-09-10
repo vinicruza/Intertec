@@ -116,6 +116,9 @@ export type PedidoCompleto = {
   // id — que é o que o formulário de edição precisa para pré-selecionar o
   // cliente no <select>.
   customer_id: string | null;
+  // Aviso de canal na ficha (10/09/2026): nulo em todo canal sem aviso, texto
+  // solto (ex.: "Descpro") em quem precisa avisar quem está faturando.
+  channels: { rotulo_ficha: string | null } | null;
   // Expedição e condições do formulário de pedido (05/08/2026).
   carrier_id: string | null;
   carrier_other: string | null;
@@ -186,7 +189,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: pedido, error } = await supabase
     .from("orders")
     .select(
-      "id, order_kind, sample_reason, sample_authorized_by, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, difal_destacado_snapshot, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, volumes_composition, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name)"
+      "id, order_kind, sample_reason, sample_authorized_by, status, approval_status, approved_at, approved_by, approval_notes, submitted_by, submitted_at, quote_number, order_number, uf, freight, freight_paid_by_customer, freight_quotes, commission_rate, applies_difal, difal_destacado_snapshot, customer_id, channel_id, seller_id, created_at, closed_at, cancelled_at, cancellation_reason, revised_from_order_id, revision_reason, totals_display, carrier_id, carrier_other, weight_kg, volumes, volumes_composition, shipping_zip, shipping_city, shipping_state, payment_term_id, payment_term_days, order_notes, carriers(name, requires_name), payment_terms(label), customers(external_code, name, tax_id, billing_zip, billing_city, billing_state, shipping_zip, shipping_city, shipping_state, contact_name, phone, email), sellers(name), channels(rotulo_ficha)"
     )
     .eq("id", id)
     .maybeSingle();
