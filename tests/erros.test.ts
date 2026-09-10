@@ -92,6 +92,15 @@ describe("traduzErroDoBanco", () => {
     );
   });
 
+  it("traduz travas da ficha de produto", () => {
+    expect(traduzErroDoBanco(doBanco('violates check constraint "products_semantic_code"'))).toMatch(
+      /código do produto/i
+    );
+    expect(traduzErroDoBanco(doBanco('violates check constraint "product_components_check2"'))).toMatch(
+      /ficha técnica/i
+    );
+  });
+
   it("nunca deixa o nome da trava chegar à tela", () => {
     const nomes = [
       "orders_shipping_zip_formato",

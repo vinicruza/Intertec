@@ -1,5 +1,6 @@
 import { Decimal, resolverQuantidade, type InsumoCascata, type ProdutoCascata, type Quantidade } from "@calc";
 import { origemDaDescricaoNF, type FamiliaNF, type OrigemDescricaoNF } from "../../../lib/nomenclatura/descricaoNF";
+import { numeroDigitado } from "../format";
 import { supabase } from "../supabase";
 
 export type ProdutoLinha = {
@@ -62,7 +63,7 @@ export async function listarCategoriasProduto(): Promise<CategoriaProduto[]> {
 }
 
 function num(texto: unknown): string {
-  const limpo = String(texto ?? "").trim().replace(",", ".");
+  const limpo = numeroDigitado(String(texto ?? "")).trim();
   return limpo === "" ? "0" : limpo;
 }
 

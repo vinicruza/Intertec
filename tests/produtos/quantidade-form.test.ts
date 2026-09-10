@@ -33,4 +33,37 @@ describe("ficha técnica no formulário de produto", () => {
       }).valor.toString()
     ).toBe("2");
   });
+
+  it("normaliza número brasileiro antes de salvar a ficha técnica", async () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "http://127.0.0.1:54321");
+    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "test-key");
+
+    const { quantidadeDoComponente } = await import("@app/lib/db/produtos");
+
+    expect(
+      quantidadeDoComponente({
+        tipo: "insumo",
+        refId: "bobina",
+        quantity_type: "area",
+        quantity: "",
+        width: "1,6",
+        length: "2,8",
+        yield_rate: "16",
+        lot_size: "",
+      }).valor.toString()
+    ).toBe("0.28");
+
+    expect(
+      quantidadeDoComponente({
+        tipo: "insumo",
+        refId: "tecido",
+        quantity_type: "direct",
+        quantity: "1.000,5",
+        width: "",
+        length: "",
+        yield_rate: "",
+        lot_size: "",
+      }).valor.toString()
+    ).toBe("1000.5");
+  });
 });

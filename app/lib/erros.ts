@@ -124,6 +124,10 @@ const POR_TRAVA: Record<string, string> = {
   product_categories_tenant_id_prefix_key: "Já existe uma categoria com este prefixo de código.",
   product_categories_prefix_check:
     "O prefixo da categoria tem de 2 a 3 caracteres, começando por letra maiúscula — por exemplo CS ou AVC.",
+  products_semantic_code:
+    "O código do produto precisa seguir o prefixo da categoria mais a sequência numérica. Atualize a página e tente salvar de novo.",
+  product_components_check2:
+    "A ficha técnica precisa de quantidade maior que zero. Para área, confira largura, comprimento e rendimento.",
   product_components_computed_quantity_check:
     "A quantidade consumida precisa ser maior que zero. Confira largura, comprimento e rendimento.",
   product_cmv_overrides_cmv_check: "O custo informado precisa ser maior que zero.",
