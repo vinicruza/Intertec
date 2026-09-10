@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  criarCategoriaProduto,
   excluirModoPagamento,
   excluirTransportadora,
   listarModosPagamentoCadastro,
@@ -361,14 +362,28 @@ function AbaCategorias() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["categoriasProduto"], queryFn: listarCategoriasProduto });
   const [erro, setErro] = useState<string | null>(null);
+  const [nova, setNova] = useState({ name: "", prefix: "", erp_prefix: "", sort_order: "0" });
+
+  const invalidar = () => {
+    setErro(null);
+    queryClient.invalidateQueries({ queryKey: ["categoriasProduto"] });
+    queryClient.invalidateQueries({ queryKey: ["categorias-produto"] });
+    queryClient.invalidateQueries({ queryKey: ["ctxSimulador"] });
+  };
+  const aoErrar = (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar."));
 
   const salvar = useMutation({
     mutationFn: (v: { id: string; prefixo: string }) => salvarPrefixoErp(v.id, v.prefixo),
+    onSuccess: invalidar,
+    onError: aoErrar,
+  });
+  const criar = useMutation({
+    mutationFn: criarCategoriaProduto,
     onSuccess: () => {
-      setErro(null);
-      queryClient.invalidateQueries({ queryKey: ["categoriasProduto"] });
+      invalidar();
+      setNova({ name: "", prefix: "", erp_prefix: "", sort_order: "0" });
     },
-    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao salvar.")),
+    onError: aoErrar,
   });
 
   if (isLoading) return <p className="text-[var(--cor-texto-suave)]">Carregando…</p>;
@@ -389,6 +404,68 @@ function AbaCategorias() {
           aoSalvar={(prefixo) => salvar.mutate({ id: c.id, prefixo })}
         />
       ))}
+
+      <Card className="space-y-3">
+        <h3 className="font-semibold">Adicionar categoria de produto</h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-56 flex-1">
+            <Label>Nome</Label>
+            <Input
+              value={nova.name}
+              onChange={(e) => setNova({ ...nova, name: e.target.value })}
+              placeholder="ex.: Avental Especial"
+            />
+          </div>
+          <div>
+            <Label>Prefixo do código</Label>
+            <Input
+              className="w-32 uppercase"
+              value={nova.prefix}
+              placeholder="ex.: AE"
+              onChange={(e) => setNova({ ...nova, prefix: e.target.value.toUpperCase() })}
+            />
+          </div>
+          <div>
+            <Label>Prefixo no ERP</Label>
+            <Input
+              className="w-28"
+              value={nova.erp_prefix}
+              placeholder="ex.: 12"
+              onChange={(e) => setNova({ ...nova, erp_prefix: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>Ordem</Label>
+            <Input
+              className="w-24"
+              value={nova.sort_order}
+              onChange={(e) => setNova({ ...nova, sort_order: e.target.value })}
+            />
+          </div>
+          <Button
+            disabled={
+              !nova.name.trim() ||
+              !/^[A-Z][A-Z0-9]{1,2}$/.test(nova.prefix.trim()) ||
+              (!!nova.erp_prefix.trim() && !/^\d{1,4}$/.test(nova.erp_prefix.trim())) ||
+              criar.isPending
+            }
+            onClick={() =>
+              criar.mutate({
+                name: nova.name,
+                prefix: nova.prefix,
+                erp_prefix: nova.erp_prefix,
+                sort_order: Number(nova.sort_order) || ((data ?? []).length + 1) * 10,
+              })
+            }
+          >
+            Adicionar
+          </Button>
+        </div>
+        <p className="text-xs text-[var(--cor-texto-suave)]">
+          O prefixo do código vira o começo dos códigos novos de produto desta família. Depois que
+          houver produto usando a categoria, trate esse prefixo como fixo.
+        </p>
+      </Card>
     </div>
   );
 }

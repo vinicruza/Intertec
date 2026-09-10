@@ -93,16 +93,32 @@ export type CategoriaProduto = {
   name: string;
   prefix: string;
   erp_prefix: string | null;
+  sort_order: number;
 };
 
 export async function listarCategoriasProduto(): Promise<CategoriaProduto[]> {
   const { data, error } = await supabase
     .from("product_categories")
-    .select("id, name, prefix, erp_prefix")
+    .select("id, name, prefix, erp_prefix, sort_order")
     .eq("active", true)
     .order("sort_order");
   if (error) throw error;
   return (data ?? []) as CategoriaProduto[];
+}
+
+export async function criarCategoriaProduto(item: {
+  name: string;
+  prefix: string;
+  erp_prefix: string;
+  sort_order: number;
+}): Promise<void> {
+  const { error } = await supabase.rpc("create_product_category", {
+    p_name: item.name.trim(),
+    p_prefix: item.prefix.trim().toUpperCase(),
+    p_erp_prefix: item.erp_prefix.trim() || null,
+    p_sort_order: item.sort_order,
+  });
+  if (error) throw error;
 }
 
 export async function salvarPrefixoErp(id: string, prefixo: string): Promise<void> {
