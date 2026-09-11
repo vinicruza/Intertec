@@ -368,6 +368,7 @@ export type ItemSimulacao = {
   refId: string; // vazio quando tipo = kitNovo
   quantidade: string;
   precoVenda: string;
+  tipoItem?: "sale" | "sample";
   kitNovo?: {
     assinatura: string;
     composicao: Array<{ produtoId: string; quantidade: string }>;
@@ -490,6 +491,7 @@ export async function salvarCotacao(
       kit_id: i.tipo === "kit" ? i.refId : null,
       quantity: numeroOuVazio(i.quantidade),
       unit_price: numeroOuVazio(i.precoVenda),
+      item_kind: i.tipoItem ?? "sale",
       ad_hoc_kit_signature: i.kitNovo?.assinatura ?? null,
       ad_hoc_kit_composition: i.kitNovo
         ? i.kitNovo.composicao.map((c) => ({ product_id: c.produtoId, quantity: c.quantidade }))

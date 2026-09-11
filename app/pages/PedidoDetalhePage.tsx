@@ -206,10 +206,11 @@ export default function PedidoDetalhePage() {
     exigeAprovacaoPeloSelo,
     podeGerarPedido,
   });
-  // Segregação de funções: quem enviou a cotação não pode ser quem aprova —
-  // senão aprovação vira só um clique a mais de quem já ia fechar de qualquer
-  // jeito (mesma regra vale no banco, é a garantia real).
+  // Segregação de funções para a operação comum: quem enviou não decide.
+  // Administrador é exceção operacional, porque pode lançar e liberar pedidos
+  // próprios quando não houver outro aprovador disponível.
   const souRemetente = Boolean(perfil?.id) && pedido.submitted_by === perfil?.id;
+  const podeDecidirProprio = perfil?.perfil === "admin";
   const pendenciasAprovacao = camposDeExpedicaoPendentes(pedido);
 
   return (
@@ -550,7 +551,7 @@ export default function PedidoDetalhePage() {
           caso mais comum, normalmente não é). Sem explicar a regra de quem
           pode decidir: só o status e o que fazer agora, porque no primeiro
           momento a ficha impressa ainda precisa ir até a admin na mão. */}
-      {aprovacao === "pendente" && souRemetente && !cancelado && (
+      {aprovacao === "pendente" && souRemetente && !podeDecidirProprio && !cancelado && (
         <Card className="border-amber-200 bg-amber-50">
           <p className="text-sm text-amber-900">
             <strong>Pedido enviado para aprovação{pedido.submitted_at ? ` em ${dataCurta(pedido.submitted_at)}` : ""}.</strong>{" "}
@@ -565,7 +566,7 @@ export default function PedidoDetalhePage() {
         </Card>
       )}
 
-      {aprovacao === "pendente" && souAprovador && !souRemetente && !cancelado && (
+      {aprovacao === "pendente" && souAprovador && (!souRemetente || podeDecidirProprio) && !cancelado && (
         <Card className="space-y-3 border-[var(--cor-primaria)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Aprovação do pedido</h2>

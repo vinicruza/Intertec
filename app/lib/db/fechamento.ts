@@ -157,6 +157,7 @@ export type PedidoCompleto = {
     id: string;
     product_id: string | null;
     kit_id: string | null;
+    item_kind: "sale" | "sample";
     quantity: string;
     unit_price: string;
     cmv_unit_snapshot: string | null;
@@ -198,7 +199,7 @@ export async function obterPedidoCompleto(id: string): Promise<PedidoCompleto | 
   const { data: itens, error: e2 } = await supabase
     .from("order_items")
     .select(
-      "id, product_id, kit_id, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, ad_hoc_kit_composition, ad_hoc_kit_packaging, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code)"
+      "id, product_id, kit_id, item_kind, quantity, unit_price, cmv_unit_snapshot, expense_unit_snapshot, kit_composition_snapshot, item_code_snapshot, ad_hoc_kit_composition, ad_hoc_kit_packaging, ad_hoc_kit_label, products(name,code,nf_description), kits(name,code)"
     )
     .eq("order_id", id);
   if (e2) throw e2;

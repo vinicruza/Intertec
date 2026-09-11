@@ -73,7 +73,7 @@ import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBus
 // dos itens vivem em lib/sim/itensDoPedido.ts — regra do projeto: nada de
 // cálculo dentro de componente de tela, e o que fica na tela não é testável.
 
-const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", kitNovo: null };
+const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", amostra: false, kitNovo: null };
 const TIPO_PEDIDO_VENDA = "sale";
 const TIPO_PEDIDO_AMOSTRA = "sample";
 const FRETE_COTADO_VAZIO: FreteCotado = {
@@ -258,6 +258,7 @@ export default function SimuladorPage() {
           itemId: (item.product_id ?? item.kit_id) as string,
           quantidade: textoDeCampo(item.quantity, "1"),
           preco: textoDeCampo(item.unit_price),
+          amostra: item.item_kind === "sample",
           kitNovo: null,
         };
       }
@@ -267,6 +268,7 @@ export default function SimuladorPage() {
         itemId: KIT_NOVO,
         quantidade: textoDeCampo(item.quantity, "1"),
         preco: textoDeCampo(item.unit_price),
+        amostra: item.item_kind === "sample",
         kitNovo: {
           rotulo: textoDeCampo(item.ad_hoc_kit_label),
           produtos: (item.ad_hoc_kit_composition ?? []).map((c) => ({
@@ -322,6 +324,7 @@ export default function SimuladorPage() {
     sellerId: vendedor?.id ?? null,
   });
   const amostra = tipoPedido === TIPO_PEDIDO_AMOSTRA;
+  const temItemAmostra = linhas.some((linha) => linha.amostra);
   const freteClienteEfetivo = amostra ? false : freteCliente;
 
   const linhasParaCalculo = useMemo(
@@ -331,7 +334,10 @@ export default function SimuladorPage() {
             ...linha,
             preco: linha.itemId && linha.quantidade.trim() !== "" ? "0" : linha.preco,
           }))
-        : linhas,
+        : linhas.map((linha) => ({
+            ...linha,
+            preco: linha.amostra && linha.itemId && linha.quantidade.trim() !== "" ? "0" : linha.preco,
+          })),
     [amostra, linhas]
   );
 
@@ -480,7 +486,7 @@ export default function SimuladorPage() {
   const pendenciasExpedicao = [problemaPeso, problemaVolumes, problemaCidade].filter(
     (p): p is string => p !== null
   );
-  const pendenciasAmostra = amostra
+  const pendenciasAmostra = amostra || temItemAmostra
     ? [
         motivoAmostra.trim() === "" ? "Informe o motivo da amostra." : null,
         autorizadoPorAmostra.trim() === "" ? "Informe quem autorizou a amostra." : null,
@@ -698,6 +704,13 @@ export default function SimuladorPage() {
     setSalvo(null);
   }
 
+  function marcarLinhaComoAmostra(i: number, marcada: boolean) {
+    setLinhas((a) =>
+      a.map((l, idx) => (idx === i ? { ...l, amostra: marcada, preco: marcada ? "0" : l.preco } : l))
+    );
+    setSalvo(null);
+  }
+
   function adicionarItem() {
     setLinhas((a) => [...a, LINHA_VAZIA]);
     setSalvo(null);
@@ -710,6 +723,7 @@ export default function SimuladorPage() {
         itemId: KIT_NOVO,
         quantidade: "1",
         preco: "",
+        amostra: false,
         kitNovo: { rotulo: "", produtos: [{ produtoId: "", quantidade: "1" }], embalagem: [] },
       },
     ]);
@@ -1017,7 +1031,7 @@ export default function SimuladorPage() {
               Amostra sem cobrança
             </button>
           </div>
-          {amostra && (
+          {(amostra || temItemAmostra) && (
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div>
                 <Label>Motivo da amostra</Label>
@@ -1159,17 +1173,27 @@ export default function SimuladorPage() {
                 <Label>{amostra ? "Preço cliente" : l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
                 <Input
                   className="w-28"
-                  value={amostra && l.itemId ? "0" : l.preco}
+                  value={(amostra || l.amostra) && l.itemId ? "0" : l.preco}
                   onChange={(e) => atualizarLinha(i, "preco", e.target.value)}
-                  disabled={amostra}
+                  disabled={amostra || l.amostra}
                 />
-                {!amostra && <AvisoDeNumero valor={l.preco} />}
+                {!amostra && !l.amostra && <AvisoDeNumero valor={l.preco} />}
                 {freteClienteEfetivo && precoFinalPorLinha.has(i) && (
                   <p className="mt-1 w-32 text-[0.65rem] leading-tight text-[var(--cor-texto-suave)]">
                     Final com frete: {reais(precoFinalPorLinha.get(i)!)}
                   </p>
                 )}
               </div>
+              {!amostra && (
+                <label className="flex min-h-10 items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={l.amostra}
+                    onChange={(e) => marcarLinhaComoAmostra(i, e.target.checked)}
+                  />
+                  Amostra
+                </label>
+              )}
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
                   ? (verNumeros ? <>CMV un.: {reais(r.cmvUnitario)}</> : null)

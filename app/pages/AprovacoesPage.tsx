@@ -79,6 +79,7 @@ export default function AprovacoesPage() {
           0
         );
         const souRemetente = Boolean(perfil?.id) && p.submitted_by === perfil?.id;
+        const podeDecidirProprio = perfil?.perfil === "admin";
         const margem = margensQuery.data?.get(p.id);
         return (
           <div
@@ -121,7 +122,7 @@ export default function AprovacoesPage() {
                   className="min-h-9 border border-[var(--cor-borda)] bg-white px-4 text-[var(--cor-primaria)] shadow-none hover:bg-[var(--cor-fundo)]"
                   onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}`); }}
                 >
-                  {souRemetente ? "Ver" : "Ver e decidir"}
+                  {souRemetente && !podeDecidirProprio ? "Ver" : "Ver e decidir"}
                 </Button>
               </div>
             </Card>

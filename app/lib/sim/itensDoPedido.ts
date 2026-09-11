@@ -34,6 +34,7 @@ export type LinhaItem = {
   itemId: string;
   quantidade: string;
   preco: string;
+  amostra?: boolean;
   kitNovo: KitNovoEdicao | null;
 };
 
@@ -351,7 +352,13 @@ export function montarItensDaCotacao(
     // Kit montado na hora cuja composição já existe: usa o kit de catálogo
     // em vez de criar outro igual (o código é o mesmo, por decisão).
     if (l.itemId === KIT_NOVO && r.kitExistente) {
-      return [{ tipo: "kit", refId: r.kitExistente.id, quantidade: l.quantidade, precoVenda: l.preco }];
+      return [{
+        tipo: "kit",
+        refId: r.kitExistente.id,
+        quantidade: l.quantidade,
+        precoVenda: l.preco,
+        ...(l.amostra ? { tipoItem: "sample" as const } : {}),
+      }];
     }
 
     if (l.itemId === KIT_NOVO && l.kitNovo && r.assinatura) {
@@ -360,6 +367,7 @@ export function montarItensDaCotacao(
         refId: "",
         quantidade: l.quantidade,
         precoVenda: l.preco,
+        ...(l.amostra ? { tipoItem: "sample" as const } : {}),
         kitNovo: {
           assinatura: r.assinatura,
           rotulo: r.nome,
@@ -375,7 +383,13 @@ export function montarItensDaCotacao(
 
     const item = itensVendaveis.find((it) => it.id === l.itemId);
     if (!item) return [];
-    return [{ tipo: item.tipo, refId: item.id, quantidade: l.quantidade, precoVenda: l.preco }];
+    return [{
+      tipo: item.tipo,
+      refId: item.id,
+      quantidade: l.quantidade,
+      precoVenda: l.preco,
+      ...(l.amostra ? { tipoItem: "sample" as const } : {}),
+    }];
   });
 }
 
