@@ -29,6 +29,7 @@ import {
   kitNovoAPartirDe,
   montarItensDaCotacao,
   montarItensParaMotor,
+  margensDosProdutosAvulsos,
   nomeSugeridoParaKit,
   pendenciasDosKits,
   produtoKitAleatorioExigeComposicao,
@@ -93,6 +94,12 @@ const CORES: Record<string, string> = {
   yellow: "bg-yellow-100 text-yellow-800",
   orange: "bg-orange-100 text-orange-800",
   red: "bg-red-100 text-red-800",
+};
+
+type MargemVisualLinha = {
+  pct: string;
+  label: string;
+  color: keyof typeof CORES;
 };
 
 function textoDeCampo(valor: unknown, padrao = ""): string {
@@ -866,6 +873,17 @@ export default function SimuladorPage() {
       }
     });
   }
+  const margemVisualPorLinha = new Map<number, MargemVisualLinha>();
+  if (!amostra && simulacao.estado === "ok") {
+    margensDosProdutosAvulsos(linhasParaCalculo, resolvidas, ctx.itens, simulacao.resultado).forEach((margem) => {
+      const selo = seloMargemComercial(margem.pct, faixaMargem);
+      margemVisualPorLinha.set(margem.indiceLinha, {
+        pct: percentual(margem.pct.toString()),
+        label: selo.label,
+        color: selo.color,
+      });
+    });
+  }
   const transportadora = ctx.transportadoras.find((t) => t.id === transportadoraId) ?? null;
   const transportadoraPedeNome = transportadora?.pedeNome ?? false;
   const clienteEscolhido = ctx.clientes.find((c) => c.id === clienteId) ?? null;
@@ -1534,14 +1552,29 @@ export default function SimuladorPage() {
                 </tr>
               </thead>
               <tbody>
-                {resumoComercial.linhas.map((linha, i) => (
-                  <tr key={`${linha.nome}-${i}`} className="border-t border-[var(--cor-borda)]">
-                    <td className="px-3 py-2">{linha.nome}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{linha.quantidade.toString().replace(".", ",")}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.precoUnitario.toString())}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{reais(linha.subtotal.toString())}</td>
-                  </tr>
-                ))}
+                {resumoComercial.linhas.map((linha, i) => {
+                  const margem = margemVisualPorLinha.get(linha.indiceLinha);
+                  return (
+                    <tr key={`${linha.nome}-${i}`} className="border-t border-[var(--cor-borda)]">
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {margem && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold tabular-nums ${CORES[margem.color]}`}
+                              title={`Margem do produto: ${margem.label}`}
+                            >
+                              {margem.pct}
+                            </span>
+                          )}
+                          <span>{linha.nome}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{linha.quantidade.toString().replace(".", ",")}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{reais(linha.precoUnitario.toString())}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{reais(linha.subtotal.toString())}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

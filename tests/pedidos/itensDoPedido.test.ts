@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   KIT_NOVO,
+  margensDosProdutosAvulsos,
   montarItensDaCotacao,
   montarItensParaMotor,
   resolverKitAdHocDoPedido,
@@ -10,7 +11,7 @@ import {
   type LinhaItem,
 } from "@app/lib/sim/itensDoPedido";
 import type { CatalogoParaKit } from "@app/lib/sim/kitNoPedido";
-import { calcularPedido, assinaturaKitCompleta, toMoney, type CustoProdutoKit } from "@calc";
+import { calcularPedido, assinaturaKitCompleta, toMoney, toPercent, type CustoProdutoKit } from "@calc";
 
 // ============================================================
 // Da linha da tela para o item do pedido
@@ -192,6 +193,30 @@ describe("itens que vão para o motor de cálculo", () => {
       { nome: "Campo Cirúrgico Catarata", subtotal: "290.00" },
     ]);
     expect(toMoney(resumo.subtotal)).toBe("17090.00");
+  });
+
+  it("calcula margem visual só para produto avulso, nunca para kit", () => {
+    const linhas = [
+      linha({ itemId: "prod-avental", quantidade: "10", preco: "4,20" }),
+      linha({ itemId: "kit-catarata", quantidade: "2", preco: "25" }),
+    ];
+    const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
+    const itens = montarItensParaMotor(linhas, resolvidas);
+    if (itens.estado !== "ok") throw new Error("Pedido deveria calcular.");
+
+    const resultado = calcularPedido({
+      itens: itens.itens,
+      frete: "0",
+      fretePorContaCliente: true,
+      tributarFreteInformado: false,
+      aliquotaImposto: "0.10",
+      aliquotaDifal: "0",
+      aliquotaComissao: "0",
+    });
+    const margens = margensDosProdutosAvulsos(linhas, resolvidas, CATALOGO, resultado);
+
+    expect(margens.map((m) => m.indiceLinha)).toEqual([0]);
+    expect(toPercent(margens[0].pct)).toBe("59.32");
   });
 
   it("kit montado no pedido entra no motor como preço por kit vezes quantidade de kits", () => {

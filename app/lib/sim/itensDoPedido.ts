@@ -1,4 +1,4 @@
-import { dec, type ItemPedido } from "@calc";
+import { dec, margemPct, type ItemPedido, type ResultadoPedido } from "@calc";
 import { numeroDigitado } from "../format";
 import {
   resolverKitDoPedido,
@@ -130,6 +130,7 @@ export type ItensParaMotor =
 const numero = numeroDigitado;
 
 export type LinhaResumoComercial = {
+  indiceLinha: number;
   nome: string;
   quantidade: ReturnType<typeof dec>;
   precoUnitario: ReturnType<typeof dec>;
@@ -148,6 +149,7 @@ export function resumoComercialDasLinhas(
       const quantidade = dec(numero(linha.quantidade));
       const precoUnitario = dec(numero(linha.preco));
       return [{
+        indiceLinha: i,
         nome: resolvida.nome,
         quantidade,
         precoUnitario,
@@ -162,6 +164,58 @@ export function resumoComercialDasLinhas(
     linhas: linhasResumo,
     subtotal: linhasResumo.reduce((s, l) => s.plus(l.subtotal), dec("0")),
   };
+}
+
+export type MargemProdutoAvulso = {
+  indiceLinha: number;
+  pct: ReturnType<typeof dec>;
+};
+
+export function margensDosProdutosAvulsos(
+  linhas: LinhaItem[],
+  resolvidas: Array<LinhaResolvida | null>,
+  itensVendaveis: ItemVendavelResumo[],
+  resultado: ResultadoPedido
+): MargemProdutoAvulso[] {
+  if (resultado.receitaBruta.lte(0)) return [];
+
+  const deducoesDoPedido = resultado.frete
+    .plus(resultado.impostoFrete)
+    .plus(resultado.imposto)
+    .plus(resultado.difal)
+    .plus(resultado.comissao);
+
+  return linhas.flatMap((linha, i) => {
+    const item = itensVendaveis.find((it) => it.id === linha.itemId);
+    const resolvida = resolvidas[i];
+    if (
+      linha.amostra ||
+      item?.tipo !== "produto" ||
+      !resolvida ||
+      resolvida.erro ||
+      !resolvida.cmvUnitario ||
+      linha.quantidade.trim() === "" ||
+      linha.preco.trim() === ""
+    ) {
+      return [];
+    }
+
+    try {
+      const quantidade = dec(numero(linha.quantidade));
+      const precoUnitario = dec(numero(linha.preco));
+      if (quantidade.lte(0) || precoUnitario.lte(0)) return [];
+
+      const receitaBrutaLinha = precoUnitario.times(quantidade);
+      const proporcao = receitaBrutaLinha.div(resultado.receitaBruta);
+      const receitaLiquidaLinha = receitaBrutaLinha.minus(deducoesDoPedido.times(proporcao));
+      const cmvLinha = dec(resolvida.cmvUnitario).times(quantidade);
+      const margemLinha = receitaLiquidaLinha.minus(cmvLinha);
+
+      return [{ indiceLinha: i, pct: margemPct(margemLinha, receitaLiquidaLinha) }];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export function montarItensParaMotor(
