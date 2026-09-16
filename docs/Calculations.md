@@ -46,6 +46,41 @@ preco_sem_imposto = preco_com_imposto × (1 − ICMS − PIS_COFINS)
 | Esterilização Horizont | 23,72 | 0% | 0% | 23,72 |
 | Punho | 0,2003333 | 18% | 9,25% | 0,1457425 |
 
+### 2.1 Cadastro de bobina: preço por kg × gramatura (16/09/2026)
+
+A implicação registrada acima — "o cadastro de insumo precisa suportar preço derivado" — estava
+implementada pela metade. O sistema multiplicava `preço de compra × fator de conversão`, mas pedia o
+**fator pronto**: um `0,04` que ninguém tem em mãos. Quem cadastra tem a **gramatura** (40 g/m²,
+30 g/m²) e o **preço do quilo**, que é como o fornecedor cobra.
+
+O resultado previsível apareceu na Bobina SMS 30 gr: preço de compra `0,654`, fator `1`. O preço do
+m² vinha calculado por fora, numa planilha, e colado no campo — de onde ninguém consegue atualizar o
+custo quando o quilo muda de preço sem refazer a conta à mão. Pedido do Bryan em 16/09/2026:
+*"o custo, ele vem por kg [...] essa seria um lugar que eu ia alterar o preço do KG"*.
+
+```
+fator (kg/m²) = gramatura (g/m²) ÷ 1.000
+preco_por_m2  = preco_por_kg × fator            ← preço COM imposto
+```
+
+| Gramatura | Preço do kg | Fator | Preço por m² (com imposto) |
+|---|---|---|---|
+| 40 g/m² | 20,00 | 0,04 | **0,80** |
+| 30 g/m² | 22,56 | 0,03 | **0,6768** |
+| 40 g/m² | 21,80 | 0,04 | **0,872** ← é o insumo do T2 |
+
+Daí para frente **nada muda**: o preço sem imposto sai pela fórmula de §2, e CMV, kits, cascata e DRE
+seguem lendo `preço de compra × fator de conversão` e as colunas de preço, como sempre. O fator
+continua gravado em `inputs.conversion_factor` — só deixou de ser digitado. A gramatura fica em
+`inputs.grammage_gsm`, e `inputs.is_roll` marca o insumo como bobina; juntas, são a memória de
+cálculo que §2 exige ("senão ninguém saberá de onde veio daqui a um ano").
+
+**Bobina sem gramatura é erro bloqueante**, não fator 1: daria custo zero em silêncio, a família de
+defeito dos bugs 3 e 4 da Seção 9. A tela avisa antes de salvar e o banco recusa
+(`inputs_bobina_tem_gramatura`).
+
+Golden tests T18, T18b e T18c.
+
 ---
 
 ## 3. Camada 2 — Ficha técnica e CMV
@@ -544,6 +579,9 @@ Toda implementação das funções de cálculo deve passar, com tolerância de 0
 | T17b | DIFAL com frete do cliente | fixture T6 com a flag marcada | frete 0, mas base 17.800 e DIFAL 2.403,00 |
 | T17c | canal sem DIFAL | fixture T6, alíquota 0 | base 17.800, DIFAL 0 |
 | T17d | mesma base | fixture T6 com frete 737,42 | base do DIFAL = base da comissão = 17.537,42 |
+| T18 | preço da bobina | 20,00/kg; gramatura 40 | 0,80/m² com imposto |
+| T18b | preço da bobina | 22,56/kg; gramatura 30 | 0,6768/m² com imposto |
+| T18c | bobina até o fim da Camada 1 | 21,80/kg; gramatura 40; ICMS 12%; PIS/COFINS 9,25% | 0,872 com imposto e 0,6867 sem — o mesmo T2 |
 
 Sugestão: importar a planilha e rodar um teste de reconciliação em massa — recalcular o CMV dos 325 produtos e comparar com a coluna Input da Alocação, listando toda divergência acima de R$ 0,01.
 

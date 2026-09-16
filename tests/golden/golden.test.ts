@@ -11,6 +11,7 @@ import {
   calcularPedido,
   custoKit,
   custoKitCompleto,
+  precoDaBobina,
   precoSemImposto,
   toMoney,
   dec,
@@ -52,6 +53,25 @@ describe("Camada 1 — preço sem imposto", () => {
 
   it("T2 — Bobina SMS 40gr m² (0,872; ICMS 12%; PIS/COFINS 9,25%)", () => {
     esperarProximo(precoSemImposto("0.872", "0.12", "0.0925"), "0.6867");
+  });
+
+  // T18 — bobina comprada por quilo (Calculations.md §2.1).
+  // Os dois exemplos são os que o Bryan mandou em 16/09/2026 ao pedir o campo
+  // de preço por kg: é por eles que se confere se o cadastro está certo.
+  it("T18 — gramatura 40 a R$ 20,00/kg = R$ 0,80/m² (com imposto)", () => {
+    esperarProximo(precoDaBobina("20", "40"), "0.80");
+  });
+
+  it("T18b — gramatura 30 a R$ 22,56/kg = R$ 0,6768/m² (com imposto)", () => {
+    esperarProximo(precoDaBobina("22.56", "30"), "0.6768");
+  });
+
+  it("T18c — a bobina por quilo desemboca no T2: 21,80/kg, gramatura 40", () => {
+    // Fecha o circuito da Camada 1: o preço derivado da gramatura é o MESMO
+    // 0,872 que o T2 recebe pronto, e o preço sem imposto continua 0,6867.
+    const comImposto = precoDaBobina("21.80", "40");
+    esperarProximo(comImposto, "0.872");
+    esperarProximo(precoSemImposto(comImposto, "0.12", "0.0925"), "0.6867");
   });
 });
 

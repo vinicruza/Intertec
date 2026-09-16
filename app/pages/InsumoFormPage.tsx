@@ -18,24 +18,43 @@ import { toMoney } from "@calc";
 import { Button, Card, Input, Label } from "@components/ui/primitives";
 import { mensagemDeErro } from "../lib/erros";
 
-const esquema = z.object({
-  name: z.string().min(1, "Informe o nome."),
-  category: z.string(),
-  purchase_unit: z.string(),
-  purchase_price: z.string().min(1, "Informe o preço de compra."),
-  conversion_factor: z.string(),
-  consumption_unit: z.string(),
-  icms_rate: z.string(),
-  pis_cofins_rate: z.string(),
-  is_labor: z.boolean(),
-  is_packaging: z.boolean(),
-});
+const esquema = z
+  .object({
+    name: z.string().min(1, "Informe o nome."),
+    category: z.string(),
+    purchase_unit: z.string(),
+    purchase_price: z.string().min(1, "Informe o preço de compra."),
+    conversion_factor: z.string(),
+    consumption_unit: z.string(),
+    icms_rate: z.string(),
+    pis_cofins_rate: z.string(),
+    is_labor: z.boolean(),
+    is_packaging: z.boolean(),
+    is_roll: z.boolean(),
+    grammage_gsm: z.string(),
+  })
+  // Bobina sem gramatura daria fator zero, e com ele um custo zero gravado em
+  // silêncio — a família de defeito que o PRD §7 manda bloquear. O banco também
+  // recusa (constraint inputs_bobina_tem_gramatura); aqui a pessoa lê por quê.
+  .superRefine((valores, ctx) => {
+    if (!valores.is_roll) return;
+    const gramatura = Number(valores.grammage_gsm.trim().replace(",", "."));
+    if (!Number.isFinite(gramatura) || gramatura <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["grammage_gsm"],
+        message: "Informe a gramatura da bobina em g/m² (ex.: 30).",
+      });
+    }
+  });
 
 const VAZIO: InsumoFormulario = {
   name: "", category: "", purchase_unit: "", purchase_price: "",
   conversion_factor: "1", consumption_unit: "", icms_rate: "0", pis_cofins_rate: "0.0925",
-  is_labor: false, is_packaging: false,
+  is_labor: false, is_packaging: false, is_roll: false, grammage_gsm: "",
 };
+
+const comVirgula = (valor: string) => valor.replace(".", ",");
 
 // Os campos do formulário são de texto, mas o banco entrega `numeric` como
 // NÚMERO. Sem esta conversão o zod recusa o formulário sem exibir mensagem
@@ -51,7 +70,7 @@ export default function InsumoFormPage() {
   const queryClient = useQueryClient();
   const [erroSalvar, setErroSalvar] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, watch, formState } = useForm<InsumoFormulario>({
+  const { register, handleSubmit, reset, watch, setValue, getValues, formState } = useForm<InsumoFormulario>({
     resolver: zodResolver(esquema),
     defaultValues: VAZIO,
   });
@@ -77,18 +96,33 @@ export default function InsumoFormPage() {
         pis_cofins_rate: texto(i.pis_cofins_rate, "0"),
         is_labor: i.is_labor ?? false,
         is_packaging: i.is_packaging ?? false,
+        is_roll: i.is_roll ?? false,
+        grammage_gsm: texto(i.grammage_gsm),
       });
     }
   }, [insumoQuery.data, reset]);
 
   // Prévia ao vivo do preço com/sem imposto (cálculo no motor, não na tela).
   const valores = watch();
+  const ehBobina = valores.is_roll;
+  const registroBobina = register("is_roll");
   let previaCom = "—";
   let previaSem = "—";
+  // Memória de cálculo da bobina: a conta inteira à vista, em precisão total.
+  // Sem ela, só sobraria o quadro abaixo — arredondado em centavos, onde
+  // 0,6768 vira 0,68 e ninguém consegue conferir contra o preço do fornecedor.
+  let memoriaDaBobina: string | null = null;
   try {
     const p = derivarPrecos(valores);
     previaCom = "R$ " + toMoney(p.comImposto).replace(".", ",");
     previaSem = "R$ " + toMoney(p.semImposto).replace(".", ",");
+    if (ehBobina && !p.fator.isZero()) {
+      const unidade = valores.consumption_unit.trim() || "m²";
+      memoriaDaBobina =
+        `R$ ${comVirgula(valores.purchase_price.trim())} por kg` +
+        ` × ${comVirgula(p.fator.toString())} (gramatura ${comVirgula(valores.grammage_gsm.trim())} g/m²)` +
+        ` = R$ ${comVirgula(p.comImposto.toString())} por ${unidade}, com imposto.`;
+    }
   } catch {
     /* valores incompletos: mantém "—" */
   }
@@ -118,13 +152,60 @@ export default function InsumoFormPage() {
             <Campo label="Categoria"><Input {...register("category")} /></Campo>
             <Campo label="Fornecedor (unidade de compra)"><Input placeholder="ex.: kg" {...register("purchase_unit")} /></Campo>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <Campo label="Preço de compra" erro={formState.errors.purchase_price?.message}>
-              <Input placeholder="ex.: 21,80" {...register("purchase_price")} />
-            </Campo>
-            <Campo label="Fator de conversão"><Input placeholder="ex.: 0,04" {...register("conversion_factor")} /></Campo>
-            <Campo label="Unidade de consumo"><Input placeholder="ex.: m²" {...register("consumption_unit")} /></Campo>
-          </div>
+          <label className="flex items-start gap-2 rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              {...registroBobina}
+              onChange={(e) => {
+                registroBobina.onChange(e);
+                // As unidades da bobina são sempre as mesmas; preenchidas à
+                // vista, e só quando estão vazias — quem já digitou manda.
+                if (e.target.checked) {
+                  if (!getValues("purchase_unit").trim()) setValue("purchase_unit", "kg");
+                  if (!getValues("consumption_unit").trim()) setValue("consumption_unit", "m²");
+                }
+              }}
+            />
+            <span>
+              <strong>É bobina, comprada por quilo</strong> (ex.: TNT, SMS, laminado)
+              <span className="block text-xs text-[var(--cor-texto-suave)]">
+                Digite o preço do kg e a gramatura; o sistema calcula o preço por m² sozinho
+                (gramatura 30 → 22,56 × 0,03 = 0,6768 por m²). Quando o quilo mudar de preço,
+                basta trocar esse número aqui — não é preciso refazer a conta por fora.
+              </span>
+            </span>
+          </label>
+
+          {ehBobina ? (
+            <div className="grid grid-cols-3 gap-4">
+              <Campo label="Preço por kg (com imposto)" erro={formState.errors.purchase_price?.message}>
+                <Input placeholder="ex.: 22,56" {...register("purchase_price")} />
+              </Campo>
+              <Campo label="Gramatura (g/m²)" erro={formState.errors.grammage_gsm?.message}>
+                <Input placeholder="ex.: 30" {...register("grammage_gsm")} />
+              </Campo>
+              <Campo label="Unidade de consumo"><Input placeholder="ex.: m²" {...register("consumption_unit")} /></Campo>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <Campo label="Preço de compra" erro={formState.errors.purchase_price?.message}>
+                <Input placeholder="ex.: 21,80" {...register("purchase_price")} />
+              </Campo>
+              <Campo label="Fator de conversão"><Input placeholder="ex.: 0,04" {...register("conversion_factor")} /></Campo>
+              <Campo label="Unidade de consumo"><Input placeholder="ex.: m²" {...register("consumption_unit")} /></Campo>
+            </div>
+          )}
+
+          {memoriaDaBobina && (
+            <p className="rounded-md bg-[var(--cor-fundo)] px-3 py-2 text-sm">
+              {memoriaDaBobina}
+              <span className="block text-xs text-[var(--cor-texto-suave)]">
+                O quadro abaixo mostra o valor arredondado em centavos; a conta guarda todas as
+                casas, e é a conta que entra no CMV.
+              </span>
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <Campo label="ICMS (fração, ex.: 0,18)"><Input {...register("icms_rate")} /></Campo>
             <Campo label="PIS/COFINS (fração, ex.: 0,0925)"><Input {...register("pis_cofins_rate")} /></Campo>

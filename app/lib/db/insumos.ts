@@ -1,4 +1,4 @@
-import { Decimal, dec, precoSemImposto } from "@calc";
+import { Decimal, dec, fatorDaGramatura, precoSemImposto } from "@calc";
 import { supabase } from "../supabase";
 
 // Linha da tabela `inputs` como vem do banco.
@@ -27,6 +27,10 @@ export type InsumoLinha = {
   // Embalagem/esterilização: filtra a lista do montador de kit. Não muda
   // cálculo — o custo entra igual, marcado ou não.
   is_packaging: boolean;
+  // Bobina: comprada por quilo, consumida por m². O fator de conversão deixa
+  // de ser digitado e passa a sair da gramatura (Calculations.md §2.1).
+  is_roll: boolean;
+  grammage_gsm: string | number | null;
 };
 
 // Dados que o formulário coleta (o preço com/sem imposto é derivado, não digitado).
@@ -41,6 +45,8 @@ export type InsumoFormulario = {
   pis_cofins_rate: string;
   is_labor: boolean;
   is_packaging: boolean;
+  is_roll: boolean;
+  grammage_gsm: string; // g/m², só quando is_roll
 };
 
 // Converte em Decimal o que vem do formulário (texto, aceita vírgula) ou do
@@ -52,12 +58,24 @@ function paraDecimal(valor: string | number): Decimal {
   return dec(limpo === "" ? "0" : limpo);
 }
 
+// O fator que multiplica o preço de compra para chegar à unidade de consumo.
+//
+// Na bobina ele NÃO é digitado: sai da gramatura (40 g/m² → 0,04 kg/m²), porque
+// é assim que o fornecedor cobra e é assim que a Intertech pensa o custo — o
+// campo pedia um 0,04 que ninguém tinha em mãos, e o resultado era o preço do
+// m² calculado por fora e colado aqui com fator 1 (Calculations.md §2.1).
+export function fatorDoFormulario(form: InsumoFormulario): Decimal {
+  if (form.is_roll) return fatorDaGramatura(paraDecimal(form.grammage_gsm));
+  return paraDecimal(form.conversion_factor || "1");
+}
+
 // Regra de negócio (Calculations.md §2): preço com imposto = preço de compra ×
 // fator de conversão; preço sem imposto = motor. Fica no lib, não na tela.
-export function derivarPrecos(form: InsumoFormulario): { comImposto: Decimal; semImposto: Decimal } {
-  const comImposto = paraDecimal(form.purchase_price).times(paraDecimal(form.conversion_factor || "1"));
+export function derivarPrecos(form: InsumoFormulario): { comImposto: Decimal; semImposto: Decimal; fator: Decimal } {
+  const fator = fatorDoFormulario(form);
+  const comImposto = paraDecimal(form.purchase_price).times(fator);
   const semImposto = precoSemImposto(comImposto, paraDecimal(form.icms_rate), paraDecimal(form.pis_cofins_rate));
-  return { comImposto, semImposto };
+  return { comImposto, semImposto, fator };
 }
 
 export function precoCompraParaFormulario(insumo: Pick<InsumoLinha, "purchase_price" | "price_with_tax" | "conversion_factor">): string {
@@ -86,13 +104,18 @@ export async function obterInsumo(id: string): Promise<InsumoLinha | null> {
 }
 
 function paraRegistro(form: InsumoFormulario) {
-  const { comImposto, semImposto } = derivarPrecos(form);
+  const { comImposto, semImposto, fator } = derivarPrecos(form);
   return {
     name: form.name.trim(),
     category: form.category.trim() || null,
     purchase_unit: form.purchase_unit.trim() || null,
     purchase_price: paraDecimal(form.purchase_price).toString(),
-    conversion_factor: paraDecimal(form.conversion_factor || "1").toString(),
+    // Na bobina o fator gravado é o derivado da gramatura. Guardar o fator (e
+    // não só a gramatura) é o que mantém intocado todo o resto do sistema: CMV,
+    // kits, cascata e DRE seguem lendo preço de compra × fator, como sempre.
+    conversion_factor: fator.toString(),
+    is_roll: form.is_roll,
+    grammage_gsm: form.is_roll ? paraDecimal(form.grammage_gsm).toString() : null,
     consumption_unit: form.consumption_unit.trim() || null,
     icms_rate: paraDecimal(form.icms_rate).toString(),
     pis_cofins_rate: paraDecimal(form.pis_cofins_rate).toString(),

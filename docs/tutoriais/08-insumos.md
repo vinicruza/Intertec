@@ -19,9 +19,9 @@ Preencha:
 - **Fornecedor (unidade de compra)** — a unidade em que o insumo é comprado (ex.: `kg`).
 - **Preço de compra** — o valor pago naquela unidade de compra.
 - **Fator de conversão** e **Unidade de consumo** — usados quando a unidade de compra é diferente
-  da unidade em que o insumo é consumido nas fichas técnicas (ex.: uma bobina comprada por
-  quilograma, mas consumida por metro quadrado). O sistema deriva o preço por unidade de consumo
-  automaticamente a partir desses dois campos.
+  da unidade em que o insumo é consumido nas fichas técnicas. O sistema deriva o preço por unidade
+  de consumo automaticamente a partir desses dois campos. Para bobina, não preencha o fator à mão:
+  marque a caixa **É bobina, comprada por quilo** e informe a gramatura (ver abaixo).
 - **ICMS** e **PIS/COFINS** — em fração (ex.: `0,18` para 18%).
 
 Duas caixas de marcar importantes:
@@ -38,6 +38,37 @@ Uma prévia ao vivo mostra o **preço com imposto** e o **preço sem imposto**, 
 do sistema conforme você preenche os campos.
 
 Clique em **Salvar** para gravar, ou **Cancelar** para voltar sem salvar.
+
+## Bobina: atualizando o preço do quilo
+
+A bobina (TNT, SMS, laminado) é comprada **por quilo** e consumida **por m²**. Marque a caixa
+**É bobina, comprada por quilo** e o formulário troca dois campos:
+
+- **Preço por kg (com imposto)** — o valor que o fornecedor cobra pelo quilo (ex.: `22,56`).
+- **Gramatura (g/m²)** — a gramatura da bobina, em gramas (ex.: `30`, `40`). Não precisa converter
+  para quilo nem calcular fator nenhum.
+
+O sistema faz a conta sozinho e mostra a memória de cálculo embaixo dos campos:
+
+```
+R$ 22,56 por kg × 0,03 (gramatura 30 g/m²) = R$ 0,6768 por m², com imposto
+```
+
+Quando o quilo mudar de preço, **é só trocar o valor do campo "Preço por kg" e salvar** — o preço
+por m², o preço sem imposto e o CMV de todos os produtos e kits que usam a bobina se atualizam
+sozinhos. Não é preciso refazer a conta em planilha nem digitar o preço do m².
+
+Duas observações:
+
+- A gramatura é obrigatória quando a caixa está marcada. Sem ela o custo sairia zero, e o sistema
+  não deixa salvar.
+- O quadro "Preço com imposto (calculado)" mostra o valor arredondado em centavos (`R$ 0,68`). A
+  conta guarda todas as casas (`0,6768`), e é a conta cheia que entra no CMV — por isso a memória
+  de cálculo aparece com o valor exato.
+
+**Insumo de bobina já cadastrado com o preço do m² no campo de preço de compra** (fator `1`):
+marque a caixa, troque o preço pelo valor do quilo e informe a gramatura. O custo passa a ser
+atualizável por aqui daí em diante.
 
 ## Histórico de custos
 
