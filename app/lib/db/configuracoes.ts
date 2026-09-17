@@ -8,6 +8,7 @@ export type CanalLinha = {
   id: string;
   name: string;
   applies_difal: boolean;
+  tax_source: "icsm_table" | "none";
   default_commission_rate: string;
   freight_model: "manual" | "uf_percent";
 };
@@ -15,7 +16,7 @@ export type CanalLinha = {
 export async function listarCanais(): Promise<CanalLinha[]> {
   const { data, error } = await supabase
     .from("channels")
-    .select("id, name, applies_difal, default_commission_rate, freight_model")
+    .select("id, name, applies_difal, tax_source, default_commission_rate, freight_model")
     .order("name");
   if (error) throw error;
   return data as CanalLinha[];
@@ -23,7 +24,7 @@ export async function listarCanais(): Promise<CanalLinha[]> {
 
 export async function atualizarCanal(
   id: string,
-  campos: Pick<CanalLinha, "applies_difal" | "default_commission_rate" | "freight_model">
+  campos: Pick<CanalLinha, "applies_difal" | "tax_source" | "default_commission_rate" | "freight_model">
 ): Promise<void> {
   const { error } = await supabase.from("channels").update(campos).eq("id", id);
   if (error) throw error;

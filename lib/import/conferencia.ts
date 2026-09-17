@@ -22,6 +22,7 @@ export const TOLERANCIA_PERCENTUAL = new Decimal("0.0001"); // 0,01 ponto percen
 // Parâmetros de canal como o SISTEMA os aplica (Calculations.md §8 e Decisão D4).
 export type CanalPedido = {
   aplicaDifal: boolean;
+  semNotaFiscal?: boolean;
   aliquotaComissao: Decimal;
   freteViaPortal: boolean; // canal marketplace: frete = %(UF) × receita
 };
@@ -49,6 +50,7 @@ export const CANAIS: Record<string, CanalPedido> = {
   Revendas: { aplicaDifal: false, aliquotaComissao: COMISSAO_PADRAO, freteViaPortal: false },
   Descpro: { aplicaDifal: false, aliquotaComissao: COMISSAO_PADRAO, freteViaPortal: false },
   Edmilson: { aplicaDifal: false, aliquotaComissao: COMISSAO_PADRAO, freteViaPortal: false },
+  Especial: { aplicaDifal: false, semNotaFiscal: true, aliquotaComissao: COMISSAO_PADRAO, freteViaPortal: false },
 };
 
 export type LinhaConferencia = {
@@ -161,8 +163,8 @@ export function conferirPedido(
       // (ver `params.ts`) — é uma divergência conhecida, de `alíquota × frete`,
       // e quem a aponta é o relatório de conferência, não este cálculo.
       tributarFreteInformado: true,
-      aliquotaImposto: icsm,
-      aliquotaDifal: canal.aplicaDifal ? aliquotaDifal(tabelas, ufNormalizada) : new Decimal(0),
+      aliquotaImposto: canal.semNotaFiscal ? new Decimal(0) : icsm,
+      aliquotaDifal: canal.aplicaDifal && !canal.semNotaFiscal ? aliquotaDifal(tabelas, ufNormalizada) : new Decimal(0),
       aliquotaComissao: canal.aliquotaComissao,
     });
   } catch (e) {

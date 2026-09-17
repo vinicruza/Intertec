@@ -518,6 +518,19 @@ describe("escolhas do vendedor que mudam a conta", () => {
     }).simulacao!;
     expect(toMoney(s.freteUsado)).toBe("2856.00"); // 17% de 16.800
   });
+
+  it("tipo de venda Especial é sem NF: zera impostos e DIFAL", () => {
+    const s = montarPedido({
+      ...base,
+      canal: { ...CANAL_INTERNO, modeloImposto: "none", aplicaDifal: false },
+      aplicaDifal: true,
+    }).simulacao!;
+
+    expect(toMoney(s.resultado.imposto)).toBe("0.00");
+    expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
+    expect(toMoney(s.resultado.difal)).toBe("0.00");
+    expect(s.aplicaDifalUsado).toBe(false);
+  });
 });
 
 describe("do pedido salvo até o fechamento", () => {

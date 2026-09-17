@@ -106,6 +106,7 @@ function AbaCanais() {
         <thead>
           <tr className="border-b border-[var(--cor-borda)] text-left text-[var(--cor-texto-suave)]">
             <th className="px-4 py-3 font-medium">Canal</th>
+            <th className="px-4 py-3 font-medium">NF/impostos</th>
             <th className="px-4 py-3 font-medium">Aplica DIFAL</th>
             <th className="px-4 py-3 font-medium">Comissão padrão</th>
             <th className="px-4 py-3 font-medium">Modelo de frete</th>
@@ -123,15 +124,39 @@ function AbaCanais() {
 
 function LinhaCanal({ canal, onSalvar }: { canal: CanalLinha; onSalvar: (c: Parameters<typeof atualizarCanal>[1]) => void }) {
   const [aplicaDifal, setAplicaDifal] = useState(canal.applies_difal);
+  const [taxSource, setTaxSource] = useState(canal.tax_source);
   const [comissao, setComissao] = useState(canal.default_commission_rate);
   const [freteModel, setFreteModel] = useState(canal.freight_model);
-  const alterado = aplicaDifal !== canal.applies_difal || comissao !== canal.default_commission_rate || freteModel !== canal.freight_model;
+  const alterado =
+    aplicaDifal !== canal.applies_difal ||
+    taxSource !== canal.tax_source ||
+    comissao !== canal.default_commission_rate ||
+    freteModel !== canal.freight_model;
 
   return (
     <tr className="border-b border-[var(--cor-borda)] last:border-0">
       <td className="px-4 py-3 font-medium">{canal.name}</td>
       <td className="px-4 py-3">
-        <input type="checkbox" checked={aplicaDifal} onChange={(e) => setAplicaDifal(e.target.checked)} />
+        <select
+          className="rounded-md border border-[var(--cor-borda)] px-2 py-1 text-sm"
+          value={taxSource}
+          onChange={(e) => {
+            const valor = e.target.value as CanalLinha["tax_source"];
+            setTaxSource(valor);
+            if (valor === "none") setAplicaDifal(false);
+          }}
+        >
+          <option value="icsm_table">Com NF</option>
+          <option value="none">Sem NF</option>
+        </select>
+      </td>
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={taxSource === "none" ? false : aplicaDifal}
+          disabled={taxSource === "none"}
+          onChange={(e) => setAplicaDifal(e.target.checked)}
+        />
       </td>
       <td className="px-4 py-3">
         <Input className="w-24" value={comissao} onChange={(e) => setComissao(e.target.value)} />
@@ -148,7 +173,14 @@ function LinhaCanal({ canal, onSalvar }: { canal: CanalLinha; onSalvar: (c: Para
         {alterado && (
           <Button
             className="ml-2 px-2 py-1 text-xs"
-            onClick={() => onSalvar({ applies_difal: aplicaDifal, default_commission_rate: comissao, freight_model: freteModel })}
+            onClick={() =>
+              onSalvar({
+                applies_difal: taxSource === "none" ? false : aplicaDifal,
+                tax_source: taxSource,
+                default_commission_rate: comissao,
+                freight_model: freteModel,
+              })
+            }
           >
             Salvar
           </Button>

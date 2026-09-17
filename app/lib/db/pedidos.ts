@@ -98,8 +98,8 @@ export type ContextoSimulador = {
 
 export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
   const [vend, canais, cli, icsm, difal, portal, regras, faixas, prods, custos, kits, insumos, custoKits, meuVend, transp, pagamento] = await Promise.all([
-    supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, default_commission_rate, freight_model)").eq("active", true).order("name"),
-    supabase.from("channels").select("id, name, applies_difal, default_commission_rate, freight_model").order("name"),
+    supabase.from("sellers").select("id, name, channel_id, channels(name, applies_difal, tax_source, default_commission_rate, freight_model)").eq("active", true).order("name"),
+    supabase.from("channels").select("id, name, applies_difal, tax_source, default_commission_rate, freight_model").order("name"),
     // O cadastro do cliente carrega os dados do cabeçalho da ficha; o
     // simulador só precisa saber quais já estão preenchidos, para avisar
     // antes de o pedido chegar à conferência com o cabeçalho vazio.
@@ -251,12 +251,13 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
       name: c.name as string,
       regras: {
         aplicaDifal: (c.applies_difal as boolean | null) ?? true,
+        modeloImposto: ((c.tax_source as string | null) ?? "icsm_table") === "none" ? "none" : "icsm_table",
         comissaoPadrao: (c.default_commission_rate as string | null) ?? "0.025",
         modeloFrete: ((c.freight_model as string | null) ?? "manual") as "manual" | "uf_percent",
       },
     })),
     vendedores: (vend.data ?? []).map((v) => {
-      const c = v.channels as unknown as { name: string; applies_difal: boolean; default_commission_rate: string; freight_model: "manual" | "uf_percent" } | null;
+      const c = v.channels as unknown as { name: string; applies_difal: boolean; tax_source: string | null; default_commission_rate: string; freight_model: "manual" | "uf_percent" } | null;
       return {
         id: v.id as string,
         name: v.name as string,
@@ -264,6 +265,7 @@ export async function carregarContextoSimulador(): Promise<ContextoSimulador> {
         canalNome: c?.name ?? "—",
         regras: {
           aplicaDifal: c?.applies_difal ?? true,
+          modeloImposto: c?.tax_source === "none" ? "none" : "icsm_table",
           comissaoPadrao: c?.default_commission_rate ?? "0.025",
           modeloFrete: c?.freight_model ?? "manual",
         },

@@ -280,6 +280,11 @@ export async function categorizarCliente(
   if (error) throw error;
 }
 
+export async function desativarCliente(id: string): Promise<void> {
+  const { error } = await supabase.rpc("deactivate_customer", { p_customer_id: id });
+  if (error) throw error;
+}
+
 export type PendenciaSegmentacao = { total: number; com_pedido: number };
 
 // Quantos cadastros ainda faltam categorizar. A reunião registrou 13 mil sem

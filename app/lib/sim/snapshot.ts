@@ -47,9 +47,10 @@ export type SnapshotPedido = {
 
 export function montarSnapshot(
   simulacao: Simulacao,
-  aliquotaIcsm: EntradaDecimal,
-  itens: ItemParaSnapshot[]
+  itensOuAliquota: ItemParaSnapshot[] | EntradaDecimal,
+  itensLegado?: ItemParaSnapshot[]
 ): SnapshotPedido {
+  const itens = Array.isArray(itensOuAliquota) ? itensOuAliquota : itensLegado ?? [];
   const r = simulacao.resultado;
   const receitaBruta = r.receitaBruta;
 
@@ -63,7 +64,7 @@ export function montarSnapshot(
       orderItemId: item.orderItemId,
       cmv_unit_snapshot: dec(item.cmvUnitario).toString(),
       expense_unit_snapshot: dec(item.despesaUnitaria).toString(),
-      tax_rate_snapshot: dec(aliquotaIcsm).toString(),
+      tax_rate_snapshot: simulacao.aliquotaImpostoAplicada.toString(),
       difal_rate_snapshot: simulacao.difalAplicado.toString(),
       commission_rate_snapshot: simulacao.comissaoUsada.toString(),
       freight_share_snapshot: freteShare.toString(),

@@ -13,6 +13,7 @@ import {
 
 export type CanalRegras = {
   aplicaDifal: boolean;
+  modeloImposto?: "icsm_table" | "none";
   comissaoPadrao: string; // fração
   modeloFrete: "manual" | "uf_percent";
 };
@@ -44,6 +45,7 @@ export type Simulacao = {
   freteUsado: Decimal;
   comissaoUsada: Decimal;
   difalAplicado: Decimal;
+  aliquotaImpostoAplicada: Decimal;
   aplicaDifalUsado: boolean;
   itensCalculados: ItemPedido[];
   avisos: string[];
@@ -57,10 +59,14 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
 
   // DIFAL: padrão do canal, com override por pedido (05/08/2026). A UF
   // fornece a alíquota (já com FCP embutido, Calculations.md §7.2).
-  const aplicaDifalUsado = entrada.aplicaDifal ?? entrada.canal.aplicaDifal;
+  const semNotaFiscal = entrada.canal.modeloImposto === "none";
+  const aplicaDifalUsado = semNotaFiscal ? false : entrada.aplicaDifal ?? entrada.canal.aplicaDifal;
   const difalAplicado = aplicaDifalUsado ? dec(entrada.uf.difalFinal) : new Decimal(0);
   if (aplicaDifalUsado && difalAplicado.isZero()) {
     avisos.push("DIFAL aplicável e zerado para esta UF — confira a tabela (PRD §7).");
+  }
+  if (semNotaFiscal) {
+    avisos.push("Tipo de venda sem NF — impostos e DIFAL zerados no cálculo.");
   }
 
   // Frete: manual ou % da receita por UF (canal marketplace).
@@ -119,12 +125,21 @@ export function simular(entrada: EntradaSimulacao): Simulacao {
     frete: freteUsado,
     fretePorContaCliente: freteDestacado,
     tributarFreteInformado: freteDestacado,
-    aliquotaImposto: entrada.uf.aliquotaIcsm,
+    aliquotaImposto: semNotaFiscal ? "0" : entrada.uf.aliquotaIcsm,
     aliquotaDifal: difalAplicado,
     aliquotaComissao: comissaoUsada,
   });
 
-  return { resultado, freteUsado, comissaoUsada, difalAplicado, aplicaDifalUsado, itensCalculados, avisos };
+  return {
+    resultado,
+    freteUsado,
+    comissaoUsada,
+    difalAplicado,
+    aliquotaImpostoAplicada: semNotaFiscal ? new Decimal(0) : dec(entrada.uf.aliquotaIcsm),
+    aplicaDifalUsado,
+    itensCalculados,
+    avisos,
+  };
 }
 
 export function aplicarFreteDestacadoAosItens(itens: ItemPedido[], frete: Decimal): ItemPedido[] {

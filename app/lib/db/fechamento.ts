@@ -444,7 +444,7 @@ export async function simularPedidoComCustosVigentes(
     uf: tabela,
   });
 
-  return { sim, snap: montarSnapshot(sim, tabela.aliquotaIcsm, itensSnapshot) };
+  return { sim, snap: montarSnapshot(sim, itensSnapshot) };
 }
 
 // Kits que o fechamento materializou. `novo` distingue o que ganhou código

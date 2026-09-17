@@ -4,11 +4,13 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   categorizarCliente,
   contarClientesSemCategoria,
+  desativarCliente,
   listarAreasCliente,
   listarClientes,
   listarTiposCliente,
 } from "../lib/db/clientes";
 import { formatarCnpjCpf, somenteDigitos } from "../../lib/cadastro/documentos";
+import { useAuth } from "../auth/AuthProvider";
 import { mensagemDeErro } from "../lib/erros";
 import { Badge, Button, Card, Input } from "@components/ui/primitives";
 
@@ -25,6 +27,8 @@ type Filtro = "todos" | "sem_categoria" | "sem_documento";
 export default function ClientesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { perfil } = useAuth();
+  const podeExcluir = perfil?.perfil === "admin";
   const [filtro, setFiltro] = useState<Filtro>("sem_categoria");
   const [busca, setBusca] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -43,6 +47,15 @@ export default function ClientesPage() {
       queryClient.invalidateQueries({ queryKey: ["pendenciaClientes"] });
     },
     onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao categorizar.")),
+  });
+  const excluir = useMutation({
+    mutationFn: (id: string) => desativarCliente(id),
+    onSuccess: () => {
+      setErro(null);
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["pendenciaClientes"] });
+    },
+    onError: (e: unknown) => setErro(mensagemDeErro(e, "Erro ao excluir cliente.")),
   });
 
   const tipos = tiposQuery.data ?? [];
@@ -145,6 +158,7 @@ export default function ClientesPage() {
                 <th className="px-4 py-3 font-medium">UF</th>
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Área</th>
+                {podeExcluir && <th className="px-4 py-3 font-medium">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -211,6 +225,21 @@ export default function ClientesPage() {
                       ))}
                     </select>
                   </td>
+                  {podeExcluir && (
+                    <td className="px-4 py-2">
+                      <Button
+                        className="bg-red-700 px-3 py-1 text-xs"
+                        disabled={excluir.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Excluir o cliente "${c.name}" da lista ativa?`)) {
+                            excluir.mutate(c.id);
+                          }
+                        }}
+                      >
+                        Excluir
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

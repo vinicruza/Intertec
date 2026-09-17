@@ -812,6 +812,7 @@ export default function SimuladorPage() {
   const comissaoForaDoNormal = comissao !== null && Number(comissao) > 0.2;
 
   const freteAutomatico = canal?.regras.modeloFrete === "uf_percent";
+  const vendaSemNotaFiscal = canal?.regras.modeloImposto === "none";
   const resumoComercial = useMemo(
     () => resumoComercialDasLinhas(linhasParaCalculo, resolvidas),
     [linhasParaCalculo, resolvidas]
@@ -1110,14 +1111,21 @@ export default function SimuladorPage() {
               </p>
             )}
           </div>
-          <label className="flex items-end gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={aplicaDifalOverride ?? canal?.regras.aplicaDifal ?? true}
-              onChange={(e) => setAplicaDifalOverride(e.target.checked)}
-            />
-            Aplica DIFAL neste pedido
-          </label>
+          {!vendaSemNotaFiscal && (
+            <label className="flex items-end gap-2 pb-2 text-sm">
+              <input
+                type="checkbox"
+                checked={aplicaDifalOverride ?? canal?.regras.aplicaDifal ?? true}
+                onChange={(e) => setAplicaDifalOverride(e.target.checked)}
+              />
+              Aplica DIFAL neste pedido
+            </label>
+          )}
+          {vendaSemNotaFiscal && (
+            <p className="flex items-end pb-2 text-sm text-[var(--cor-texto-suave)]">
+              Venda sem NF: impostos e DIFAL zerados.
+            </p>
+          )}
         </div>
 
         {/* DIFAL: devido pela Intertech quando o cliente é NÃO CONTRIBUINTE
@@ -1125,7 +1133,7 @@ export default function SimuladorPage() {
             Intertech em 05/08/2026 (Calculations.md §12). O canal já vem com
             um padrão, mas o mesmo vendedor pode vender para os dois tipos de
             cliente, então a caixa acima decide pedido a pedido. */}
-        {canal && (aplicaDifalOverride ?? canal.regras.aplicaDifal) !== canal.regras.aplicaDifal && (
+        {canal && !vendaSemNotaFiscal && (aplicaDifalOverride ?? canal.regras.aplicaDifal) !== canal.regras.aplicaDifal && (
           <p className="text-xs text-amber-700">
             Diferente do padrão da situação {canal.name} ({canal.regras.aplicaDifal ? "aplica" : "não aplica"} DIFAL) —
             registrado no pedido.
