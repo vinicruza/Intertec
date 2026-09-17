@@ -166,17 +166,16 @@ export function resumoComercialDasLinhas(
   };
 }
 
-export type MargemProdutoAvulso = {
+export type MargemLinhaVendavel = {
   indiceLinha: number;
   pct: ReturnType<typeof dec>;
 };
 
-export function margensDosProdutosAvulsos(
+export function margensDasLinhasVendaveis(
   linhas: LinhaItem[],
   resolvidas: Array<LinhaResolvida | null>,
-  itensVendaveis: ItemVendavelResumo[],
   resultado: ResultadoPedido
-): MargemProdutoAvulso[] {
+): MargemLinhaVendavel[] {
   if (resultado.receitaBruta.lte(0)) return [];
 
   const deducoesDoPedido = resultado.frete
@@ -186,11 +185,9 @@ export function margensDosProdutosAvulsos(
     .plus(resultado.comissao);
 
   return linhas.flatMap((linha, i) => {
-    const item = itensVendaveis.find((it) => it.id === linha.itemId);
     const resolvida = resolvidas[i];
     if (
       linha.amostra ||
-      item?.tipo !== "produto" ||
       !resolvida ||
       resolvida.erro ||
       !resolvida.cmvUnitario ||

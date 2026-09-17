@@ -29,7 +29,7 @@ import {
   kitNovoAPartirDe,
   montarItensDaCotacao,
   montarItensParaMotor,
-  margensDosProdutosAvulsos,
+  margensDasLinhasVendaveis,
   nomeSugeridoParaKit,
   pendenciasDosKits,
   produtoKitAleatorioExigeComposicao,
@@ -875,7 +875,7 @@ export default function SimuladorPage() {
   }
   const margemVisualPorLinha = new Map<number, MargemVisualLinha>();
   if (!amostra && simulacao.estado === "ok") {
-    margensDosProdutosAvulsos(linhasParaCalculo, resolvidas, ctx.itens, simulacao.resultado).forEach((margem) => {
+    margensDasLinhasVendaveis(linhasParaCalculo, resolvidas, simulacao.resultado).forEach((margem) => {
       const selo = seloMargemComercial(margem.pct, faixaMargem);
       margemVisualPorLinha.set(margem.indiceLinha, {
         pct: percentual(margem.pct.toString()),
@@ -1561,7 +1561,7 @@ export default function SimuladorPage() {
                           {margem && (
                             <span
                               className={`rounded-full px-2 py-0.5 text-[0.7rem] font-semibold tabular-nums ${CORES[margem.color]}`}
-                              title={`Margem do produto: ${margem.label}`}
+                              title={`Margem da linha: ${margem.label}`}
                             >
                               {margem.pct}
                             </span>

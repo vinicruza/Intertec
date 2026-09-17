@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   KIT_NOVO,
-  margensDosProdutosAvulsos,
+  margensDasLinhasVendaveis,
   montarItensDaCotacao,
   montarItensParaMotor,
   resolverKitAdHocDoPedido,
@@ -195,10 +195,16 @@ describe("itens que vão para o motor de cálculo", () => {
     expect(toMoney(resumo.subtotal)).toBe("17090.00");
   });
 
-  it("calcula margem visual só para produto avulso, nunca para kit", () => {
+  it("calcula margem visual para produto, kit de catálogo e kit montado", () => {
     const linhas = [
       linha({ itemId: "prod-avental", quantidade: "10", preco: "4,20" }),
       linha({ itemId: "kit-catarata", quantidade: "2", preco: "25" }),
+      linha({
+        itemId: KIT_NOVO,
+        quantidade: "1",
+        preco: "40",
+        kitNovo: kitNovo(COMPOSICAO_EXISTENTE, [{ insumoId: "ins-envelope", modo: "porKit", quantidade: "1" }]),
+      }),
     ];
     const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
     const itens = montarItensParaMotor(linhas, resolvidas);
@@ -213,10 +219,10 @@ describe("itens que vão para o motor de cálculo", () => {
       aliquotaDifal: "0",
       aliquotaComissao: "0",
     });
-    const margens = margensDosProdutosAvulsos(linhas, resolvidas, CATALOGO, resultado);
+    const margens = margensDasLinhasVendaveis(linhas, resolvidas, resultado);
 
-    expect(margens.map((m) => m.indiceLinha)).toEqual([0]);
-    expect(toPercent(margens[0].pct)).toBe("59.32");
+    expect(margens.map((m) => m.indiceLinha)).toEqual([0, 1, 2]);
+    expect(margens.map((m) => toPercent(m.pct))).toEqual(["59.32", "70.98", "81.86"]);
   });
 
   it("kit montado no pedido entra no motor como preço por kit vezes quantidade de kits", () => {
