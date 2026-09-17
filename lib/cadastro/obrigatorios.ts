@@ -9,7 +9,8 @@
 //
 // Cadastro SEM DOCUMENTO é o que deixa a porta aberta: sem CNPJ nada impede o
 // mesmo cliente de nascer de novo, porque a única defesa vira o nome — e nome
-// se digita errado.
+// se digita errado. Código externo ajuda na operação, mas não pode travar o
+// comercial quando o administrativo vai completar depois.
 //
 // ---------- Por que nem tudo é obrigatório ----------
 //
@@ -26,7 +27,6 @@
 // Contato FINANCEIRO, complemento e observação seguem opcionais: são canais
 // extras, não a identidade do cliente nem para onde a nota vai.
 export type CamposObrigatoriosCliente = {
-  external_code: string;
   name: string;
   uf: string;
   tax_id: string;
@@ -56,7 +56,6 @@ export type CamposObrigatoriosCliente = {
 // Rótulo de cada campo, na mesma palavra que a tela usa — a mensagem de
 // pendência é lida por quem está olhando o formulário.
 export const ROTULOS_OBRIGATORIOS: Record<keyof CamposObrigatoriosCliente, string> = {
-  external_code: "Código do cliente",
   name: "Empresa / nome",
   uf: "UF",
   tax_id: "CNPJ / CPF",

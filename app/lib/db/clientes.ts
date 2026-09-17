@@ -75,6 +75,13 @@ export type ClienteDocumentoExistente = {
   name: string;
 };
 
+export type ClienteDuplicidadePossivel = {
+  id: string;
+  external_code: string | null;
+  name: string;
+  tax_id: string | null;
+};
+
 const CAMPOS_CADASTRO =
   "id, code, external_code, name, uf, tax_id, billing_zip, billing_street, billing_number, billing_complement, billing_district, billing_city, billing_state, shipping_zip, shipping_street, shipping_number, shipping_complement, shipping_district, shipping_city, shipping_state, contact_name, phone, email, commercial_contact_name, commercial_phone, commercial_email, financial_contact_name, financial_phone, financial_email, notes, customer_type_id, customer_specialty_id";
 
@@ -141,6 +148,28 @@ export async function listarClientesPorDocumento(
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as ClienteDocumentoExistente[];
+}
+
+export async function listarClientesPorNomeParecido(
+  nome: string,
+  ignorarId?: string | null
+): Promise<ClienteDuplicidadePossivel[]> {
+  const termo = nome.trim().replace(/\s+/g, " ");
+  if (termo.length < 4) return [];
+
+  let query = supabase
+    .from("customers")
+    .select("id, external_code, name, tax_id")
+    .eq("active", true)
+    .ilike("name", `%${termo}%`)
+    .order("name")
+    .limit(10);
+
+  if (ignorarId) query = query.neq("id", ignorarId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as ClienteDuplicidadePossivel[];
 }
 
 // Grava o cadastro. Documento, CEP e telefone vão SEM MÁSCARA — a pontuação

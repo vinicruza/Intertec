@@ -41,6 +41,10 @@ describe("obrigatoriosPendentes", () => {
 });
 
 describe("o que fica de fora, e por quê", () => {
+  it("codigo externo segue opcional para o comercial cadastrar rapido", () => {
+    expect(CAMPOS_OBRIGATORIOS).not.toContain("external_code");
+  });
+
   // Campo obrigatório demais não produz cadastro completo: produz cadastro
   // inventado. Na base de 02/09 o contato financeiro faltava em 77 dos 143
   // clientes ativos — exigi-lo travaria a edição de mais da metade.

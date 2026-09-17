@@ -22,7 +22,7 @@ import { Badge, Button, Card, Input } from "@components/ui/primitives";
 // cadastros sem categoria — sem um lugar para fazer esse trabalho, a decisão
 // não sai do papel.
 
-type Filtro = "todos" | "sem_categoria" | "sem_documento";
+type Filtro = "todos" | "sem_categoria" | "sem_documento" | "sem_codigo";
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
@@ -67,8 +67,10 @@ export default function ClientesPage() {
     const digitos = somenteDigitos(texto);
     return todos.filter((c) => {
       const semCategoria = !c.customer_type_id || !c.customer_specialty_id;
+      const semCodigo = !c.external_code?.trim();
       if (filtro === "sem_categoria" && !semCategoria) return false;
       if (filtro === "sem_documento" && c.tax_id) return false;
+      if (filtro === "sem_codigo" && !semCodigo) return false;
       if (texto) {
         const porNome = `${c.external_code ?? ""} ${c.code ?? ""} ${c.name}`.toLocaleLowerCase("pt-BR").includes(texto);
         // Busca por documento aceita com ou sem máscara: quem copia um CNPJ
@@ -83,6 +85,7 @@ export default function ClientesPage() {
   // Quantos ainda estão sem CNPJ. É o número que diz quanto falta para a ficha
   // impressa parar de sair com o cabeçalho pela metade.
   const semDocumento = useMemo(() => todos.filter((c) => !c.tax_id).length, [todos]);
+  const semCodigo = useMemo(() => todos.filter((c) => !c.external_code?.trim()).length, [todos]);
 
   const pendencia = pendenciaQuery.data;
 
@@ -113,6 +116,16 @@ export default function ClientesPage() {
         </Card>
       )}
 
+      <div
+        className={
+          semCodigo > 0
+            ? "rounded-md bg-red-700 px-4 py-3 text-sm font-semibold text-white shadow-sm"
+            : "rounded-md bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+        }
+      >
+        {semCodigo} cliente(s) sem código. Use o filtro "Sem código" para revisar e completar esses cadastros.
+      </div>
+
       <Card className="flex flex-wrap gap-3 p-4">
         <select
           className="rounded-md border border-[var(--cor-borda)] px-2 py-2 text-sm"
@@ -120,6 +133,7 @@ export default function ClientesPage() {
           onChange={(e) => setFiltro(e.target.value as Filtro)}
         >
           <option value="sem_categoria">Só os sem categoria</option>
+          <option value="sem_codigo">Só os sem código</option>
           <option value="sem_documento">Só os sem CNPJ/CPF</option>
           <option value="todos">Todos os clientes</option>
         </select>
@@ -142,6 +156,8 @@ export default function ClientesPage() {
           <p className="text-sm text-[var(--cor-texto-suave)]">
             {filtro === "sem_categoria"
               ? "Nenhum cliente pendente de categoria — trabalho concluído."
+              : filtro === "sem_codigo"
+                ? "Nenhum cliente sem código — trabalho concluído."
               : "Nenhum cliente corresponde à busca."}
           </p>
         </Card>

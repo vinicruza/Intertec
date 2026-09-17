@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   categorizarCliente,
   listarClientesPorDocumento,
+  listarClientesPorNomeParecido,
   listarAreasCliente,
   listarTiposCliente,
   obterCliente,
@@ -279,6 +280,25 @@ export default function ClienteFormPage() {
         }
       }
 
+      if (!c.external_code.trim()) {
+        const clientesComNomeParecido = await listarClientesPorNomeParecido(c.name, novo ? null : id);
+        if (clientesComNomeParecido.length > 0) {
+          const lista = clientesComNomeParecido
+            .map((cliente) => {
+              const codigo = cliente.external_code ? `${cliente.external_code} — ` : "sem código — ";
+              const documento = cliente.tax_id ? ` (${formatarCnpjCpf(cliente.tax_id)})` : "";
+              return `${codigo}${cliente.name}${documento}`;
+            })
+            .join("\n");
+          const prosseguir = window.confirm(
+            `Este cadastro está sem código e encontrei cliente com nome parecido:\n\n${lista}\n\nConfirme se não é duplicidade antes de prosseguir. Deseja salvar mesmo assim?`
+          );
+          if (!prosseguir) {
+            throw new Error("Cadastro não salvo. Confira o cliente parecido antes de criar outro sem código.");
+          }
+        }
+      }
+
       const d: DadosCliente = {
         external_code: c.external_code || null,
         name: c.name,
@@ -371,13 +391,18 @@ export default function ClienteFormPage() {
         <h2 className="font-semibold">Identificação</h2>
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <Label htmlFor="codigo-cliente">Código do cliente<Obrig /></Label>
+            <Label htmlFor="codigo-cliente">Código do cliente</Label>
             <Input
               id="codigo-cliente"
               value={c.external_code}
               placeholder="Código Intertech"
               onChange={(e) => mudar("external_code")(e.target.value.toUpperCase())}
             />
+            {!c.external_code.trim() && (
+              <p className="mt-1 text-xs font-medium text-red-700">
+                Pode salvar sem código, mas ele ficará pendente para o administrativo completar depois.
+              </p>
+            )}
           </div>
           <div className="md:col-span-2">
             <Label htmlFor="nome">Empresa / nome<Obrig /></Label>
