@@ -70,6 +70,10 @@ const CORES_SELO_MARGEM: Record<string, string> = {
   red: "bg-red-100 text-red-800",
 };
 
+function aprovadoAutomaticamentePelaMargem(pedido: Pick<PedidoCompleto, "approval_status" | "approval_notes">): boolean {
+  return pedido.approval_status === "aprovado" && (pedido.approval_notes ?? "").startsWith("Aprovado automaticamente pela margem");
+}
+
 // Detalhe do pedido. Para pedido FECHADO, tudo vem do snapshot congelado —
 // nada é recalculado (D7). Simulações mostram os itens e oferecem o fechamento.
 export default function PedidoDetalhePage() {
@@ -179,6 +183,12 @@ export default function PedidoDetalhePage() {
   const souAprovador = podeAprovar(perfil?.perfil, params);
   const aprovacao = pedido.approval_status;
   const cancelado = Boolean(pedido.cancelled_at);
+  const autoAprovadoPorMargem = aprovadoAutomaticamentePelaMargem(pedido);
+  const podeEditarCotacao =
+    !fechado &&
+    !cancelado &&
+    !perdida &&
+    (aprovacao === "rascunho" || aprovacao === "recusado" || autoAprovadoPorMargem);
   const t = pedido.totals_display;
   const cascata = cascataQuery.data;
   // Régua deste pedido: Marketplace tem faixa própria (Intertech, 26/08/2026).
@@ -518,11 +528,10 @@ export default function PedidoDetalhePage() {
             Reabrir cotação
           </Button>
         )}
-        {/* Editar só existe enquanto ninguém decidiu nada sobre este pedido —
-            rascunho (nunca enviado) ou recusado (volta para a mesa). O banco
-            recusa fora disso (migração 20260805200000); a tela nem oferece o
-            botão para não anunciar uma ação que ia falhar. */}
-        {!fechado && !cancelado && !perdida && (aprovacao === "rascunho" || aprovacao === "recusado") && (
+        {/* Editar existe para cotações que ainda podem voltar ao simulador.
+            Aprovação automática pela margem não é uma decisão manual final:
+            ao salvar nova versão, o banco limpa a aprovação e recalcula. */}
+        {podeEditarCotacao && (
           <Button
             className="bg-transparent text-[var(--cor-texto-suave)] hover:bg-[var(--cor-fundo)]"
             onClick={() => navigate(`/simulador/${pedido.id}`)}
