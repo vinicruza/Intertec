@@ -282,9 +282,6 @@ export default function ProdutoFormPage() {
             <div><Label>Tamanho</Label><Input {...register("size")} /></div>
             <div><Label>Gramatura</Label><Input {...register("grammage")} /></div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register("sterile")} /> Estéril
-          </label>
           <div>
             <Label>Descrição NF</Label>
             <Input {...register("nfDescription")} placeholder="Texto que sai na nota fiscal ao faturar este produto" />
