@@ -982,6 +982,7 @@ export default function SimuladorPage() {
                 }
               }}
               placeholder="Digite o código ou nome do cliente…"
+              escolherAoDigitar={false}
             />
             {clienteId && (
               <button

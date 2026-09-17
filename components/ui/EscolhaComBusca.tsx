@@ -48,6 +48,13 @@ export function idPorRotulo(texto: string, opcoes: OpcaoDeBusca[]): string | nul
   return porCodigo.length === 1 ? porCodigo[0].id : null;
 }
 
+export function idPorEscolhaImediata(texto: string, opcoes: OpcaoDeBusca[]): string | null {
+  const alvo = texto.trim().toLocaleLowerCase("pt-BR");
+  if (alvo === "") return null;
+  const exata = opcoes.find((o) => rotuloDaOpcao(o).toLocaleLowerCase("pt-BR") === alvo);
+  return exata ? exata.id : null;
+}
+
 export function rotuloPorId(id: string, opcoes: OpcaoDeBusca[]): string {
   const o = opcoes.find((x) => x.id === id);
   return o ? rotuloDaOpcao(o) : "";
@@ -60,6 +67,7 @@ export function EscolhaComBusca({
   placeholder = "Digite o código ou o nome…",
   className,
   id: idExterno,
+  escolherAoDigitar = true,
 }: {
   // Id do item escolhido; vazio = nada escolhido ainda.
   valor: string;
@@ -68,6 +76,10 @@ export function EscolhaComBusca({
   placeholder?: string;
   className?: string;
   id?: string;
+  // Em campos com muitos códigos parecidos (cliente), o navegador pode
+  // completar a primeira opção do datalist enquanto a pessoa ainda digita.
+  // Nesses casos a tela só deve gravar a escolha no blur/Enter.
+  escolherAoDigitar?: boolean;
 }) {
   const idGerado = useId();
   const idLista = `${idExterno ?? idGerado}-lista`;
@@ -83,7 +95,15 @@ export function EscolhaComBusca({
         defaultValue={rotuloPorId(valor, opcoes)}
         key={valor} // troca externa (ex.: limpar a linha) redesenha o campo
         placeholder={placeholder}
-        onChange={(e) => aoEscolher(idPorRotulo(e.target.value, opcoes) ?? "")}
+        onChange={(e) => {
+          if (!escolherAoDigitar) return;
+          aoEscolher(idPorEscolhaImediata(e.target.value, opcoes) ?? "");
+        }}
+        onBlur={(e) => aoEscolher(idPorRotulo(e.target.value, opcoes) ?? "")}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          aoEscolher(idPorRotulo(e.currentTarget.value, opcoes) ?? "");
+        }}
         className={cn(
           "w-full min-h-10 rounded-[0.625rem] border border-[var(--cor-borda)] bg-white px-3 py-2 text-sm",
           "outline-none placeholder:text-slate-400 focus:border-[var(--cor-primaria)] focus:ring-4 focus:ring-indigo-100",

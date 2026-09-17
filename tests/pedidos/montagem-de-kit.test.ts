@@ -17,6 +17,7 @@ import {
   percentualParaFracao,
 } from "@app/lib/format";
 import {
+  idPorEscolhaImediata,
   idPorRotulo,
   rotuloDaOpcao,
   rotuloPorId,
@@ -253,6 +254,18 @@ describe("busca por código ou nome no catálogo de 324 produtos", () => {
   it("digitar só o código também acerta", () => {
     expect(idPorRotulo("KC0001", OPCOES)).toBe("3");
     expect(idPorRotulo("  av0011 ", OPCOES)).toBe("2");
+  });
+
+  it("enquanto digita, código exato ainda não seleciona automaticamente", () => {
+    const clientes: OpcaoDeBusca[] = [
+      { id: "curto", codigo: "41", nome: "Cliente antigo" },
+      { id: "longo", codigo: "4129", nome: "Cliente correto" },
+    ];
+
+    expect(idPorEscolhaImediata("41", clientes)).toBeNull();
+    expect(idPorEscolhaImediata("4129", clientes)).toBeNull();
+    expect(idPorEscolhaImediata("4129 — Cliente correto", clientes)).toBe("longo");
+    expect(idPorRotulo("4129", clientes)).toBe("longo");
   });
 
   it("texto pela metade não vira escolha — nada de adivinhar produto parecido", () => {
