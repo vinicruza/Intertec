@@ -64,7 +64,7 @@ import {
   problemaNoCampoNumerico,
   reais,
 } from "../lib/format";
-import { cepValido, cnpjCpfValido, formatarCep, formatarCnpjCpf } from "../../lib/cadastro/documentos";
+import { cepValido, cnpjCpfValido, formatarCep, formatarCnpjCpf, somenteDigitos } from "../../lib/cadastro/documentos";
 import { camposDoCep, mensagemDaConsulta } from "../../lib/cadastro/consultaReceita";
 import { consultarCep } from "../lib/db/consultaReceita";
 import { Badge, Button, Card, Input, Label } from "@components/ui/primitives";
@@ -146,6 +146,7 @@ export default function SimuladorPage() {
   const [clienteNovoCodigo, setClienteNovoCodigo] = useState("");
   const [clienteNovo, setClienteNovo] = useState("");
   const [clienteNovoCnpj, setClienteNovoCnpj] = useState("");
+  const [clienteAutoSelecionado, setClienteAutoSelecionado] = useState<string | null>(null);
   const [canalId, setCanalId] = useState("");
   const [tipoPedido, setTipoPedido] = useState<"sale" | "sample">(TIPO_PEDIDO_VENDA);
   const [motivoAmostra, setMotivoAmostra] = useState("");
@@ -371,6 +372,35 @@ export default function SimuladorPage() {
     const ufDoCliente = ctx.clientes.find((c) => c.id === clienteId)?.uf;
     if (ufDoCliente && ctx.tabelaPorUF.has(ufDoCliente)) setUf(ufDoCliente);
   }, [ctx, clienteId, uf]);
+
+  useEffect(() => {
+    if (!ctx || clienteId) return;
+    const documento = somenteDigitos(clienteNovoCnpj);
+    if (documento.length !== 11 && documento.length !== 14) {
+      setClienteAutoSelecionado(null);
+      return;
+    }
+    if (!cnpjCpfValido(documento)) {
+      setClienteAutoSelecionado(null);
+      return;
+    }
+
+    const clienteExistente = ctx.clientes.find((c) => somenteDigitos(c.tax_id) === documento);
+    if (!clienteExistente) {
+      setClienteAutoSelecionado(null);
+      return;
+    }
+
+    setClienteId(clienteExistente.id);
+    setClienteNovoCodigo("");
+    setClienteNovo("");
+    setClienteNovoCnpj("");
+    if (!uf && clienteExistente.uf && ctx.tabelaPorUF.has(clienteExistente.uf)) {
+      setUf(clienteExistente.uf);
+    }
+    const codigo = clienteExistente.external_code ? `${clienteExistente.external_code} - ` : "";
+    setClienteAutoSelecionado(`Cliente encontrado pelo CNPJ/CPF: ${codigo}${clienteExistente.name}.`);
+  }, [ctx, clienteId, clienteNovoCnpj, uf]);
 
   // Custo de cada linha de embalagem, vindo do banco. A tela nunca recebe o
   // preço do insumo: manda a composição, recebe o custo. Ver `custosDeEmbalagem`.
@@ -976,19 +1006,27 @@ export default function SimuladorPage() {
               opcoes={opcoesDeCliente}
               aoEscolher={(id) => {
                 setClienteId(id);
+                setClienteAutoSelecionado(null);
                 if (id) {
                   setClienteNovoCodigo("");
                   setClienteNovo("");
+                  setClienteNovoCnpj("");
                 }
               }}
               placeholder="Digite o código ou nome do cliente…"
               escolherAoDigitar={false}
             />
+            {clienteAutoSelecionado && (
+              <p className="mt-1 text-xs text-green-700">{clienteAutoSelecionado}</p>
+            )}
             {clienteId && (
               <button
                 type="button"
                 className="mt-1 text-xs text-[var(--cor-primaria)] hover:underline"
-                onClick={() => setClienteId("")}
+                onClick={() => {
+                  setClienteId("");
+                  setClienteAutoSelecionado(null);
+                }}
               >
                 cadastrar novo cliente nesta cotação
               </button>
