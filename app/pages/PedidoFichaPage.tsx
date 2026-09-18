@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   dec,
-  difalNoBlocoComercial,
   freteCobradoDoCliente,
   identificacaoDaFolha,
+  resumoDifalFcpNoBlocoComercial,
   margemPct,
   totaisDaFichaDoPedido,
   totalACobrarDoCliente,
@@ -18,7 +18,7 @@ import {
 } from "../lib/db/aprovacao";
 import { PARAMETROS_APROVACAO_PADRAO } from "../lib/sim/aprovacao";
 import { faixaDoPedido, seloMargemComercial } from "../lib/sim/params";
-import { listarFaixasMargemComercial } from "../lib/db/configuracoes";
+import { listarDifal, listarFaixasMargemComercial } from "../lib/db/configuracoes";
 import { useAuth } from "../auth/AuthProvider";
 import { dataCurta, percentual, reais } from "../lib/format";
 import { formatarCep, formatarCnpjCpf, formatarTelefone } from "../../lib/cadastro/documentos";
@@ -71,6 +71,10 @@ export default function PedidoFichaPage() {
   const faixasQuery = useQuery({
     queryKey: ["faixasMargemComercial"],
     queryFn: listarFaixasMargemComercial,
+  });
+  const difalQuery = useQuery({
+    queryKey: ["difal"],
+    queryFn: listarDifal,
   });
   const cascataQuery = useQuery({
     queryKey: ["cascataVigente", id],
@@ -198,10 +202,9 @@ export default function PedidoFichaPage() {
   // cliente (Calculations.md §12.1), então o TOTAL segue sendo subtotal + frete
   // — travado em `totalACobrarDoCliente`, com teste.
   //
-  // FCP não ganha número próprio: já vem embutido na alíquota final da tabela
-  // `difal_rates` (§7.2), e o sistema nunca calculou os dois separados. Por isso
-  // "DIFAL + FCP" repete o valor do DIFAL, e quem explica onde o FCP está é a
-  // nota do rodapé do bloco.
+  // FCP ganhou número próprio para AL, SE e RJ (Patrícia/Intertech, 18/09/2026).
+  // A cobrança antecipada já acontece em AL e SE; RJ fica configurado, mas ainda
+  // não destacado. Nos demais estados a folha preserva a leitura anterior.
   // ---------- Destacado e não destacado (regra da Intertech, 25/08/2026) ----
   //
   // O DIFAL sai da margem em toda UF que tenha alíquota — isso não é opcional e
@@ -214,11 +217,20 @@ export default function PedidoFichaPage() {
   //
   // Em nenhum dos dois casos o TOTAL muda: DIFAL nunca foi cobrança do cliente
   // (§12.1), e o TOTAL segue sendo subtotal + frete, travado com teste.
-  const difalNaFolha = difalNoBlocoComercial({
+  const regraDifalUf = difalQuery.data?.find((r) => r.uf === String(pedido.uf || "").toUpperCase());
+  const resumoDifalFcp = resumoDifalFcpNoBlocoComercial({
+    uf: pedido.uf,
     destacado: difalDestacado,
-    valor: totaisFinanceiros?.difal != null ? reais(totaisFinanceiros.difal) : null,
+    valorTotal: totaisFinanceiros?.difal ?? null,
+    fcpRate: regraDifalUf?.fcp_rate ?? null,
+    finalRate: regraDifalUf?.final_rate ?? null,
     calculando: !fechado && cascataQuery.isLoading,
-  }).texto;
+  });
+  const valorResumoFiscal = (valor: typeof resumoDifalFcp.difal, textoFallback = "—") =>
+    valor != null ? reais(valor.toString()) : textoFallback;
+  const difalNaFolha = valorResumoFiscal(resumoDifalFcp.difal, resumoDifalFcp.texto);
+  const fcpNaFolha = valorResumoFiscal(resumoDifalFcp.fcp);
+  const difalFcpNaFolha = valorResumoFiscal(resumoDifalFcp.total, resumoDifalFcp.texto);
 
   return (
     // 190mm, não 210mm: a folha é A4 (210mm) MENOS os 10mm de margem de cada
@@ -481,8 +493,8 @@ export default function PedidoFichaPage() {
                     rotulo={pedido.applies_difal ? "DIFAL" : "DIFAL dispensado"}
                     valor={difalNaFolha}
                   />
-                  <LinhaResumo rotulo="FCP" valor="—" />
-                  <LinhaResumo rotulo="DIFAL + FCP" valor={difalNaFolha} />
+                  <LinhaResumo rotulo="FCP" valor={fcpNaFolha} />
+                  <LinhaResumo rotulo="DIFAL + FCP" valor={difalFcpNaFolha} />
                   <tr className="bg-[var(--cor-primaria-clara)]">
                     <td className="px-4 py-2 text-base font-bold text-[var(--cor-primaria)]">TOTAL:</td>
                     <td className="px-4 py-2 text-right text-base font-extrabold text-[var(--cor-primaria)]">

@@ -3,6 +3,7 @@ import {
   difalNoBlocoComercial,
   freteCobradoDoCliente,
   identificacaoDaFolha,
+  resumoDifalFcpNoBlocoComercial,
   totaisDaFichaDoPedido,
   totalACobrarDoCliente,
 } from "@calc";
@@ -120,6 +121,75 @@ describe("difalNoBlocoComercial", () => {
   it("o TOTAL do cliente é o mesmo destacado ou não", () => {
     const total = totalACobrarDoCliente("1015", "200");
     expect(total.toString()).toBe("1215");
+  });
+});
+
+describe("resumoDifalFcpNoBlocoComercial", () => {
+  it("AL separa FCP a partir do total final, mesmo com base_rate diferente", () => {
+    const r = resumoDifalFcpNoBlocoComercial({
+      uf: "AL",
+      destacado: true,
+      valorTotal: "197.93",
+      fcpRate: "0.01",
+      finalRate: "0.145",
+      calculando: false,
+    });
+
+    expect(r.fcpSeparado).toBe(true);
+    expect(r.difal?.toFixed(2)).toBe("184.28");
+    expect(r.fcp?.toFixed(2)).toBe("13.65");
+    expect(r.total?.toFixed(2)).toBe("197.93");
+  });
+
+  it("SE também separa DIFAL e FCP quando destacado", () => {
+    const r = resumoDifalFcpNoBlocoComercial({
+      uf: "SE",
+      destacado: true,
+      valorTotal: "177.45",
+      fcpRate: "0.01",
+      finalRate: "0.13",
+      calculando: false,
+    });
+
+    expect(r.fcpSeparado).toBe(true);
+    expect(r.difal?.toFixed(2)).toBe("163.80");
+    expect(r.fcp?.toFixed(2)).toBe("13.65");
+  });
+
+  it("RJ fica configurado, mas sem destaque não imprime valores", () => {
+    const r = resumoDifalFcpNoBlocoComercial({
+      uf: "RJ",
+      destacado: false,
+      valorTotal: "100.00",
+      fcpRate: "0.02",
+      finalRate: "0.10",
+      calculando: false,
+    });
+
+    expect(r).toMatchObject({
+      difal: null,
+      fcp: null,
+      total: null,
+      texto: "não destacado",
+      imprimeValor: false,
+      fcpSeparado: false,
+    });
+  });
+
+  it("demais UFs preservam a leitura antiga: FCP sem linha própria", () => {
+    const r = resumoDifalFcpNoBlocoComercial({
+      uf: "BA",
+      destacado: true,
+      valorTotal: "351.27",
+      fcpRate: "0",
+      finalRate: "0.135",
+      calculando: false,
+    });
+
+    expect(r.fcpSeparado).toBe(false);
+    expect(r.difal?.toString()).toBe("351.27");
+    expect(r.fcp).toBeNull();
+    expect(r.total?.toString()).toBe("351.27");
   });
 });
 

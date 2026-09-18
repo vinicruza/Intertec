@@ -96,6 +96,82 @@ export function difalNoBlocoComercial(entrada: {
   return { texto: entrada.calculando ? "calculando…" : "—", imprimeValor: false };
 }
 
+export type ResumoDifalFcp = {
+  difal: Decimal | null;
+  fcp: Decimal | null;
+  total: Decimal | null;
+  texto: string;
+  imprimeValor: boolean;
+  fcpSeparado: boolean;
+};
+
+const UFS_COM_FCP_SEPARADO = new Set(["AL", "SE", "RJ"]);
+
+// ---------- DIFAL + FCP separados na ficha ----------
+//
+// Ajuste pedido pela Patrícia/Intertech em 18/09/2026: para AL e SE, onde a
+// cobrança antecipada já acontece, e RJ, já configurado para quando entrar em
+// uso, a ficha precisa abrir a soma em duas linhas:
+//
+//   DIFAL = total − FCP
+//   FCP   = total × (fcp_rate / final_rate)
+//
+// Usar `final_rate − fcp_rate` é intencional: AL veio da planilha com
+// `base_rate` diferente da soma final, mas o exemplo validado pela Patrícia
+// bate exatamente quando a separação parte do total final cobrado pela UF.
+export function resumoDifalFcpNoBlocoComercial(entrada: {
+  uf?: string | null;
+  destacado: boolean;
+  valorTotal: EntradaDecimal | null | undefined;
+  fcpRate?: EntradaDecimal | null;
+  finalRate?: EntradaDecimal | null;
+  calculando: boolean;
+}): ResumoDifalFcp {
+  const bruto = entrada.valorTotal == null ? null : dec(entrada.valorTotal);
+  const linha = difalNoBlocoComercial({
+    destacado: entrada.destacado,
+    valor: bruto == null ? null : bruto.toString(),
+    calculando: entrada.calculando,
+  });
+
+  if (!linha.imprimeValor || bruto == null) {
+    return {
+      difal: null,
+      fcp: null,
+      total: null,
+      texto: linha.texto,
+      imprimeValor: false,
+      fcpSeparado: false,
+    };
+  }
+
+  const uf = String(entrada.uf || "").toUpperCase();
+  const fcpRate = dec(entrada.fcpRate || "0");
+  const finalRate = dec(entrada.finalRate || "0");
+  const fcpSeparado = UFS_COM_FCP_SEPARADO.has(uf) && fcpRate.gt(0) && finalRate.gt(0);
+
+  if (!fcpSeparado) {
+    return {
+      difal: bruto,
+      fcp: null,
+      total: bruto,
+      texto: linha.texto,
+      imprimeValor: true,
+      fcpSeparado: false,
+    };
+  }
+
+  const fcp = bruto.times(fcpRate).div(finalRate);
+  return {
+    difal: bruto.minus(fcp),
+    fcp,
+    total: bruto,
+    texto: linha.texto,
+    imprimeValor: true,
+    fcpSeparado: true,
+  };
+}
+
 // ---------- Frete no bloco comercial: destacado ou não ----------
 //
 // Relatado pela Intertech em 27/08/2026, no pedido 05270826 (Mari,
