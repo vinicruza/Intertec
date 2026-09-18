@@ -343,10 +343,14 @@ describe("comercial lança pedido em nome próprio", () => {
     expect(trava).toMatch(/Não foi possível salvar o pedido\. Procure um Administrador/i);
   });
 
-  it("Comercial pode trocar tipo de venda, mas não vendedor nem comissão", () => {
+  it("Comercial pode trocar tipo de venda, mas só muda comissão em vendedor externo", () => {
     expect(trava).toMatch(/from public\.channels c/i);
     expect(trava).toMatch(/c\.id = new\.channel_id/i);
     expect(trava).not.toMatch(/new\.channel_id is distinct from v_channel_id/i);
+    expect(trava).toMatch(/v_comissao_variavel/i);
+    expect(trava).toMatch(/v_seller_channel_name/i);
+    expect(trava).toMatch(/like '%extern%'/i);
+    expect(trava).toMatch(/new\.commission_rate < 0 or new\.commission_rate >= 1/i);
     expect(trava).toMatch(/new\.commission_rate is null or abs\(new\.commission_rate - v_default_commission\)/i);
     expect(trava).not.toMatch(/Comercial só pode|Comissão só pode|nome próprio|canal do próprio vendedor/i);
     expect(TODAS).toMatch(/before insert or update of seller_id,\s*channel_id,\s*commission_rate on public\.orders/i);

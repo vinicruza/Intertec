@@ -295,7 +295,6 @@ export default function SimuladorPage() {
   }, [idParaEditar, pedidoParaEditar, ctx, carregado, editavel]);
 
   const podeEscolherVendedor = perfil?.perfil === "admin";
-  const podeEditarComissao = perfil?.perfil === "admin";
   // Comercial lança pedido só em nome próprio. Administrador lança por
   // qualquer vendedor. O tipo de venda, porém, pode variar pedido a pedido:
   // Interno, Revendas, Descpro etc. A trava definitiva fica no banco.
@@ -324,6 +323,8 @@ export default function SimuladorPage() {
   const vendedor = ctx?.vendedores.find((v) => v.id === vendedorIdEfetivo) ?? null;
   const canalIdEfetivo = canalId || vendedor?.channel_id || "";
   const canal = ctx?.canais.find((c) => c.id === canalIdEfetivo) ?? null;
+  const vendaExterna = normalizarNome(canal?.name ?? vendedor?.canalNome ?? "").includes("extern");
+  const podeEditarComissao = perfil?.perfil === "admin" || vendaExterna;
   // Régua do selo comercial deste pedido (Intertech, 26/08/2026): Marketplace
   // tem faixa própria, e um vendedor pode ter a dele. Resolvida uma vez aqui
   // para a tela e a gravação nunca discordarem.
