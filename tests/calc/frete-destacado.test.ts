@@ -117,23 +117,29 @@ describe("caixa Frete destacado — manda no resultado E no imposto", () => {
       );
     });
 
-    // Marcar a caixa devolve o frete ao resultado, mas cobra o imposto dele.
-    it(`${caso.nome}: marcar a caixa vale frete × (1 − alíquota)`, () => {
+    // Marcar a caixa devolve o frete ao resultado, mas cobra o imposto e o
+    // DIFAL dele, porque o valor passa a compor o total da NF.
+    it(`${caso.nome}: marcar a caixa vale frete × (1 − alíquota − DIFAL)`, () => {
       const diferenca = rodar(caso, true).receitaLiquida.minus(rodar(caso, false).receitaLiquida);
-      expect(diferenca.toString()).toBe(dec(caso.frete).times(dec("1").minus(caso.aliquota)).toString());
+      expect(diferenca.toString()).toBe(
+        dec(caso.frete).times(dec("1").minus(caso.aliquota).minus(caso.difal)).toString()
+      );
     });
 
-    // DIFAL e comissão seguem `receita + frete informado` nos dois estados
-    // (decisões de 18/08/2026). São as duas linhas que NÃO mudam com a caixa —
-    // sem isto, um erro no par de flags passaria despercebido.
-    it(`${caso.nome}: DIFAL e comissão não mudam com a caixa`, () => {
+    // A comissão segue `receita + frete informado` nos dois estados. O DIFAL
+    // segue o total da NF: com frete destacado usa receita + frete; sem
+    // destaque usa somente a receita dos produtos.
+    it(`${caso.nome}: DIFAL segue o total da NF e comissão segue receita + frete`, () => {
       const marcada = rodar(caso, true);
       const branco = rodar(caso, false);
       const base = dec(caso.receita).plus(caso.frete);
-      expect(marcada.difal.toString()).toBe(branco.difal.toString());
+      expect(marcada.difal.toString()).toBe(dec(caso.difal).times(base).toString());
+      expect(branco.difal.toString()).toBe(dec(caso.difal).times(caso.receita).toString());
       expect(marcada.comissao.toString()).toBe(branco.comissao.toString());
       expect(marcada.baseDifal.toString()).toBe(base.toString());
+      expect(branco.baseDifal.toString()).toBe(dec(caso.receita).toString());
       expect(marcada.baseComissao.toString()).toBe(base.toString());
+      expect(branco.baseComissao.toString()).toBe(base.toString());
     });
 
     // O tamanho exato da divergência que sobra contra a planilha, para quando
@@ -166,21 +172,19 @@ describe("ORC-2026-0041 — Oclusor 700 un a R$ 3,60, BA, frete R$ 82,00 em bran
     expect(toMoney(r.receitaBruta)).toBe("2520.00"); // planilha F24
     expect(toMoney(r.frete)).toBe("82.00"); // planilha N6, descontado por N12 = 0
     expect(toMoney(r.imposto)).toBe("409.50"); // planilha N8
-    expect(toMoney(r.difal)).toBe("351.27"); // planilha N9
+    expect(toMoney(r.difal)).toBe("340.20");
     expect(toMoney(r.comissao)).toBe("65.05"); // planilha N10
     // Planilha N7 = 13,325. Aqui é zero, pela regra do Bryan: o frete não está
     // na nota. É a única linha em que os dois discordam.
     expect(toMoney(r.impostoFrete)).toBe("0.00");
-    expect(toMoney(r.receitaLiquida)).toBe("1612.18"); // planilha N14 = 1.598,855
-    expect(toPercent(r.margemContribuicaoPct)).toBe("41.94"); // planilha N16 = 41,46%
+    expect(toMoney(r.receitaLiquida)).toBe("1623.25");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("42.34");
   });
 
-  it("a diferença para a planilha é exatamente 16,25% × 82,00", () => {
+  it("a diferença para a regra antiga é exatamente 13,5% × 82,00", () => {
     const r = rodar(caso, false);
-    const receitaLiquidaDaPlanilha = dec("1598.855");
-    expect(r.receitaLiquida.minus(receitaLiquidaDaPlanilha).toString()).toBe(
-      dec("0.1625").times("82").toString()
-    );
+    const receitaLiquidaDaRegraAntiga = dec("1612.18");
+    expect(r.receitaLiquida.minus(receitaLiquidaDaRegraAntiga).toString()).toBe(dec("0.135").times("82").toString());
   });
 });
 

@@ -166,17 +166,17 @@ describe("pedido só com produtos individuais", () => {
     const s = pedido.simulacao!;
     expect(toMoney(s.resultado.receitaBruta)).toBe("17550.00"); // 16.800 + 750
     expect(toMoney(s.resultado.imposto)).toBe("2851.88"); // 16,25%
-    expect(toMoney(s.resultado.difal)).toBe("2504.25"); // 13,5% × (17.550 + 1.000 de frete)
+    expect(toMoney(s.resultado.difal)).toBe("2369.25"); // 13,5% × 17.550, frete não destacado fica fora
     expect(toMoney(s.resultado.comissao)).toBe("463.75"); // 2,5% × (17.550 + 1.000 de frete)
     // Frete desmarcado = a Intertec paga o transporte: sai do resultado e não
     // é tributado (regra do Bryan, 19/08/2026 — golden T14c).
     expect(toMoney(s.resultado.frete)).toBe("1000.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10730.13");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10865.13");
     // CMV: 4000 × 1,537605 + 500 × 0,412
     expect(toMoney(s.resultado.cmvTotal)).toBe("6356.42");
-    expect(toMoney(s.resultado.margemContribuicao)).toBe("4373.71");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("40.76");
+    expect(toMoney(s.resultado.margemContribuicao)).toBe("4508.71");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("41.50");
     expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS_MARGEM)?.label).toBe("Boa");
   });
 
@@ -488,10 +488,11 @@ describe("escolhas do vendedor que mudam a conta", () => {
     expect(toMoney(s.resultado.frete)).toBe("1000.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
     // Marcar a caixa devolve os R$ 1.000 ao resultado, mas cobra os 162,50 de
-    // imposto sobre o frete que passa a aparecer na nota: sobram 837,50.
+    // imposto e os 135,00 de DIFAL sobre o frete que passa a aparecer na nota:
+    // sobram 702,50.
     const destacado = montarPedido({ ...base, fretePorContaCliente: true }).simulacao!;
     expect(toMoney(destacado.resultado.impostoFrete)).toBe("162.50");
-    expect(destacado.resultado.receitaLiquida.minus(s.resultado.receitaLiquida).toString()).toBe("837.5");
+    expect(destacado.resultado.receitaLiquida.minus(s.resultado.receitaLiquida).toString()).toBe("702.5");
   });
 
   it("DIFAL desmarcado no pedido vale mais que o padrão do canal", () => {
@@ -502,7 +503,7 @@ describe("escolhas do vendedor que mudam a conta", () => {
 
   it("DIFAL marcado num canal que não aplica também vale — é decisão do pedido", () => {
     const s = montarPedido({ ...base, canal: CANAL_REVENDAS, aplicaDifal: true }).simulacao!;
-    expect(toMoney(s.resultado.difal)).toBe("2403.00");
+    expect(toMoney(s.resultado.difal)).toBe("2268.00");
   });
 
   it("comissão digitada substitui a do canal", () => {

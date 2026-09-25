@@ -313,19 +313,19 @@ describe("ciclo da cotação", () => {
     expect(linhaBase).not.toMatch(/freight_paid_by_customer/i);
   });
 
-  // Mesma trava para o DIFAL (§6.3), decidido no mesmo dia que a comissão.
-  it("a base do DIFAL no banco é receita + frete, igual ao motor (§6.3)", () => {
+  // DIFAL segue o total da NF: quando o frete está destacado, a NF inclui frete;
+  // quando não está, a base fica somente nos produtos.
+  it("a base do DIFAL no banco acompanha o destaque do frete", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
     expect(fechar).toMatch(/v_base_with_freight := v_gross\+p_freight/i);
-    expect(fechar).toMatch(/v_difal := v_difal_rate\*v_base_with_freight/i);
-    // Não pode voltar a ser só a receita bruta.
-    expect(fechar).not.toMatch(/v_difal := v_difal_rate\*v_gross(?![a-z_])/i);
+    expect(fechar).toMatch(/v_difal_base := case when v_order\.freight_paid_by_customer then v_base_with_freight else v_gross end/i);
+    expect(fechar).toMatch(/v_difal := v_difal_rate\*v_difal_base/i);
   });
 
-  it("o frete do cliente não encolhe a base do DIFAL no banco", () => {
+  it("a base do DIFAL no banco usa a flag de frete destacado", () => {
     const fechar = definicaoVigente("close_order_with_snapshots");
-    const linhaBase = /v_base_with_freight := [^;]+;/i.exec(fechar)?.[0] ?? "";
-    expect(linhaBase).not.toMatch(/freight_paid_by_customer/i);
+    const linhaBase = /v_difal_base := [^;]+;/i.exec(fechar)?.[0] ?? "";
+    expect(linhaBase).toMatch(/freight_paid_by_customer/i);
   });
 
   // O ICMS continua sobre a receita: ele alcança o frete pela linha própria de

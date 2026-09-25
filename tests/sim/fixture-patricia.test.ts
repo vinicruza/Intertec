@@ -45,29 +45,27 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
   // Antes disto o simulador mandava `fretePorContaCliente: true` fixo, e o
   // frete nunca saía do resultado.
   //
-  //   RL 11.222,00 / margem 45,19%  →  RL 10.222,00 / margem 39,83%.
+  //   RL 11.222,00 / margem 45,19%  →  RL 10.357,00 / margem 40,62%.
   //
   // É o golden test T14c. A planilha, no mesmo pedido, ainda cobraria 162,50 de
   // imposto sobre o frete (T6) — a diferença conhecida de `alíquota × frete`.
-  it("reproduz a cascata com frete desmarcado: RL 10.222,00 e margem 39,83% (T14c)", () => {
+  it("reproduz a cascata com frete desmarcado: RL 10.357,00 e margem 40,62% (T14c)", () => {
     const s = simular(entrada);
     expect(toMoney(s.resultado.receitaBruta)).toBe("16800.00");
     expect(toMoney(s.resultado.imposto)).toBe("2730.00");
-    expect(toMoney(s.resultado.baseDifal)).toBe("17800.00"); // 16.800 + frete 1.000
-    expect(toMoney(s.resultado.difal)).toBe("2403.00");
+    expect(toMoney(s.resultado.baseDifal)).toBe("16800.00"); // frete não destacado fica fora da NF
+    expect(toMoney(s.resultado.difal)).toBe("2268.00");
     expect(toMoney(s.resultado.baseComissao)).toBe("17800.00");
     expect(toMoney(s.resultado.comissao)).toBe("445.00");
     // O frete sai do resultado e NÃO é tributado.
     expect(toMoney(s.resultado.frete)).toBe("1000.00");
     expect(toMoney(s.resultado.impostoFrete)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10222.00");
-    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("39.83");
-    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("9.36");
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10357.00");
+    expect(toPercent(s.resultado.margemContribuicaoPct)).toBe("40.62");
+    expect(toPercent(s.resultado.resultadoAposRateioPct)).toBe("10.54");
     expect(s.avisos).toHaveLength(0);
 
-    // Consequência prática da mudança: este pedido saiu da faixa "Boa" e caiu
-    // para "Atenção". Não é a régua que mudou — é a margem que era otimista.
-    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS)?.label).toBe("Atenção");
+    expect(statusMargem(s.resultado.margemContribuicaoPct, REGRAS)?.label).toBe("Boa");
   });
 
   it("frete destacado ligado mantém a base da venda e deduz frete/imposto frete em linhas próprias", () => {
@@ -82,7 +80,7 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
   it("canal Revendas (sem DIFAL): margem sobe e o DIFAL zera", () => {
     const s = simular({ ...entrada, canal: { ...entrada.canal, aplicaDifal: false } });
     expect(toMoney(s.difalAplicado)).toBe("0.00");
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("12625.00"); // 10.222,00 + 2.403
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("12625.00"); // 10.357,00 + 2.268
   });
 
   it("canal Marketplace: frete vira % da receita por UF (BA 17%)", () => {
@@ -122,8 +120,8 @@ describe("simulador — fixture Patricia (Unimed Salto Itu, BA)", () => {
     });
     expect(s.aplicaDifalUsado).toBe(true);
     expect(s.difalAplicado.toString()).toBe("0.135"); // alíquota usada
-    expect(toMoney(s.resultado.difal)).toBe("2403.00"); // valor em R$
-    expect(toMoney(s.resultado.receitaLiquida)).toBe("10222.00"); // igual ao padrão
+    expect(toMoney(s.resultado.difal)).toBe("2268.00"); // valor em R$
+    expect(toMoney(s.resultado.receitaLiquida)).toBe("10357.00"); // igual ao padrão
   });
 
   it("sem override (null/undefined), usa o padrão do canal — comportamento antigo preservado", () => {

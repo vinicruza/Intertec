@@ -107,14 +107,14 @@ describe("pedido de Patrocínio/MG (CEP 38700-196)", () => {
     }).resultado;
   }
 
-  it("6% sobre receita + frete = 120,60", () => {
+  it("frete não destacado: 6% somente sobre os produtos = 111,90", () => {
     const r = pedidoDeMG(false);
     expect(r.receitaBruta.toString()).toBe("1865");
-    expect(r.baseDifal.toString()).toBe("2010");
-    expect(r.difal.toString()).toBe("120.6");
+    expect(r.baseDifal.toString()).toBe("1865");
+    expect(r.difal.toString()).toBe("111.9");
   });
 
-  it("frete destacado não muda o DIFAL — a base usa o frete INFORMADO (§6.3)", () => {
+  it("frete destacado entra no total da NF e muda o DIFAL", () => {
     expect(pedidoDeMG(true).difal.toString()).toBe("120.6");
   });
 });

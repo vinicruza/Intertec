@@ -132,20 +132,16 @@ describe("Camada 4 — pedido completo", () => {
     despesaUnitaria: "0.778783",
   };
 
-  // ⚠️ Valores revisados DUAS VEZES em 18/08/2026, o cliente decidindo nas duas:
-  //   1) a comissão passou a incidir sobre receita + frete (T16)
-  //   2) o DIFAL passou a incidir sobre receita + frete (T17)
-  // O pedido-fixture é o mesmo da planilha; o que mudou foi a regra, não o
-  // exemplo. Histórico: comissão 420,00 / DIFAL 2.268,00 / RL 10.219,50 /
-  // margem 39,82%  →  comissão 445,00 / DIFAL 2.403,00 / RL 10.059,50 /
-  // margem 38,86%.
+  // ⚠️ Valores revisados: a comissão continua incidindo sobre receita + frete
+  // (T16), mas o DIFAL agora segue o total da NF. Se o frete não está
+  // destacado, a base do DIFAL é só a receita dos produtos.
   // ⚠️ 21/08/2026: `tributarFreteInformado: true` passou a ser EXPLÍCITO aqui.
   // Nenhum número mudou — este golden test descreve a cascata da PLANILHA
   // (Calculations.md §6), onde o frete pago pela Intertec é deduzido E
   // tributado. Antes o motor tributava por omissão; agora a flag é quem manda,
   // porque a regra do Bryan (áudio de 19/08/2026) exige o caso "deduz e NÃO
   // tributa" para o frete não destacado, que a aplicação usa. Ver `params.ts`.
-  it("T6 — pedido UF BA: receita líquida 10.059,50 e margem 38,86%", () => {
+  it("T6 — pedido UF BA: receita líquida 10.194,50 e margem 39,67%", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
@@ -158,16 +154,16 @@ describe("Camada 4 — pedido completo", () => {
     esperarProximo(r.receitaBruta, "16800");
     esperarProximo(r.cmvTotal, "6150.42");
     esperarProximo(r.imposto, "2730");
-    esperarProximo(r.baseDifal, "17800"); // 16.800 de venda + 1.000 de frete
-    esperarProximo(r.difal, "2403");
+    esperarProximo(r.baseDifal, "16800"); // frete não destacado: DIFAL só sobre produtos
+    esperarProximo(r.difal, "2268");
     esperarProximo(r.baseComissao, "17800");
     esperarProximo(r.comissao, "445");
     esperarProximo(r.impostoFrete, "162.50");
-    esperarProximo(r.receitaLiquida, "10059.50");
-    esperarProximo(r.margemContribuicao, "3909.08");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("38.86");
+    esperarProximo(r.receitaLiquida, "10194.50");
+    esperarProximo(r.margemContribuicao, "4044.08");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
     // O mesmo pedido, se descontasse a despesa rateada, cairia para 7,89% (§6).
-    expect(toPercent(r.resultadoAposRateioPct)).toBe("7.89");
+    expect(toPercent(r.resultadoAposRateioPct)).toBe("9.11");
   });
 
   it("T7 — mesmo pedido em UF SP: imposto 27,25% e DIFAL 0", () => {
@@ -551,14 +547,14 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaDifal: "0.135",
       aliquotaComissao: "0.025",
     });
-    esperarProximo(r.receitaLiquida, "10059.50");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("38.86");
+    esperarProximo(r.receitaLiquida, "10194.50");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("39.67");
   });
 
   // T14c — a combinação que a APLICAÇÃO usa desde 21/08/2026 para o frete não
   // destacado, pela regra do Bryan: o frete sai do resultado e NÃO é tributado,
   // porque não aparece na nota fiscal. É o T6 sem os 162,50 de imposto sobre
-  // frete — a diferença exata entre a regra da empresa e a da planilha.
+  // frete.
   it("T14c — frete não destacado: deduz o frete e NÃO tributa (regra do Bryan)", () => {
     const r = calcularPedido({
       itens: [itemAvental],
@@ -571,9 +567,9 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
     });
     esperarProximo(r.frete, "1000");
     esperarProximo(r.impostoFrete, "0");
-    // 10.059,50 do T6 + os 162,50 que a planilha cobra a mais.
-    esperarProximo(r.receitaLiquida, "10222");
-    expect(toPercent(r.margemContribuicaoPct)).toBe("39.83");
+    // 10.194,50 do T6 + os 162,50 de imposto sobre frete que não entram.
+    esperarProximo(r.receitaLiquida, "10357");
+    expect(toPercent(r.margemContribuicaoPct)).toBe("40.62");
   });
 
   // ============================================================
@@ -646,17 +642,13 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
   });
 
   // ============================================================
-  // T17 — base do DIFAL inclui o frete (cliente, 18/08/2026)
+  // T17 — base do DIFAL segue o total da NF
   // ------------------------------------------------------------
-  // Mesma decisão da comissão (T16), tomada no mesmo dia, depois que a planilha
-  // Rentabilidade 2026 trocou `*F24` por `*(F24+N6)` em 9 das 12 abas.
-  //
-  // O ICMS não precisou mudar: ele já alcança o frete pela linha "Imposto sobre
-  // frete", separada. O DIFAL não tem linha equivalente — somar o frete na base
-  // é como se tributa o frete nele.
+  // Confirmado pela Patricia em 25/09/2026: o cálculo é sempre sobre o valor
+  // total da NF. Se o frete não é destacado, a NF fica somente com os produtos.
   // ============================================================
 
-  it("T17 — DIFAL sai sobre receita + frete informado", () => {
+  it("T17 — DIFAL sem frete destacado sai somente sobre produtos", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "1000",
@@ -665,9 +657,9 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaComissao: "0.025",
     });
 
-    // 13,5% × (16.800 + 1.000) = 2.403,00 — e não 2.268,00 (13,5% × 16.800).
-    esperarProximo(r.baseDifal, "17800");
-    esperarProximo(r.difal, "2403");
+    // 13,5% × 16.800 = 2.268,00.
+    esperarProximo(r.baseDifal, "16800");
+    esperarProximo(r.difal, "2268");
   });
 
   it("T17b — frete por conta do cliente NÃO reduz a base do DIFAL", () => {
@@ -694,11 +686,11 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaComissao: "0.025",
     });
 
-    esperarProximo(r.baseDifal, "17800");
+    esperarProximo(r.baseDifal, "16800");
     esperarProximo(r.difal, "0");
   });
 
-  it("T17d — DIFAL e comissão partem da MESMA base", () => {
+  it("T17d — sem destaque, DIFAL e comissão têm bases diferentes", () => {
     const r = calcularPedido({
       itens: [itemAvental],
       frete: "737.42",
@@ -707,8 +699,9 @@ describe("T14/T15 — correções de 04/08/2026 (Calculations.md §6)", () => {
       aliquotaComissao: "0.025",
     });
 
-    expect(r.baseDifal.equals(r.baseComissao)).toBe(true);
-    esperarProximo(r.baseDifal, "17537.42");
+    expect(r.baseDifal.equals(r.baseComissao)).toBe(false);
+    esperarProximo(r.baseDifal, "16800");
+    esperarProximo(r.baseComissao, "17537.42");
   });
 
   it("T15 — prejuízo nunca devolve percentual positivo", () => {

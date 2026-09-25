@@ -33,7 +33,7 @@ export type ResultadoPedido = {
   freteInformado: Decimal;    // o que foi digitado/calculado, antes da regra acima
   impostoFrete: Decimal;
   imposto: Decimal;           // imposto sobre a receita (ICSM)
-  baseDifal: Decimal;         // receita + frete informado — a memória de cálculo do DIFAL
+  baseDifal: Decimal;         // total da NF: receita + frete quando destacado; só receita quando não destacado
   difal: Decimal;
   baseComissao: Decimal;      // receita + frete informado — a memória de cálculo da comissão
   comissao: Decimal;
@@ -57,8 +57,9 @@ export type ResultadoItem = {
 //   receita_pedido   = Σ (preco_venda × quantidade)
 //   imposto_frete    = aliquota_imposto × frete
 //   imposto          = aliquota_imposto × receita_pedido
-//   base_com_frete   = receita_pedido + frete_informado
-//   DIFAL            = aliquota_difal × base_com_frete
+//   base_difal       = total da NF (receita + frete se destacado; só receita se não)
+//   DIFAL            = aliquota_difal × base_difal
+//   base_comissao    = receita_pedido + frete_informado
 //   comissao         = aliquota_comissao × base_com_frete
 //   frete            = 0, se o frete é por conta do cliente (e então imposto_frete = 0)
 //   receita_liquida  = receita − frete − imposto_frete − imposto − DIFAL − comissao
@@ -126,30 +127,20 @@ export function calcularPedido(p: ParametrosPedido): ResultadoPedido {
   const impostoFrete = aliquotaImposto.times(baseImpostoFrete);
   const imposto = aliquotaImposto.times(receitaBruta);
 
-  // Base de receita + FRETE INFORMADO — usada pela COMISSÃO e pelo DIFAL.
+  // Base de receita + FRETE INFORMADO — usada pela COMISSÃO.
   //
   // Comissão: confirmado pelo cliente em 18/08/2026.
-  // DIFAL: confirmado pelo cliente em 18/08/2026, na mesma direção.
-  //
-  // Por que os dois e o ICMS não. O imposto sobre venda (ICSM) já alcança o
-  // frete, mas por outro caminho: a linha "Imposto sobre frete", separada, que
-  // aplica a mesma alíquota sobre o frete. Somando as duas linhas, o ICMS já
-  // incide sobre receita + frete. O DIFAL não tem linha própria de frete — daí
-  // somar o frete na base ser exatamente como tributá-lo. O resultado final é
-  // o mesmo tratamento para os dois impostos, escrito de duas formas.
-  //
   // Usa o frete INFORMADO, não o efetivo: mesmo quando o cliente paga o frete
   // (e a dedução vai a zero), o transporte foi vendido — o vendedor comissiona
   // sobre ele e o estado cobra sobre ele. É o que a planilha faz: a fórmula
   // aponta para a célula do frete digitado, não para a linha já líquida de
   // estorno. Golden tests T16b e T17b.
   const baseComFrete = receitaBruta.plus(freteInformado);
+  const baseDifal = p.fretePorContaCliente ? baseComFrete : receitaBruta;
 
   // Expostos com nomes próprios: são duas linhas distintas da cascata, cada uma
-  // com a sua memória de cálculo na tela. Hoje a base é a mesma; se um dia uma
-  // delas mudar, muda sozinha.
+  // com a sua memória de cálculo na tela.
   const baseComissao = baseComFrete;
-  const baseDifal = baseComFrete;
 
   const difal = dec(p.aliquotaDifal).times(baseDifal);
   const comissao = dec(p.aliquotaComissao).times(baseComissao);

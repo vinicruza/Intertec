@@ -32,15 +32,14 @@ describe("snapshot de fechamento — fixture Patricia", () => {
     },
   ]);
 
-  // Valores de 21/08/2026: com o frete desmarcado, os R$ 1.000 do transporte
-  // saem do resultado e NÃO são tributados — a regra do Bryan (golden T14c).
-  // Antes eram 11.222,00 de receita líquida e 5.071,58 de margem.
+  // Valores de 25/09/2026: com o frete desmarcado, os R$ 1.000 do transporte
+  // saem do resultado, NÃO são tributados e ficam fora da base do DIFAL.
   it("congela os totais em precisão total e o display a 2 casas", () => {
-    expect(snap.pedido.net_revenue_snapshot).toBe("10222");
-    expect(snap.pedido.totals_display.receita_liquida).toBe("10222.00");
-    expect(snap.pedido.totals_display.margem_contribuicao).toBe("4071.58");
+    expect(snap.pedido.net_revenue_snapshot).toBe("10357");
+    expect(snap.pedido.totals_display.receita_liquida).toBe("10357.00");
+    expect(snap.pedido.totals_display.margem_contribuicao).toBe("4206.58");
     expect(snap.pedido.totals_display.cmv).toBe("6150.42");
-    expect(snap.pedido.totals_display.difal).toBe("2403.00");
+    expect(snap.pedido.totals_display.difal).toBe("2268.00");
   });
 
   it("congela alíquotas, comissão e frete rateado por item", () => {
@@ -116,8 +115,9 @@ describe("totals_display fecha a cascata", () => {
       ]).pedido.totals_display;
 
       const num = (v: string) => Number(v);
-      // Frete DEDUZIDO: o cotado (t.frete) continua na base do DIFAL e da
-      // comissão, mas não sai da receita quando quem paga é o cliente.
+      // Frete DEDUZIDO: o cotado (t.frete) continua na base da comissão e só
+      // entra no DIFAL quando destacado; não sai da receita quando quem paga é
+      // o cliente.
       const deducoes = num(t.frete_deduzido) + num(t.imposto_frete) + num(t.impostos) + num(t.difal) + num(t.comissao);
 
       expect(num(t.receita_bruta) - deducoes).toBeCloseTo(num(t.receita_liquida), 2);
