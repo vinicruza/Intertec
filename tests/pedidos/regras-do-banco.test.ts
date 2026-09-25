@@ -246,6 +246,18 @@ describe("ciclo da cotação", () => {
     expect(fechar).toMatch(/when coalesce\(v_order\.order_kind,\s*'sale'\) = 'sample' then 'aprovado'::approval_status/i);
   });
 
+  it("reposição por item fica separada de amostra no banco", () => {
+    const gravar = definicaoVigente("save_quote_revision");
+    const tipoPorPreco = definicaoVigente("set_order_item_kind_from_price");
+    const duplicar = definicaoVigente("copy_order_as_simulation");
+
+    expect(TODAS).toMatch(/item_kind in \('sale', 'sample', 'replacement'\)/i);
+    expect(gravar).toMatch(/unit_price,\s*item_kind/i);
+    expect(gravar).toMatch(/coalesce\(x\.item_kind,\s*'sale'\)/i);
+    expect(tipoPorPreco).toMatch(/coalesce\(new\.unit_price,\s*0\) = 0[\s\S]*coalesce\(new\.item_kind,\s*'sale'\) = 'sale'[\s\S]*new\.item_kind := 'sample'/i);
+    expect(duplicar).toMatch(/unit_price,\s*item_kind/i);
+  });
+
   // Até 26/08/2026 o limite da auto-aprovação era `v_margin_pct > 0.50`,
   // escrito à mão dos dois lados. Com faixa por canal esse número deixou de
   // ser único: um pedido de Marketplace com 45% é VERDE pela régua nova e

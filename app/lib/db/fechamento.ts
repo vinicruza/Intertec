@@ -157,7 +157,7 @@ export type PedidoCompleto = {
     id: string;
     product_id: string | null;
     kit_id: string | null;
-    item_kind: "sale" | "sample";
+    item_kind: "sale" | "sample" | "replacement";
     quantity: string;
     unit_price: string;
     cmv_unit_snapshot: string | null;

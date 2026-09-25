@@ -225,6 +225,29 @@ describe("itens que vão para o motor de cálculo", () => {
     expect(margens.map((m) => toPercent(m.pct))).toEqual(["59.32", "70.98", "81.86"]);
   });
 
+  it("reposição sem cobrança não entra na régua de margem da venda", () => {
+    const linhas = [
+      linha({ itemId: "prod-avental", quantidade: "10", preco: "4,20" }),
+      linha({ itemId: "prod-campo", quantidade: "5", preco: "0", reposicao: true }),
+    ];
+    const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
+    const itens = montarItensParaMotor(linhas, resolvidas);
+    if (itens.estado !== "ok") throw new Error("Pedido deveria calcular.");
+
+    const resultado = calcularPedido({
+      itens: itens.itens,
+      frete: "0",
+      fretePorContaCliente: true,
+      tributarFreteInformado: false,
+      aliquotaImposto: "0.10",
+      aliquotaDifal: "0",
+      aliquotaComissao: "0",
+    });
+    const margens = margensDasLinhasVendaveis(linhas, resolvidas, resultado);
+
+    expect(margens.map((m) => m.indiceLinha)).toEqual([0]);
+  });
+
   it("kit montado no pedido entra no motor como preço por kit vezes quantidade de kits", () => {
     const linhas = [
       linha({
@@ -271,6 +294,17 @@ describe("itens gravados na cotação", () => {
     expect(montarItensDaCotacao(linhas, resolvidas, CATALOGO)).toEqual([
       { tipo: "produto", refId: "prod-avental", quantidade: "100", precoVenda: "4.20" },
       { tipo: "kit", refId: "kit-catarata", quantidade: "10", precoVenda: "30" },
+    ]);
+  });
+
+  it("reposição é gravada como item_kind replacement, não como amostra", () => {
+    const linhas = [
+      linha({ itemId: "prod-campo", quantidade: "5", preco: "0", reposicao: true }),
+    ];
+    const resolvidas = linhas.map((l) => resolverLinhaDoPedido(l, CATALOGO, catalogoDeKit()));
+
+    expect(montarItensDaCotacao(linhas, resolvidas, CATALOGO)).toEqual([
+      { tipo: "produto", refId: "prod-campo", quantidade: "5", precoVenda: "0", tipoItem: "replacement" },
     ]);
   });
 

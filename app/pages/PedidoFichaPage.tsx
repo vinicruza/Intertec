@@ -378,11 +378,22 @@ export default function PedidoFichaPage() {
                   // da composição congelada; em aberto, da composição montada.
                   const composicao =
                     (i.kit_composition_snapshot as ComposicaoKit | null) ?? adHoc ?? null;
+                  const marcadorSemCobranca =
+                    i.item_kind === "replacement"
+                      ? "REPOSIÇÃO - sem cobrança"
+                      : i.item_kind === "sample"
+                        ? "AMOSTRA - sem cobrança"
+                        : null;
                   return (
                     <tr key={i.id} className="border-t border-[var(--cor-borda)] align-middle">
                       <td className="px-3 py-2 align-top font-mono text-[10px] font-semibold">{codigo}</td>
                       <td className="px-3 py-2 align-top">
                         {!ehKit && <div className="font-semibold">{nome}</div>}
+                        {marcadorSemCobranca && (
+                          <div className="mt-0.5 inline-flex rounded-full border border-black/30 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-black">
+                            {marcadorSemCobranca}
+                          </div>
+                        )}
                         {/* Os dois nomes, um embaixo do outro: a conferência
                             reconhece o produto pelo nome de casa (com gramatura),
                             e o faturamento precisa do nome fiscal. */}

@@ -35,6 +35,7 @@ export type LinhaItem = {
   quantidade: string;
   preco: string;
   amostra?: boolean;
+  reposicao?: boolean;
   kitNovo: KitNovoEdicao | null;
 };
 
@@ -188,6 +189,7 @@ export function margensDasLinhasVendaveis(
     const resolvida = resolvidas[i];
     if (
       linha.amostra ||
+      linha.reposicao ||
       !resolvida ||
       resolvida.erro ||
       !resolvida.cmvUnitario ||
@@ -408,7 +410,7 @@ export function montarItensDaCotacao(
         refId: r.kitExistente.id,
         quantidade: l.quantidade,
         precoVenda: l.preco,
-        ...(l.amostra ? { tipoItem: "sample" as const } : {}),
+        ...(l.reposicao ? { tipoItem: "replacement" as const } : l.amostra ? { tipoItem: "sample" as const } : {}),
       }];
     }
 
@@ -418,7 +420,7 @@ export function montarItensDaCotacao(
         refId: "",
         quantidade: l.quantidade,
         precoVenda: l.preco,
-        ...(l.amostra ? { tipoItem: "sample" as const } : {}),
+        ...(l.reposicao ? { tipoItem: "replacement" as const } : l.amostra ? { tipoItem: "sample" as const } : {}),
         kitNovo: {
           assinatura: r.assinatura,
           rotulo: r.nome,
@@ -439,7 +441,7 @@ export function montarItensDaCotacao(
       refId: item.id,
       quantidade: l.quantidade,
       precoVenda: l.preco,
-      ...(l.amostra ? { tipoItem: "sample" as const } : {}),
+      ...(l.reposicao ? { tipoItem: "replacement" as const } : l.amostra ? { tipoItem: "sample" as const } : {}),
     }];
   });
 }

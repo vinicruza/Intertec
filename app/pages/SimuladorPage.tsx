@@ -74,7 +74,7 @@ import { EscolhaComBusca, type OpcaoDeBusca } from "@components/ui/EscolhaComBus
 // dos itens vivem em lib/sim/itensDoPedido.ts — regra do projeto: nada de
 // cálculo dentro de componente de tela, e o que fica na tela não é testável.
 
-const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", amostra: false, kitNovo: null };
+const LINHA_VAZIA: LinhaItem = { itemId: "", quantidade: "1", preco: "", amostra: false, reposicao: false, kitNovo: null };
 const TIPO_PEDIDO_VENDA = "sale";
 const TIPO_PEDIDO_AMOSTRA = "sample";
 const FRETE_COTADO_VAZIO: FreteCotado = {
@@ -267,6 +267,7 @@ export default function SimuladorPage() {
           quantidade: textoDeCampo(item.quantity, "1"),
           preco: textoDeCampo(item.unit_price),
           amostra: item.item_kind === "sample",
+          reposicao: item.item_kind === "replacement",
           kitNovo: null,
         };
       }
@@ -277,6 +278,7 @@ export default function SimuladorPage() {
         quantidade: textoDeCampo(item.quantity, "1"),
         preco: textoDeCampo(item.unit_price),
         amostra: item.item_kind === "sample",
+        reposicao: item.item_kind === "replacement",
         kitNovo: {
           rotulo: textoDeCampo(item.ad_hoc_kit_label),
           produtos: (item.ad_hoc_kit_composition ?? []).map((c) => ({
@@ -334,6 +336,7 @@ export default function SimuladorPage() {
   });
   const amostra = tipoPedido === TIPO_PEDIDO_AMOSTRA;
   const temItemAmostra = linhas.some((linha) => linha.amostra);
+  const temItemReposicao = linhas.some((linha) => linha.reposicao);
   const freteClienteEfetivo = amostra ? false : freteCliente;
 
   const linhasParaCalculo = useMemo(
@@ -345,7 +348,7 @@ export default function SimuladorPage() {
           }))
         : linhas.map((linha) => ({
             ...linha,
-            preco: linha.amostra && linha.itemId && linha.quantidade.trim() !== "" ? "0" : linha.preco,
+            preco: (linha.amostra || linha.reposicao) && linha.itemId && linha.quantidade.trim() !== "" ? "0" : linha.preco,
           })),
     [amostra, linhas]
   );
@@ -530,6 +533,12 @@ export default function SimuladorPage() {
         autorizadoPorAmostra.trim() === "" ? "Informe quem autorizou a amostra." : null,
       ].filter((p): p is string => p !== null)
     : [];
+  const pendenciasReposicao = temItemReposicao
+    ? [
+        motivoAmostra.trim() === "" ? "Informe o motivo da reposição." : null,
+        autorizadoPorAmostra.trim() === "" ? "Informe quem autorizou a reposição." : null,
+      ].filter((p): p is string => p !== null)
+    : [];
   const pendenciasCadastro = () => (problemaClienteNovo ? [problemaClienteNovo] : []);
 
   // Cliente novo criado na cotacao precisa de CNPJ (Intertech, 02/09/2026).
@@ -617,7 +626,9 @@ export default function SimuladorPage() {
         );
       }
 
-      if (pendenciasAmostra.length > 0) throw new Error(pendenciasAmostra.join(" "));
+      if ([...pendenciasAmostra, ...pendenciasReposicao].length > 0) {
+        throw new Error([...pendenciasAmostra, ...pendenciasReposicao].join(" "));
+      }
 
       const itens = montarItensDaCotacao(linhasParaCalculo, resolvidas, ctx.itens);
 
@@ -626,8 +637,8 @@ export default function SimuladorPage() {
         registrado_em: new Date().toISOString(),
         uf,
         tipo_pedido: tipoPedido,
-        motivo_amostra: amostra ? motivoAmostra.trim() : null,
-        autorizado_por_amostra: amostra ? autorizadoPorAmostra.trim() : null,
+        motivo_amostra: (amostra || temItemAmostra || temItemReposicao) ? motivoAmostra.trim() : null,
+        autorizado_por_amostra: (amostra || temItemAmostra || temItemReposicao) ? autorizadoPorAmostra.trim() : null,
         itens: itens.map((i) => ({ tipo: i.tipo, quantidade: i.quantidade, preco: i.precoVenda, rotulo: i.kitNovo?.rotulo })),
         receita_bruta: simulacao.resultado.receitaBruta.toString(),
         receita_liquida: simulacao.resultado.receitaLiquida.toString(),
@@ -651,8 +662,8 @@ export default function SimuladorPage() {
         aplicaDifal: simulacao.aplicaDifalUsado,
         itens,
         tipoPedido,
-        motivoAmostra: amostra ? motivoAmostra : null,
-        autorizadoPorAmostra: amostra ? autorizadoPorAmostra : null,
+        motivoAmostra: (amostra || temItemAmostra || temItemReposicao) ? motivoAmostra : null,
+        autorizadoPorAmostra: (amostra || temItemAmostra || temItemReposicao) ? autorizadoPorAmostra : null,
         transportadoraId: transportadoraId || null,
         transportadoraOutra: transportadoraPedeNome ? transportadoraOutra : null,
         fretesCotados,
@@ -744,7 +755,14 @@ export default function SimuladorPage() {
 
   function marcarLinhaComoAmostra(i: number, marcada: boolean) {
     setLinhas((a) =>
-      a.map((l, idx) => (idx === i ? { ...l, amostra: marcada, preco: marcada ? "0" : l.preco } : l))
+      a.map((l, idx) => (idx === i ? { ...l, amostra: marcada, reposicao: marcada ? false : l.reposicao, preco: marcada ? "0" : l.preco } : l))
+    );
+    setSalvo(null);
+  }
+
+  function marcarLinhaComoReposicao(i: number, marcada: boolean) {
+    setLinhas((a) =>
+      a.map((l, idx) => (idx === i ? { ...l, reposicao: marcada, amostra: marcada ? false : l.amostra, preco: marcada ? "0" : l.preco } : l))
     );
     setSalvo(null);
   }
@@ -762,6 +780,7 @@ export default function SimuladorPage() {
         quantidade: "1",
         preco: "",
         amostra: false,
+        reposicao: false,
         kitNovo: { rotulo: "", produtos: [{ produtoId: "", quantidade: "1" }], embalagem: [] },
       },
     ]);
@@ -1090,14 +1109,14 @@ export default function SimuladorPage() {
               Amostra sem cobrança
             </button>
           </div>
-          {(amostra || temItemAmostra) && (
+          {(amostra || temItemAmostra || temItemReposicao) && (
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div>
-                <Label>Motivo da amostra</Label>
+                <Label>{temItemReposicao && !amostra && !temItemAmostra ? "Motivo da reposição" : "Motivo"}</Label>
                 <Input
                   value={motivoAmostra}
                   onChange={(e) => setMotivoAmostra(e.target.value)}
-                  placeholder="ex.: avaliação do cliente"
+                  placeholder={temItemReposicao ? "ex.: reposição por não conformidade" : "ex.: avaliação do cliente"}
                 />
               </div>
               <div>
@@ -1109,7 +1128,7 @@ export default function SimuladorPage() {
                 />
               </div>
               <p className="md:col-span-2 text-xs text-[var(--cor-texto-suave)]">
-                A amostra baixa custo/CMV interno, mas o valor cobrado do cliente fica travado em R$ 0,00.
+                Amostra e reposição baixam custo/CMV interno, mas o valor cobrado do cliente fica travado em R$ 0,00.
               </p>
             </div>
           )}
@@ -1239,11 +1258,11 @@ export default function SimuladorPage() {
                 <Label>{amostra ? "Preço cliente" : l.itemId === KIT_NOVO ? "Preço por kit" : "Preço de venda"}</Label>
                 <Input
                   className="w-28"
-                  value={(amostra || l.amostra) && l.itemId ? "0" : l.preco}
+                  value={(amostra || l.amostra || l.reposicao) && l.itemId ? "0" : l.preco}
                   onChange={(e) => atualizarLinha(i, "preco", e.target.value)}
-                  disabled={amostra || l.amostra}
+                  disabled={amostra || l.amostra || l.reposicao}
                 />
-                {!amostra && !l.amostra && <AvisoDeNumero valor={l.preco} />}
+                {!amostra && !l.amostra && !l.reposicao && <AvisoDeNumero valor={l.preco} />}
                 {freteClienteEfetivo && precoFinalPorLinha.has(i) && (
                   <p className="mt-1 w-32 text-[0.65rem] leading-tight text-[var(--cor-texto-suave)]">
                     Final com frete: {reais(precoFinalPorLinha.get(i)!)}
@@ -1251,14 +1270,24 @@ export default function SimuladorPage() {
                 )}
               </div>
               {!amostra && (
-                <label className="flex min-h-10 items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={l.amostra}
-                    onChange={(e) => marcarLinhaComoAmostra(i, e.target.checked)}
-                  />
-                  Amostra
-                </label>
+                <>
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={l.amostra}
+                      onChange={(e) => marcarLinhaComoAmostra(i, e.target.checked)}
+                    />
+                    Amostra
+                  </label>
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={l.reposicao ?? false}
+                      onChange={(e) => marcarLinhaComoReposicao(i, e.target.checked)}
+                    />
+                    Reposição
+                  </label>
+                </>
               )}
               <div className="pb-2 text-xs text-[var(--cor-texto-suave)]">
                 {r && !r.erro && (r.cmvUnitario
@@ -1759,6 +1788,7 @@ export default function SimuladorPage() {
                 salvar.isPending ||
                 pendenciasKit.length > 0 ||
                 pendenciasAmostra.length > 0 ||
+                pendenciasReposicao.length > 0 ||
                 pendenciasExpedicao.length > 0 ||
                 pendenciasCadastro().length > 0
               }
@@ -1767,6 +1797,8 @@ export default function SimuladorPage() {
                   ? "Corrija as pendências dos kits antes de salvar."
                   : pendenciasAmostra.length > 0
                     ? pendenciasAmostra.join(" ")
+                  : pendenciasReposicao.length > 0
+                    ? pendenciasReposicao.join(" ")
                   : pendenciasExpedicao.length > 0
                     ? pendenciasExpedicao.join(" ")
                     : undefined
@@ -1803,9 +1835,9 @@ export default function SimuladorPage() {
                       : ""} ✓
               </span>
             )}
-            {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasExpedicao].length > 0 && (
+            {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasReposicao, ...pendenciasExpedicao].length > 0 && (
               <span className="text-sm text-amber-700">
-                {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasExpedicao].join(" ")}
+                {[...pendenciasCadastro(), ...pendenciasAmostra, ...pendenciasReposicao, ...pendenciasExpedicao].join(" ")}
               </span>
             )}
             {erroSalvar && <span className="text-sm text-red-600">{erroSalvar}</span>}

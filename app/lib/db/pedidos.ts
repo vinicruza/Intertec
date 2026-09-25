@@ -370,7 +370,7 @@ export type ItemSimulacao = {
   refId: string; // vazio quando tipo = kitNovo
   quantidade: string;
   precoVenda: string;
-  tipoItem?: "sale" | "sample";
+  tipoItem?: "sale" | "sample" | "replacement";
   kitNovo?: {
     assinatura: string;
     composicao: Array<{ produtoId: string; quantidade: string }>;

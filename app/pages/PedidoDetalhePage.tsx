@@ -326,6 +326,16 @@ export default function PedidoDetalhePage() {
                         : i.ad_hoc_kit_composicao
                           ? `[Kit] ${i.ad_hoc_kit_label?.trim() || "Kit montado no pedido"}`
                           : "—")}
+                    {i.item_kind === "replacement" && (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                        Reposição
+                      </span>
+                    )}
+                    {i.item_kind === "sample" && (
+                      <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-800">
+                        Amostra
+                      </span>
+                    )}
                     {/* Nome fiscal ao lado do nome do catálogo — só quando os
                         dois diferem, para não repetir a mesma linha. */}
                     {i.products?.nf_description && i.products.nf_description !== i.products.name && (
