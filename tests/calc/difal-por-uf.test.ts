@@ -74,6 +74,29 @@ describe("DIFAL: a UF precisa cobrar E o pedido precisa aplicar", () => {
   it("a base é receita + frete informado", () => {
     expect(rodar("0.135", CANAL_COM_DIFAL).baseDifal.toString()).toBe("2602");
   });
+
+  it("regressão Patricia: R$ 9.350 + R$ 500 com DIFAL 12,5% fecha R$ 1.231,25", () => {
+    const r = simular({
+      itens: [
+        {
+          nome: "Pedido conferido pela Patricia",
+          precoVenda: "9350",
+          quantidade: "1",
+          cmvUnitario: "1",
+          despesaUnitaria: "0",
+        },
+      ],
+      freteManual: "500",
+      fretePorContaCliente: true,
+      comissao: null,
+      aplicaDifal: true,
+      canal: CANAL_COM_DIFAL,
+      uf: { aliquotaIcsm: "0.1625", difalFinal: "0.125", fretePortalPct: null },
+    }).resultado;
+
+    expect(r.baseDifal.toString()).toBe("9850");
+    expect(r.difal.toDecimalPlaces(2).toString()).toBe("1231.25");
+  });
 });
 
 // ============================================================

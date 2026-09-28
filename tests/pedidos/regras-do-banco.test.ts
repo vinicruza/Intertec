@@ -393,6 +393,17 @@ describe("visibilidade de pedidos por perfil", () => {
   });
 });
 
+describe("vendedores externos sem acesso ao sistema", () => {
+  it("Milena entra como vendedora ativa no canal Externos, sem criar perfil", () => {
+    expect(TODAS).toMatch(/'Milena', c\.id, true/i);
+    expect(TODAS).toMatch(/where c\.name = 'Externos'/i);
+    expect(TODAS).toMatch(/lower\(btrim\(s\.name\)\) = 'milena'/i);
+
+    const migracaoMilena = MIGRACOES.find((m) => m.nome.includes("vendedor_externo_milena"));
+    expect(migracaoMilena?.sql ?? "").not.toMatch(/insert into public\.profiles|auth\.users/i);
+  });
+});
+
 // A embalagem do kit é a segunda metade do CMV do kit (Calculations.md §4). Em
 // 19/08/2026 o navegador somava produtos + embalagem e o banco só os produtos:
 // o primeiro kit COM embalagem seria recusado no fechamento. Nunca apareceu

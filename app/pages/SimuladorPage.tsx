@@ -1774,7 +1774,7 @@ export default function SimuladorPage() {
           {verNumeros && <p className="text-xs text-[var(--cor-texto-suave)]">
             {amostra
               ? "Amostra sem cobrança: o cliente não paga nada, mas CMV e frete interno ficam registrados para controle."
-              : "Cascata alinhada à planilha: comissão, imposto e DIFAL usam a receita da venda sem frete; frete cliente não reduz a margem, mas o imposto sobre frete aparece separado."}
+              : "Cascata alinhada à planilha: comissão e DIFAL usam venda + frete informado; frete cliente não reduz a margem, e o imposto sobre frete aparece separado quando destacado."}
           </p>}
 
           {simulacao.avisos.map((a, i) => (
