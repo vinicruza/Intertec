@@ -31,6 +31,9 @@ export type InsumoLinha = {
   // de ser digitado e passa a sair da gramatura (Calculations.md §2.1).
   is_roll: boolean;
   grammage_gsm: string | number | null;
+  // Insumo recebido do cliente, sem custo para a Intertech. Custo zero só é
+  // aceito no CMV quando esta marca está ligada.
+  is_customer_supplied: boolean;
 };
 
 // Dados que o formulário coleta (o preço com/sem imposto é derivado, não digitado).
@@ -47,6 +50,7 @@ export type InsumoFormulario = {
   is_packaging: boolean;
   is_roll: boolean;
   grammage_gsm: string; // g/m², só quando is_roll
+  is_customer_supplied: boolean;
 };
 
 // Converte em Decimal o que vem do formulário (texto, aceita vírgula) ou do
@@ -123,6 +127,7 @@ function paraRegistro(form: InsumoFormulario) {
     price_without_tax: semImposto.toString(),
     is_labor: form.is_labor,
     is_packaging: form.is_packaging,
+    is_customer_supplied: form.is_customer_supplied,
   };
 }
 

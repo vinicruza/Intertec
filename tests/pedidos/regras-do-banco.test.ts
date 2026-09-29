@@ -440,6 +440,24 @@ describe("embalagem do kit no fechamento", () => {
   });
 });
 
+describe("insumo fornecido pelo cliente", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20260929170308_insumo_fornecido_cliente_cmv_zero.sql",
+    "utf8"
+  );
+
+  it("permite custo zero só quando o insumo está marcado como fornecido pelo cliente", () => {
+    expect(sql).toMatch(/is_customer_supplied boolean not null default false/i);
+    expect(definicaoVigente("recalculate_product_costs")).toMatch(
+      /i\.price_without_tax > 0 or coalesce\(i\.is_customer_supplied,\s*false\)/i
+    );
+  });
+
+  it("marca o Saco Exclusivo sem custo para corrigir o caso real da Patrícia", () => {
+    expect(sql).toMatch(/lower\(btrim\(name\)\) = 'saco exclusivo'/i);
+  });
+});
+
 // O papel de cada insumo na embalagem do kit é dado no banco, não deduzido do
 // nome. Casar por prefixo quebraria calado no dia em que alguém renomeasse
 // "Caixa 6" para "Caixa 06" — e quebraria no custo de um orçamento.

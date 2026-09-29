@@ -32,6 +32,7 @@ const esquema = z
     is_packaging: z.boolean(),
     is_roll: z.boolean(),
     grammage_gsm: z.string(),
+    is_customer_supplied: z.boolean(),
   })
   // Bobina sem gramatura daria fator zero, e com ele um custo zero gravado em
   // silêncio — a família de defeito que o PRD §7 manda bloquear. O banco também
@@ -51,7 +52,7 @@ const esquema = z
 const VAZIO: InsumoFormulario = {
   name: "", category: "", purchase_unit: "", purchase_price: "",
   conversion_factor: "1", consumption_unit: "", icms_rate: "0", pis_cofins_rate: "0.0925",
-  is_labor: false, is_packaging: false, is_roll: false, grammage_gsm: "",
+  is_labor: false, is_packaging: false, is_roll: false, grammage_gsm: "", is_customer_supplied: false,
 };
 
 const comVirgula = (valor: string) => valor.replace(".", ",");
@@ -98,6 +99,7 @@ export default function InsumoFormPage() {
         is_packaging: i.is_packaging ?? false,
         is_roll: i.is_roll ?? false,
         grammage_gsm: texto(i.grammage_gsm),
+        is_customer_supplied: i.is_customer_supplied ?? false,
       });
     }
   }, [insumoQuery.data, reset]);
@@ -231,6 +233,17 @@ export default function InsumoFormPage() {
                 Não muda o cálculo do custo — o insumo entra igual no CMV do kit, marcado ou não. Só
                 filtra a lista que aparece ao montar um kit no Simulador, para não precisar procurar
                 o envelope no meio de laminado, compressa e elástico.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 rounded-md bg-[var(--cor-fundo)] p-3 text-sm">
+            <input type="checkbox" className="mt-1" {...register("is_customer_supplied")} />
+            <span>
+              <strong>Fornecido pelo cliente, sem custo para a Intertech</strong>
+              <span className="block text-xs text-[var(--cor-texto-suave)]">
+                Use quando o cliente envia o insumo, como o Saco Exclusivo. Nesse caso o custo pode
+                ser R$ 0,00 sem travar o CMV; insumos comuns continuam bloqueados se ficarem sem custo.
               </span>
             </span>
           </label>

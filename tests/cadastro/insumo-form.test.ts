@@ -33,6 +33,7 @@ function campos(troca: Partial<InsumoFormulario> = {}): InsumoFormulario {
     is_packaging: false,
     is_roll: false,
     grammage_gsm: "",
+    is_customer_supplied: false,
     ...troca,
   };
 }
